@@ -7,6 +7,12 @@
 #include "Node.hpp"
 #include "../params/Params.hpp"
 
+#ifdef DEBUG_GEOMVIEW
+#include <CGAL/IO/Geomview_stream.h>
+#include <CGAL/IO/Triangulation_geomview_ostream_2.h>
+#include <CGAL/IO/Triangulation_geomview_ostream_3.h>
+#endif
+
 class Mesh
 {
     public:
@@ -15,16 +21,15 @@ class Mesh
 
         std::vector<Node> nodesList;
 
-        void addNodes();
+        bool addNodes();
 
-        void computeDetInvJ();
+        void computeDetJ();
+        void computeInvJ();
 
         inline double getDetJ(std::size_t elm) const;
 
         inline std::vector<std::size_t> getElement(std::size_t elm) const;
         inline std::size_t getElementNumber() const;
-
-        inline std::vector<bool> getIndices() const;
 
         inline double getInvJ(std::size_t elm, unsigned short i, unsigned short j) const;
 
@@ -35,14 +40,18 @@ class Mesh
 
         void remesh();
 
-        void removeNodes();
+        bool removeNodes();
 
     private:
-        const Params& params;
+        const Params& m_params;
 
-        std::vector<std::vector<std::size_t>> elementList;
-        std::vector<double> detJ;
-        std::vector<Eigen::Matrix2d> invJ;
+        std::vector<std::vector<std::size_t>> m_elementList;
+        std::vector<double> m_detJ;
+        std::vector<Eigen::Matrix2d> m_invJ;
+
+#ifdef DEBUG_GEOMVIEW
+        CGAL::Geomview_stream m_gv;
+#endif
 };
 
 #include "Mesh.inl"

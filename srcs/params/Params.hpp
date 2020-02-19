@@ -20,6 +20,10 @@ class Params
         double simuTime;
         double simuTimeToWrite;
 
+        bool adaptDT;
+
+        std::vector<double> sideParams;
+
         bool loadFromFile(std::string fileName);
 
         //std::vector<double> remeshingParameters;

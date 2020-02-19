@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <fstream>
 #if defined(_OPENMP)
     #include <cstdlib>
     #include <omp.h>
@@ -25,6 +26,11 @@ int main(int argc, char **argv)
                     <<  std::endl;
         return 1;
     }
+    
+    std::ofstream out("test.txt");
+
+   	// Set the rdbuf of clog.
+   	std::clog.rdbuf(out.rdbuf());
 
     Params params;
     if(!params.loadFromFile(std::string(argv[1])))

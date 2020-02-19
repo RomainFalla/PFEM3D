@@ -26,6 +26,8 @@ bool Params::loadFromFile(std::string fileName)
     this->maxTimeStep = j["general"]["simulationMaxTimeStep"];
     this->simuTime = j["general"]["simulationTime"];
     this->simuTimeToWrite = j["general"]["simulationTimeToWrite"];
+    this->adaptDT = j["general"]["adaptDT"].get<bool>();
+    this->sideParams = j["general"]["sideParams"].get<std::vector<double>>();
 
     this->hchar = j["remeshing"]["hchar"];
     this->alphaHchar = j["remeshing"]["alpha"];

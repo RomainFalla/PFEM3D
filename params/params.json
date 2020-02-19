@@ -1,0 +1,19 @@
+{
+	"general": {
+		"simulationTime": 0.4,
+		"simulationMaxTimeStep": 0.001,
+		"simulationTimeToWrite": 0.001,
+		"adaptDT": true,
+		"sideParams": [5e-6, 10, 1.5, 2]
+	},
+	"remeshing": {
+		"hchar": 1,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7
+	},
+	"physics": {
+		"fluidParameters": [ 1e3, 1e-3 ],
+		"gravity": 9.81
+	}
+}

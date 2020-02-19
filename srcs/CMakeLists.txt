@@ -1,7 +1,6 @@
 SET(SRCS
 main.cpp
-./mesh/Node.hpp ./mesh/Node.cpp
-./mesh/Mesh.cpp ./mesh/Mesh.hpp ./mesh/Mesh.inl
+./mesh/Node.hpp ./mesh/Mesh.cpp ./mesh/Mesh.hpp ./mesh/Mesh.inl
 ./params/Params.hpp ./params/Params.cpp
 ./solver/Solver.hpp ./solver/Solver.cpp
 ./quadrature/gausslegendre.hpp)
