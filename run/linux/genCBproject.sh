@@ -2,10 +2,10 @@
 #Do not forget to install libgfortran3  on your system!
 
 cd ../../
-if [ ! -d "gmsh-4.4.0-Linux64-sdk" ]; then
-  wget http://gmsh.info/bin/Linux/gmsh-4.4.0-Linux64-sdk.tgz
-  tar -xf gmsh-4.4.0-Linux64-sdk.tgz 
-  rm -rf gmsh-4.4.0-Linux64-sdk.tgz 
+if [ ! -d "gmsh-4.5.2-Linux64-sdk" ]; then
+  wget http://gmsh.info/bin/Linux/gmsh-4.5.2-Linux64-sdk.tgz
+  tar -xf gmsh-4.5.2-Linux64-sdk.tgz 
+  rm -rf gmsh-4.5.2-Linux64-sdk.tgz 
 fi
 
 if [ ! -d "eigen-eigen-323c052e1731" ]; then
@@ -22,17 +22,17 @@ if [ ! -d "nlohmann" ]; then
   rm -rf include
 fi
 
-export GMSHSDK=${PWD}/gmsh-4.4.0-Linux64-sdk/
+export GMSHSDK=${PWD}/gmsh-4.5.2-Linux64-sdk/
 export EIGENSDK=${PWD}/eigen-eigen-323c052e1731/
 export JSONSDK=${PWD}/nlohmann/
 
-export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:${PATH}
-export INCLUDE=${GMSHSDK}/include:${INCLUDE}
-export INCLUDE=${EIGENSDK}:${INCLUDE}
-export INCLUDE=${JSONSDK}:${INCLUDE}
-export LIB=${GMSHSDK}/lib:${LIB}
-export PYTHONPATH=${GMSHSDK}/lib:${PYTHONPATH}
-export DYLD_LIBRARY_PATH=${GMSHSDK}/lib:${DYLD_LIBRARY_PATH}
+export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:"${PATH}"
+export INCLUDE=${GMSHSDK}/include:"${INCLUDE}"
+export INCLUDE=${EIGENSDK}:"${INCLUDE}"
+export INCLUDE=${JSONSDK}:"${INCLUDE}"
+export LIB=${GMSHSDK}/lib:"${LIB}"
+export PYTHONPATH=${GMSHSDK}/lib:"${PYTHONPATH}"
+export DYLD_LIBRARY_PATH=${GMSHSDK}/lib:"${DYLD_LIBRARY_PATH}"
 
 rm -rf build
 mkdir build

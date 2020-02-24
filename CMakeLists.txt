@@ -1,4 +1,4 @@
-PROJECT(MULTIPHYSICS CXX)
+PROJECT(PFEM CXX)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 
 # build type is "" by default in Linux
