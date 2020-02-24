@@ -2,7 +2,9 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <fstream>
 #include <utility>
+
 #ifdef DEBUG_GEOMVIEW
 #include <chrono>
 #include <thread>
@@ -14,6 +16,8 @@
 #include <CGAL/Alpha_shape_2.h>
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
+
+#include <nlohmann/json.hpp>
 
 #include "Mesh.hpp"
 
@@ -33,19 +37,25 @@ typedef CGAL::Delaunay_triangulation_2<Kernel,asTds>         asTriangulation_2;
 typedef CGAL::Alpha_shape_2<asTriangulation_2>               Alpha_shape_2;
 
 
-Mesh::Mesh(const Params& params) :
+Mesh::Mesh(const Params& params)
 #ifdef DEBUG_GEOMVIEW
-m_params(params), m_gv(CGAL::Bbox_3(0, 0, -10, 10, 10, 10))
+: m_gv(CGAL::Bbox_3(0, 0, -10, 10, 10, 10))
+#endif // DEBUG_GEOMVIEW
 {
-    m_gv.set_line_width(4);
-    m_gv.set_bg_color(CGAL::Color(0, 200, 200));
-}
-#else
-m_params(params)
-{
-}
-#endif
+	nlohmann::json j = params.getJSON();
 
+    m_verboseOutput = j["verboseOutput"].get<bool>();
+
+	m_p.hchar = j["RemeshingParams"]["hchar"].get<double>();
+	m_p.alpha = j["RemeshingParams"]["alpha"].get<double>();
+	m_p.omega = j["RemeshingParams"]["omega"].get<double>();
+	m_p.gamma = j["RemeshingParams"]["gamma"].get<double>();
+
+	#ifdef DEBUG_GEOMVIEW
+	m_gv.set_line_width(4);
+    m_gv.set_bg_color(CGAL::Color(0, 200, 200));
+	#endif // DEBUG_GEOMVIEW
+}
 
 Mesh::~Mesh()
 {
@@ -65,7 +75,7 @@ bool Mesh::addNodes()
 
     for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
     {
-        if(m_detJ[i]/2 > m_params.omegaH2)
+        if(m_detJ[i]/2 > m_p.omega*m_p.hchar*m_p.hchar)
         {
             Node newNode(dim, nUnknowns);
 
@@ -85,8 +95,11 @@ bool Mesh::addNodes()
 
             nodesList.push_back(newNode);
 
-            std::cout << "Adding node (" << newNode.position[0] << ", "
-                      << newNode.position[1] << ")" << std::endl;
+            if(m_verboseOutput)
+            {
+                std::cout << "Adding node (" << newNode.position[0] << ", "
+                          << newNode.position[1] << ")" << std::endl;
+            }
 
             addedNodes = true;
         }
@@ -143,61 +156,111 @@ void Mesh::computeInvJ()
     }
 }
 
-bool Mesh::loadFromFile(std::string fileName)
+void Mesh::loadFromFile(std::string fileName)
 {
+    std::cout   << "================================================================"
+                << std::endl
+                << "                         LOADING THE MESH                       "
+                << std::endl
+                << "================================================================"
+                << std::endl;
+
     nodesList.clear();
 
-    for (unsigned int i = 1 ; i <= static_cast<unsigned int>(5.0/m_params.hchar) ; ++i)
+    gmsh::initialize();
+    gmsh::option::setNumber("General.Terminal", 1);
+
+    std::ifstream file(fileName);
+    if(file.is_open())
+        file.close();
+    else
+        throw std::runtime_error("The params.json file does not exist!");
+
+    gmsh::open(fileName);
+
+    // Check that the mesh is not 3D
+    m_dim = _computeMeshDim();
+    if(m_dim != 2)
+        throw std::runtime_error("Only 2D meshes supported currently!");
+
+    // We retrieve the tags of the physical groups of dimension m_dim and
+    // m_dim-1
+    std::vector<std::pair<int, int>> physGroupHandles2D;
+    gmsh::model::getPhysicalGroups(physGroupHandles2D, m_dim);
+
+    std::vector<std::pair<int, int>> physGroupHandles1D;
+    gmsh::model::getPhysicalGroups(physGroupHandles1D, m_dim - 1);
+
+    std::vector<std::size_t> nodesTagsBoundary;
+    for(auto physGroup1D : physGroupHandles1D)
     {
-        for (unsigned int j = 1 ; j <= static_cast<unsigned int>(5.0/m_params.hchar) ; ++j)
+        std::string name;
+        gmsh::model::getPhysicalName(m_dim - 1, physGroup1D.second, name);
+        if(name == "Boundary")
         {
-            Node node(2, 3);
-            node.position[0] = i*m_params.hchar;
-            node.position[1] = j*m_params.hchar;
-            node.states[0] = 0.0;
-            node.states[1] = 0.0;
-            node.states[2] = (5.0-node.position[1])*m_params.gravity*m_params.fluidParameters[0];
-            node.isBound = false;
-            nodesList.push_back(node);
+            std::vector<double> coord;
+            gmsh::model::mesh::getNodesForPhysicalGroup(m_dim - 1, physGroup1D.second,
+                                                        nodesTagsBoundary, coord);
+
+            for(std::size_t i = 0 ; i < nodesTagsBoundary.size() ; ++i)
+            {
+                Node node(m_dim, 3);
+                node.position[0] = coord[3*i];
+                node.position[1] = coord[3*i + 1];
+                node.states[0] = 0;
+                node.states[1] = 0;
+                node.states[2] = 0;
+                node.isBound = true;
+
+                nodesList.push_back(node);
+
+                if(m_verboseOutput)
+                {
+                    std::cout << "Loading boundary node: " << "(" << node.position[0]
+                              << ", " << node.position[1] << ")" << std::endl;
+                }
+            }
         }
     }
 
-    for (unsigned int i = 0 ; i < static_cast<unsigned int>(10.0/m_params.hchar) ; ++i)
+        for(auto physGroup2D : physGroupHandles2D)
     {
-        Node node(2, 3);
-        node.position[0] = 0.0*m_params.hchar;
-        node.position[1] = i*m_params.hchar;
-        node.states[0] = 0.0;
-        node.states[1] = 0.0;
-        if(node.position[1] <= 5 + m_params.hchar)
-            node.states[2] = (5.0-node.position[1])*m_params.gravity*m_params.fluidParameters[0];
-        else
-            node.states[2] = 0.0;
-        node.isBound = true;
-        nodesList.push_back(node);
-        node.position[0] = 10.0;
-        node.position[1] = i*m_params.hchar;
-        node.states[0] = 0.0;
-        node.states[1] = 0.0;
-        node.states[2] = 0.0;
-        node.isBound = true;
-        nodesList.push_back(node);
-        if(i != 0)
+        std::string name;
+        gmsh::model::getPhysicalName(m_dim, physGroup2D.second, name);
+        if(name == "Fluid")
         {
-            node.position[0] = i*m_params.hchar;
-            node.position[1] = 0.0;
-            node.states[0] = 0.0;
-            node.states[1] = 0.0;
-            if(node.position[0] <= 5 + m_params.hchar)
-                node.states[2] = 5.0*m_params.gravity*m_params.fluidParameters[0];
-            else
-                node.states[2] = 0.0;
-            node.isBound = true;
-            nodesList.push_back(node);
+            std::vector<std::size_t> dummyNodesTags;
+            std::vector<double> coord;
+            gmsh::model::mesh::getNodesForPhysicalGroup(m_dim, physGroup2D.second,
+                                                        dummyNodesTags, coord);
+
+            for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
+            {
+                //If the nodes is already on the boundary, we do not add it twice
+                if(std::find(nodesTagsBoundary.begin(), nodesTagsBoundary.end(),
+                             dummyNodesTags[i]) != nodesTagsBoundary.end())
+                    continue;
+
+                Node node(m_dim, 3);
+                node.position[0] = coord[3*i];
+                node.position[1] = coord[3*i + 1];
+                node.states[0] = 0;
+                node.states[1] = 0;
+                node.states[2] = 0;
+                node.isBound = false;
+
+                nodesList.push_back(node);
+
+                if(m_verboseOutput)
+                {
+                    std::cout << "Loading fluid node: " << "(" << node.position[0]
+                              << ", " << node.position[1] << ")" << std::endl;
+                }
+            }
         }
     }
 
-    return true;
+    gmsh::finalize();
 }
 
 void Mesh::remesh()
@@ -223,7 +286,7 @@ void Mesh::remesh()
     }
 
     const Alpha_shape_2 as(pointsList.begin(), pointsList.end(),
-                           FT(m_params.alphaHchar*m_params.alphaHchar),
+                           FT(m_p.alpha*m_p.alpha*m_p.hchar*m_p.hchar),
                            Alpha_shape_2::GENERAL);
 
     // We check for each triangle which one will be kept (alpha shape), then we
@@ -300,6 +363,9 @@ void Mesh::remesh()
 
                             }), m_elementList.end());
 
+    if(m_elementList.empty())
+        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
+
 #ifdef DEBUG_GEOMVIEW
     m_gv.clear();
     for(std::size_t n = 0 ; n < this->nodesList.size() ; ++n)
@@ -340,7 +406,7 @@ void Mesh::remesh()
     m_gv << as;
 
     std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-#endif
+#endif // DEBUG_GEOMVIEW
 }
 
 bool Mesh::removeNodes()
@@ -365,7 +431,7 @@ bool Mesh::removeNodes()
                                      *(nodesList[i].position[1]
                                      - nodesList[nodesList[i].neighbourNodes[j]].position[1]));
 
-            if(d <= m_params.gammaH)
+            if(d <= m_p.gamma*m_p.hchar)
             {
                 if(nodesList[nodesList[i].neighbourNodes[j]].touched)
                 {
@@ -390,13 +456,16 @@ bool Mesh::removeNodes()
     }
 
     nodesList.erase(std::remove_if(nodesList.begin(), nodesList.end(),
-                                   [](const Node& node){
+                                   [this](const Node& node){
                                        if(node.toBeDeleted)
                                        {
-                                           std::cout << "Removing node ("
-                                                     << node.position[0] << ", "
-                                                     << node.position[1] << ") "
-                                                     << std::endl;
+                                           if(this->m_verboseOutput)
+                                           {
+                                               std::cout << "Removing node ("
+                                                         << node.position[0] << ", "
+                                                         << node.position[1] << ") "
+                                                         << std::endl;
+                                           }
 
                                            return true;
                                        }

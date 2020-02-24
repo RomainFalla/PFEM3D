@@ -1,19 +1,25 @@
 {
-	"general": {
-		"simulationTime": 0.4,
-		"simulationMaxTimeStep": 0.001,
-		"simulationTimeToWrite": 0.001,
+	"TimeParams": {
 		"adaptDT": true,
-		"sideParams": [5e-6, 10, 1.5, 2]
+    	"coeffDTincrease": 1.5,
+    	"coeffDTdecrease": 2,
+    	"maxDT": 0.001,
+    	"simuTime": 0.4,
+    	"simuDTToWrite": 0.001
 	},
-	"remeshing": {
+	"RemeshingParams": {
 		"hchar": 1,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7
 	},
-	"physics": {
-		"fluidParameters": [ 1e3, 1e-3 ],
-		"gravity": 9.81
-	}
+	"PicardParams": {
+		relTol: 5e-6,
+    	maxIter: 1
+	},
+	"FluidParams": {
+		"rho": 1000,
+		"mu": 1e-3	
+	},
+	"gravity": 9.81
 }

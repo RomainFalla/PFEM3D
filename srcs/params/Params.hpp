@@ -4,30 +4,21 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 class Params
 {
     public:
-        double hchar;
-        double alphaHchar;
-        double omegaH2;
-        double gammaH;
+        Params();
+        ~Params();
 
-        std::vector<double> fluidParameters;
+        void loadFromFile(std::string fileName);
 
-        double gravity;
+        inline nlohmann::json getJSON() const { return m_json; }
+;
 
-        double maxTimeStep;
-        double simuTime;
-        double simuTimeToWrite;
-
-        bool adaptDT;
-
-        std::vector<double> sideParams;
-
-        bool loadFromFile(std::string fileName);
-
-        //std::vector<double> remeshingParameters;
+    private:
+        nlohmann::json m_json;
 };
-
 
 #endif // PARAMS_H_INCLUDED

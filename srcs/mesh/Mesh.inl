@@ -68,3 +68,39 @@ inline std::vector<Eigen::MatrixXd> Mesh::getB(std::size_t elm) const
 
     return Bs;
 }
+
+/**
+ * \brief Compute the mesh dimension.
+ * \return The mesh dimension (1, 2 or 3).
+ */
+inline unsigned short Mesh::_computeMeshDim() const
+{
+    int elementDim = -1;
+
+    // loop over the dimension i to get the maximum element dimension in the mesh
+    for(unsigned short i = 0 ; i <= 3 ; ++i)
+    {
+        std::vector<int> eleTypes;
+        gmsh::model::mesh::getElementTypes(eleTypes, i);
+
+        switch(eleTypes.size())
+        {
+            case 0:
+                break;
+            case 1:
+                elementDim = i;
+                break;
+            default:
+                elementDim = i;
+                std::cerr   << "Hybrid meshes not handled in this example!"
+                            << std::endl;
+        }
+    }
+
+    return elementDim;
+}
+
+inline unsigned short Mesh::getMeshDim() const
+{
+    return m_dim;
+}

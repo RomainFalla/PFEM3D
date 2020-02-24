@@ -9,15 +9,46 @@
 #include "../params/Params.hpp"
 #include "../mesh/Mesh.hpp"
 
-enum ProblemType
+struct FluidParams
 {
-    INCOMPRESSIBLE_PSPG
+    double rho;
+    double mu;
+};
+
+struct PicardParams
+{
+    double relTol;
+    unsigned int maxIter;
+    unsigned int currentNumIter;
+};
+
+struct TimeParams
+{
+    bool adaptDT;
+    double currentDT;
+    double coeffDTincrease;
+    double coeffDTdecrease;
+    double maxDT;
+    double simuTime;
+    double simuDTToWrite;
+    double nextWriteTrigger;
+};
+
+struct SolverIncompressibleParams
+{
+    double hchar;
+    double gravity;
+    FluidParams fluid;
+    PicardParams picard;
+    TimeParams time;
+    std::array<bool, 5> whatToWrite {false}; //u v p ke velocity
+    std::string resultsName;
 };
 
 class Solver
 {
     public:
-        Solver(const Params& params, Mesh& mesh, ProblemType ProblemType);
+        Solver(const Params& params, Mesh& mesh, std::string resultsName);
         ~Solver();
 
         void solveProblem();
@@ -27,11 +58,10 @@ class Solver
         void _buildPicardSystem();
         void _computeTauPSPG();
         bool _solveSystem();
+        void _write(double time, unsigned int step);
+        void _writeFinalize();
 
-        const Params& m_params;
         Mesh& m_mesh;
-
-        ProblemType m_problemType;
 
         Eigen::VectorXd m_qprev;
         Eigen::VectorXd m_q;
@@ -48,11 +78,11 @@ class Solver
 
         std::vector<double> m_tauPSPG;
 
-        double m_currentDT;
-
-        double m_numIterSolverMsh;
-
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solver;
+
+        SolverIncompressibleParams m_p;
+
+        bool m_verboseOutput;
 };
 
 #endif // SOLVER_HPP_INCLUDED
