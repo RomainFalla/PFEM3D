@@ -1,25 +1,30 @@
 {
-	"TimeParams": {
-		"adaptDT": true,
-    	"coeffDTincrease": 1.5,
-    	"coeffDTdecrease": 2,
-    	"maxDT": 0.001,
-    	"simuTime": 0.4,
-    	"simuDTToWrite": 0.001
-	},
 	"RemeshingParams": {
-		"hchar": 1,
+		"hchar": 0.25,
 		"alpha": 1.2,
 		"omega": 0.7,
-		"gamma": 0.7
+		"gamma": 0.7,
+		"boundingBox": [-2, -1, 12, 100]
 	},
-	"PicardParams": {
-		relTol: 5e-6,
-    	maxIter: 1
+	"SolverIncompressibleParams": {
+		"gravity": 9.81,
+		"TimeParams": {
+			"adaptDT": true,
+    		"coeffDTincrease": 1.5,
+    		"coeffDTdecrease": 2.0,
+    		"maxDT": 0.01,
+    		"simuTime": 4,
+    		"simuDTToWrite": 0.025
+		},
+		"PicardParams": {
+			"relTol": 5e-6,
+    		"maxIter": 10
+		},
+		"FluidParams": {
+			"rho": 1000,
+			"mu": 1e-3	
+		},
+		"whatToWrite": ["p", "ke"]
 	},
-	"FluidParams": {
-		"rho": 1000,
-		"mu": 1e-3	
-	},
-	"gravity": 9.81
+	"verboseOutput": false
 }
