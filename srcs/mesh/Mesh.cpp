@@ -50,6 +50,7 @@ Mesh::Mesh(const Params& params)
 	m_p.alpha = j["RemeshingParams"]["alpha"].get<double>();
 	m_p.omega = j["RemeshingParams"]["omega"].get<double>();
 	m_p.gamma = j["RemeshingParams"]["gamma"].get<double>();
+	m_p.boundingBox = j["RemeshingParams"]["boundingBox"].get<std::vector<double>>();
 
 	#ifdef DEBUG_GEOMVIEW
 	m_gv.set_line_width(4);
@@ -108,6 +109,45 @@ bool Mesh::addNodes()
     return addedNodes;
 }
 
+bool Mesh::checkBoundingBox()
+{
+    assert(!m_elementList.empty() && !nodesList.empty() && "There is no mesh !");
+
+    bool outofBBNodes = false;
+
+    for(std::size_t n = 0 ; n < nodesList.size() ; ++n)
+    {
+        if(nodesList[n].position[0] < m_p.boundingBox[0]
+           || nodesList[n].position[1] < m_p.boundingBox[1]
+           || nodesList[n].position[0] > m_p.boundingBox[2]
+           || nodesList[n].position[1] > m_p.boundingBox[3])
+        {
+            nodesList[n].toBeDeleted = true;
+            outofBBNodes = true;
+        }
+    }
+
+    nodesList.erase(std::remove_if(nodesList.begin(), nodesList.end(),
+                                   [this](const Node& node){
+                                       if(node.toBeDeleted)
+                                       {
+                                           if(this->m_verboseOutput)
+                                           {
+                                               std::cout << "Removing node out of bouding box ("
+                                                         << node.position[0] << ", "
+                                                         << node.position[1] << ") "
+                                                         << std::endl;
+                                           }
+
+                                           return true;
+                                       }
+                                       else
+                                           return false;
+                                    }), nodesList.end());
+
+    return outofBBNodes;
+}
+
 void Mesh::computeDetJ()
 {
     assert(!m_elementList.empty() && !nodesList.empty() && "There is no mesh !");
@@ -115,6 +155,7 @@ void Mesh::computeDetJ()
     m_detJ.clear();
     m_detJ.resize(m_elementList.size());
 
+    #pragma omp parallel for default(none) shared(m_detJ, m_elementList, nodesList)
     for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
     {
         m_detJ[i] = (nodesList[m_elementList[i][1]].position[0]
@@ -136,6 +177,7 @@ void Mesh::computeInvJ()
     m_invJ.clear();
     m_invJ.resize(m_elementList.size());
 
+    #pragma omp parallel for default(none) shared(m_invJ, m_detJ, m_elementList, nodesList)
     for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
     {
         m_invJ[i].resize(2,2);
@@ -174,7 +216,7 @@ void Mesh::loadFromFile(std::string fileName)
     if(file.is_open())
         file.close();
     else
-        throw std::runtime_error("The params.json file does not exist!");
+        throw std::runtime_error("The input .msh file does not exist!");
 
     gmsh::open(fileName);
 
@@ -182,6 +224,10 @@ void Mesh::loadFromFile(std::string fileName)
     m_dim = _computeMeshDim();
     if(m_dim != 2)
         throw std::runtime_error("Only 2D meshes supported currently!");
+
+    if(m_p.boundingBox.size() != 2*m_dim)
+        throw std::runtime_error("Bad bounding box format! Format: [xmin, ymin, xmax, ymax]");
+
 
     // We retrieve the tags of the physical groups of dimension m_dim and
     // m_dim-1
@@ -223,7 +269,7 @@ void Mesh::loadFromFile(std::string fileName)
         }
     }
 
-        for(auto physGroup2D : physGroupHandles2D)
+    for(auto physGroup2D : physGroupHandles2D)
     {
         std::string name;
         gmsh::model::getPhysicalName(m_dim, physGroup2D.second, name);
@@ -303,8 +349,6 @@ void Mesh::remesh()
                                                    face->vertex(1)->info(),
                                                    face->vertex(2)->info()};
 
-            m_elementList.push_back(element);
-
             // those nodes are not free (flying nodes and not wetted boundary nodes)
             nodesList[element[0]].isFree = false;
             nodesList[element[1]].isFree = false;
@@ -330,6 +374,8 @@ void Mesh::remesh()
                 nodesList[element[2]].neighbourNodes.push_back(element[0]);
             if(std::find(temp.begin(), temp.end(), element[1]) == temp.end())
                 nodesList[element[2]].neighbourNodes.push_back(element[1]);
+
+            m_elementList.push_back(element);
         }
     }
 

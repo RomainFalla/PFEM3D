@@ -165,8 +165,8 @@ void Solver::solveProblem()
                 }
             }
 
-            if(time + m_p.time.currentDT > m_p.time.simuTime)
-                        m_p.time.currentDT = m_p.time.simuTime - time;
+            if(m_mesh.checkBoundingBox())
+                m_mesh.remesh();
 
             if(m_mesh.removeNodes())
                 m_mesh.remesh();

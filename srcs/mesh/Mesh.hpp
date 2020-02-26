@@ -21,6 +21,7 @@ struct RemeshingParams
     double alpha;
     double omega;
     double gamma;
+    std::vector<double> boundingBox;
 };
 
 class Mesh
@@ -32,6 +33,8 @@ class Mesh
         std::vector<Node> nodesList;
 
         bool addNodes();
+
+        bool checkBoundingBox();
 
         void computeDetJ();
         void computeInvJ();
