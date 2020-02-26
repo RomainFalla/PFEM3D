@@ -3,10 +3,6 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#if defined(_OPENMP)
-    #include <cstdlib>
-    #include <omp.h>
-#endif
 
 #include "mesh/Node.hpp"
 #include "mesh/Mesh.hpp"
