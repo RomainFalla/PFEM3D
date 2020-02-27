@@ -78,7 +78,7 @@ class Solver
 
         std::vector<double> m_tauPSPG;
 
-        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solver;
+        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU;
 
         SolverIncompressibleParams m_p;
 
