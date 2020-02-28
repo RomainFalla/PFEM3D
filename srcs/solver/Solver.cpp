@@ -677,7 +677,7 @@ void Solver::_write(double time, unsigned int step)
 {
     gmsh::model::add("theModel");
     gmsh::model::setCurrent("theModel");
-    gmsh::model::addDiscreteEntity(m_mesh.getMeshDim(), 1);
+    gmsh::model::addDiscreteEntity(0, 1);
 
     if(m_p.whatToWrite[0])
         gmsh::view::add("u", 1);
@@ -695,30 +695,34 @@ void Solver::_write(double time, unsigned int step)
         gmsh::view::add("velocity", 5);
 
     std::vector<std::size_t> nodesTags(m_mesh.nodesList.size());
+    std::vector<std::size_t> pointElementTags(m_mesh.nodesList.size());
     std::vector<double> nodesCoord(3*m_mesh.nodesList.size());
     #pragma omp parallel for default(shared)
     for(std::size_t i = 0 ; i < m_mesh.nodesList.size() ; ++i)
     {
         nodesTags[i] = i + 1;
+        pointElementTags[i] = i + 1;
         nodesCoord[3*i] = m_mesh.nodesList[i].position[0];
         nodesCoord[3*i + 1] = m_mesh.nodesList[i].position[1];
         nodesCoord[3*i + 2] = 0;
     }
 
-    gmsh::model::mesh::addNodes(m_mesh.getMeshDim(), 1, nodesTags, nodesCoord);
+    gmsh::model::mesh::addNodes(0, 1, nodesTags, nodesCoord);
 
-    std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
-    std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
-    #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
-    {
-        elementTags[i] = i + 1;
-        nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
-        nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
-        nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
-    }
+//    std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
+//    std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
+//    #pragma omp parallel for default(shared)
+//    for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
+//    {
+//        elementTags[i] = i + 1;
+//        nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
+//        nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
+//        nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
+//    }
+//
+//    gmsh::model::mesh::addElementsByType(1, 2, elementTags, nodesTagsPerElement);
 
-    gmsh::model::mesh::addElementsByType(1, 2, elementTags, nodesTagsPerElement);
+    gmsh::model::mesh::addElementsByType(1, 15, pointElementTags, nodesTags);
 
     std::vector<std::vector<double>> dataU;
     std::vector<std::vector<double>> dataV;

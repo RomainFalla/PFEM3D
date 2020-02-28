@@ -18,7 +18,8 @@ if [ ! -d "nlohmann" ]; then
   wget https://github.com/nlohmann/json/releases/download/v3.6.1/include.zip
   unzip include.zip
   rm -rf include.zip
-  mv include/nlohmann nlohmann
+  mkdir nlohmann/
+  mv include/nlohmann nlohmann/nlohmann
   rm -rf include
 fi
 
@@ -38,11 +39,8 @@ rm -rf build
 mkdir build
 cd build
 
+cmake ../ -DCMAKE_BUILD_TYPE=Debug  -G "CodeBlocks - Unix Makefiles"
+cp -r ../geometry/ $PWD/bin
+cp -r ../params/ $PWD/bin
 
-mkdir Debug
-cd Debug
-cmake ../../ -DCMAKE_BUILD_TYPE=Debug  -G "CodeBlocks - Unix Makefiles"
-#cp -r ../../geometry/ $PWD/bin
-#cp -r ../../params/ $PWD/bin
-
-cd ../../
+cd ../
