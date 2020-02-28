@@ -76,6 +76,7 @@ bool Mesh::addNodes()
 
     for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
     {
+        //If an element is too big, we add a node at his center
         if(m_detJ[i]/2 > m_p.omega*m_p.hchar*m_p.hchar)
         {
             Node newNode(dim, nUnknowns);
@@ -117,6 +118,7 @@ bool Mesh::checkBoundingBox()
 
     for(std::size_t n = 0 ; n < nodesList.size() ; ++n)
     {
+        //If the node is out of the bounding box, we delete it.
         if(nodesList[n].position[0] < m_p.boundingBox[0]
            || nodesList[n].position[1] < m_p.boundingBox[1]
            || nodesList[n].position[0] > m_p.boundingBox[2]
@@ -237,6 +239,8 @@ void Mesh::loadFromFile(std::string fileName)
     std::vector<std::pair<int, int>> physGroupHandles1D;
     gmsh::model::getPhysicalGroups(physGroupHandles1D, m_dim - 1);
 
+    //The file should contain physical group for the boundary, the free surface and the fluid
+
     std::vector<std::size_t> nodesTagsBoundary;
     for(auto physGroup1D : physGroupHandles1D)
     {
@@ -349,7 +353,7 @@ void Mesh::remesh()
                                                    face->vertex(1)->info(),
                                                    face->vertex(2)->info()};
 
-            // those nodes are not free (flying nodes and not wetted boundary nodes)
+            // Those nodes are not free (flying nodes and not wetted boundary nodes)
             nodesList[element[0]].isFree = false;
             nodesList[element[1]].isFree = false;
             nodesList[element[2]].isFree = false;
@@ -382,6 +386,7 @@ void Mesh::remesh()
     for(Alpha_shape_2::Alpha_shape_vertices_iterator it = as.alpha_shape_vertices_begin() ;
         it != as.alpha_shape_vertices_end() ; ++it)
     {
+        // We compute the free surface nodes
         const Alpha_shape_2::Vertex_handle vert = *it;;
         if(!nodesList[vert->info()].isBound)
             nodesList[vert->info()].isOnFreeSurface = true;
@@ -413,6 +418,7 @@ void Mesh::remesh()
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
 
 #ifdef DEBUG_GEOMVIEW
+    // Display nodes and alpha shape with colors for each node type
     m_gv.clear();
     for(std::size_t n = 0 ; n < this->nodesList.size() ; ++n)
     {
@@ -463,6 +469,8 @@ bool Mesh::removeNodes()
 
     for(std::size_t i = 0 ; i < nodesList.size() ; ++i)
     {
+        //We the node is free, it is not in an element; if a node is already tagged,
+        //we can skip it (do not delete node twice)
         if(nodesList[i].toBeDeleted || nodesList[i].isFree)
             continue;
 
@@ -477,18 +485,23 @@ bool Mesh::removeNodes()
                                      *(nodesList[i].position[1]
                                      - nodesList[nodesList[i].neighbourNodes[j]].position[1]));
 
+            //Two nodes are too close.
             if(d <= m_p.gamma*m_p.hchar)
             {
+                //If the neighbour nodes is touched, we delete the current nodes
                 if(nodesList[nodesList[i].neighbourNodes[j]].touched)
                 {
+                    //Do not delete bounded or free surface nodes
                     if(nodesList[i].isBound || nodesList[i].isOnFreeSurface)
                         continue;
 
                     nodesList[i].toBeDeleted = true;
                     removeNodes = true;
                 }
+                //If the neighbour nodes is not touched, we delete the neoghbour nodes
                 else
                 {
+                    //Do not delete bounded or free surface nodes
                     if(nodesList[nodesList[i].neighbourNodes[j]].isBound ||
                        nodesList[nodesList[i].neighbourNodes[j]].isOnFreeSurface)
                         continue;

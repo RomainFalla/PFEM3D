@@ -156,6 +156,7 @@ void Solver::solveProblem()
                 }
             }
 
+            //Remeshing step
             if(m_mesh.checkBoundingBox())
                 m_mesh.remesh();
 
@@ -397,16 +398,15 @@ void Solver::_buildPicardSystem()
         indexD.reserve(3*6*m_mesh.getElementNumber());
     }
 
-    m_C.resize(m_mesh.nodesList.size(), 2*m_mesh.nodesList.size());
-    m_C.data().squeeze();
+    Eigen::SparseMatrix<double> C(m_mesh.nodesList.size(), 2*m_mesh.nodesList.size());
     std::vector<Eigen::Triplet<double>> indexC;
     indexC.reserve(3*6*m_mesh.getElementNumber());
 
     m_F.resize(2*m_mesh.nodesList.size());
     m_F.setZero();
 
-    m_H.resize(m_mesh.nodesList.size());
-    m_H.setZero();
+    Eigen::VectorXd H(m_mesh.nodesList.size());
+    H.setZero();
 
     Eigen::MatrixXd MPrev(6, 6); MPrev.setZero();
     for (unsigned short k = 0 ; k < N.size() ; ++k)
@@ -414,17 +414,20 @@ void Solver::_buildPicardSystem()
 
     MPrev *= 0.5*(m_p.fluid.rho/m_p.time.currentDT);
 
-    const Eigen::DiagonalMatrix<double, 3> ddev(2, 2, 1);
+    const Eigen::DiagonalMatrix<double, 3> ddev(2, 2, 1); ddev *= m_p.fluid.mu;
 
     const Eigen::Vector3d m(1, 1, 0);
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
     {
+        //Me = S Nv^T Nv dV
         Eigen::MatrixXd Me = MPrev*m_mesh.getDetJ(elm);
 
-        Eigen::MatrixXd Ke = 0.5*m_p.fluid.mu*B[elm][0].transpose()*ddev*B[elm][0]*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
+        //Ke = S Bv^T ddev Bv dV
+        Eigen::MatrixXd Ke = 0.5*B[elm][0].transpose()*ddev*B[elm][0]*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
 
+        //De = S Np^T m Bv dV
         Eigen::MatrixXd De(3,6); De.setZero();
 
         for (unsigned short k = 0 ; k < N.size() ; ++k)
@@ -432,6 +435,7 @@ void Solver::_buildPicardSystem()
 
         De *= 0.5*m_mesh.getDetJ(elm);
 
+        //Ce = tauPSPG S Bp^T Nv dV
         Eigen::MatrixXd Ce(3,6); Ce.setZero();
 
         for (unsigned short k = 0 ; k < N.size() ; ++k)
@@ -439,12 +443,14 @@ void Solver::_buildPicardSystem()
 
         Ce *= (0.5*m_tauPSPG[elm]/m_p.time.currentDT)*m_mesh.getDetJ(elm);
 
+        //Le = tauPSPG S Bp^T Bp dV
         Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_p.fluid.rho)
                              *(BleftP*B[elm][0]*BrightP).transpose()*(BleftP*B[elm][0]*BrightP)
                              *m_mesh.getDetJ(elm);
 
         const Eigen::Vector2d b(0, -m_p.gravity);
 
+        //Fe = S Nv^T bodyforce dV
         Eigen::MatrixXd Fe(6,1); Fe.setZero();
 
         for (unsigned short k = 0 ; k < N.size() ; ++k)
@@ -452,9 +458,11 @@ void Solver::_buildPicardSystem()
 
         Fe *= 0.5*m_p.fluid.rho*m_mesh.getDetJ(elm);
 
+        //He = tauPSPG S Bp^T bodyforce dV
         Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*(BleftP*B[elm][0]*BrightP).transpose()
                              *b*m_mesh.getDetJ(elm);
 
+        //Big push_back ^^
         #pragma omp critical
         {
             for(unsigned short i = 0 ; i < 3 ; ++i)
@@ -589,8 +597,7 @@ void Solver::_buildPicardSystem()
                 /************************************************************************
                                                 Build f
                 ************************************************************************/
-                m_H(m_mesh.getElement(elm)[i]) += He(i);
-
+                H(m_mesh.getElement(elm)[i]) += He(i);
             }
         }
     }
@@ -603,14 +610,14 @@ void Solver::_buildPicardSystem()
         m_D.setFromTriplets(indexD.begin(), indexD.end());
     }
 
-    m_C.setFromTriplets(indexC.begin(), indexC.end());
+    C.setFromTriplets(indexC.begin(), indexC.end());
 
     /********************************************************************************
                                         Compute A and b
     ********************************************************************************/
     m_A.setFromTriplets(indexA.begin(), indexA.end());
 
-    m_b << m_F + m_M*m_qprev.head(2*m_mesh.nodesList.size()), m_H + m_C*m_qprev.head(2*m_mesh.nodesList.size());
+    m_b << m_F + m_M*m_qprev.head(2*m_mesh.nodesList.size()), H + C*m_qprev.head(2*m_mesh.nodesList.size());
 }
 
 void Solver::_computeTauPSPG()
@@ -688,13 +695,11 @@ void Solver::_write(double time, unsigned int step)
         gmsh::view::add("velocity", 5);
 
     std::vector<std::size_t> nodesTags(m_mesh.nodesList.size());
-    std::vector<std::size_t> pointElementTags(m_mesh.nodesList.size());
     std::vector<double> nodesCoord(3*m_mesh.nodesList.size());
     #pragma omp parallel for default(shared)
     for(std::size_t i = 0 ; i < m_mesh.nodesList.size() ; ++i)
     {
         nodesTags[i] = i + 1;
-        pointElementTags[i] = i + 1;
         nodesCoord[3*i] = m_mesh.nodesList[i].position[0];
         nodesCoord[3*i + 1] = m_mesh.nodesList[i].position[1];
         nodesCoord[3*i + 2] = 0;
@@ -715,7 +720,7 @@ void Solver::_write(double time, unsigned int step)
 //
 //    gmsh::model::mesh::addElementsByType(1, 2, elementTags, nodesTagsPerElement);
 
-    gmsh::model::mesh::addElementsByType(1, 15, pointElementTags, nodesTags);
+    gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
 
     std::vector<std::vector<double>> dataU;
     std::vector<std::vector<double>> dataV;
@@ -787,6 +792,6 @@ void Solver::_write(double time, unsigned int step)
     gmsh::model::remove();
 }
 
-void Solver::_writeFinalize()
-{
-}
+//void Solver::_writeFinalize()
+//{
+//}

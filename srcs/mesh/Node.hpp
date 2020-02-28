@@ -17,16 +17,16 @@ struct Node
                                              Can be u,v,p or u,v,p,rho, etc.*/
 
     std::vector<std::size_t> neighbourNodes;    /**< Indexes in the nodes list of the
-                                             neighbour nodes*/
+                                                     neighbour nodes*/
 
     bool isBound;                       /**< Is the node a wall node*/
     bool isOnFreeSurface;               /**< Is the node on the free surface*/
     bool isFree;                        /**< Is the node disconnected from any fluid
                                              elements*/
 
-    //Re-meshing marker, should be moved I guess
-    bool touched;
-    bool toBeDeleted;
+    bool touched;                       /**< Is the node next to a node which should
+                                             be deleted */
+    bool toBeDeleted;                   /**< Should the node be deleted */
 
     /**
      * \brief Constructor
