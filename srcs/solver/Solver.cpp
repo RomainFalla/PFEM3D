@@ -139,16 +139,7 @@ void Solver::solveProblem()
         {
             time = time + m_p.time.currentDT;
 
-            #pragma omp parallel for default(none) shared(m_mesh, m_q, m_p)
-            for(std::size_t n = 0 ; n < m_mesh.nodesList.size() ; ++n)
-            {
-                m_mesh.nodesList[n].states[0] = m_q(n);
-                m_mesh.nodesList[n].states[1] = m_q(n + m_mesh.nodesList.size());
-                m_mesh.nodesList[n].states[2] = m_q(n + 2*m_mesh.nodesList.size());
-
-                m_mesh.nodesList[n].position[0] += m_mesh.nodesList[n].states[0]*m_p.time.currentDT;
-                m_mesh.nodesList[n].position[1] += m_mesh.nodesList[n].states[1]*m_p.time.currentDT;
-            }
+            //The solution is updated through the last step of _solveSystem
 
             if(time >= m_p.time.nextWriteTrigger)
             {
@@ -174,6 +165,7 @@ void Solver::solveProblem()
             m_mesh.addNodes();
             m_mesh.remesh();
 
+            //We have to compute qPrev here due to new nodes !
             m_qprev.resize(3*m_mesh.nodesList.size());
 
             #pragma omp parallel for default(none) shared(m_mesh, m_qprev)
@@ -327,17 +319,18 @@ bool Solver::_solveSystem()
         }
     }
 
-    m_q = qIter;
-    m_mesh.nodesList = nodesListSave;
-
-    #pragma omp parallel for default(none) shared(m_mesh, m_q)
+    #pragma omp parallel for default(none) shared(m_mesh, qIter)
     for(std::size_t n = 0 ; n < m_mesh.nodesList.size() ; ++n)
     {
         if(m_mesh.nodesList[n].isFree && !m_mesh.nodesList[n].isBound)
         {
-            m_q(m_mesh.nodesList.size() + n) = m_q (m_mesh.nodesList.size() + n) -
-                                                    m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*
+            qIter(m_mesh.nodesList.size() + n) += - m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*
                                                     m_p.hchar*m_p.hchar*0.5;
+
+            m_mesh.nodesList[n].states[1] = qIter(m_mesh.nodesList.size() + n);
+
+            m_mesh.nodesList[n].position[0] += m_mesh.nodesList[n].states[0]*m_p.time.currentDT;
+            m_mesh.nodesList[n].position[1] += m_mesh.nodesList[n].states[1]*m_p.time.currentDT;
         }
     }
 

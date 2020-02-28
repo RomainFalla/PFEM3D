@@ -64,7 +64,6 @@ class Solver
         Mesh& m_mesh;
 
         Eigen::VectorXd m_qprev;
-        Eigen::VectorXd m_q;
         Eigen::SparseMatrix<double> m_A;
         Eigen::VectorXd m_b;
 
