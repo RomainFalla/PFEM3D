@@ -414,7 +414,7 @@ void Solver::_buildPicardSystem()
 
     MPrev *= 0.5*(m_p.fluid.rho/m_p.time.currentDT);
 
-    const Eigen::DiagonalMatrix<double, 3> ddev(2, 2, 1); ddev *= m_p.fluid.mu;
+    const Eigen::DiagonalMatrix<double, 3> ddev(2*m_p.fluid.mu, 2*m_p.fluid.mu, m_p.fluid.mu);
 
     const Eigen::Vector3d m(1, 1, 0);
 
