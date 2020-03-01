@@ -59,6 +59,7 @@ struct SolverIncompressibleParams
     TimeParams time;        /**< Time integration parameters. */
     std::array<bool, 5> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
     std::string resultsName;    /**< File name in which the results will be written. */
+    std::vector<double> initialCondition;    /**< Initial condition on u, v and p (mainly to have inlet) **/
 };
 
 /**
@@ -79,7 +80,7 @@ class Solver
     private:
         /**
          * \brief Return a vector of boolean to know which line of the A matrix should
-         * transformed into ... 0 1 0 ... and which element of the b vector set to qprev
+         * transformed into ... 0 1 0 ... and which element of the b vector set to qprev.
          * \return Vector of boolean in which an element is true if the node is a
          *         boundary node (u and v should be conserved) or the node is a free
          *         node (u, v, p) should be conservec.
@@ -87,12 +88,17 @@ class Solver
         std::vector<bool> _getIndices() const;
 
         /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithl
+         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
+         */
+        void _setInitialCondition();
+
+        /**
+         * \brief Build the matrix A and the vector b of the Picard Algorithm.
          */
         void _buildPicardSystem();
 
         /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithl
+         * \brief Build the matrix A and the vector b of the Picard Algorithm.
          */
         void _computeTauPSPG();
 

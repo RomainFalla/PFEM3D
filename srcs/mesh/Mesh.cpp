@@ -79,7 +79,7 @@ bool Mesh::addNodes()
         //If an element is too big, we add a node at his center
         if(m_detJ[i]/2 > m_p.omega*m_p.hchar*m_p.hchar)
         {
-            Node newNode(dim, nUnknowns);
+            Node newNode(dim);
 
             for(unsigned short k = 0 ; k < dim ; ++k)
             {
@@ -88,6 +88,7 @@ bool Mesh::addNodes()
                                        + nodesList[m_elementList[i][2]].position[k])/3.0;
             }
 
+			newNode.states.resize(nUnknowns);
             for(unsigned short k = 0 ; k < nUnknowns ; ++k)
             {
                 newNode.states[k] = (nodesList[m_elementList[i][0]].states[k]
@@ -241,26 +242,31 @@ void Mesh::loadFromFile(std::string fileName)
 
     //The file should contain physical group for the boundary, the free surface and the fluid
 
-    std::vector<std::size_t> nodesTagsBoundary;
     for(auto physGroup1D : physGroupHandles1D)
     {
         std::string name;
         gmsh::model::getPhysicalName(m_dim - 1, physGroup1D.second, name);
-        if(name == "Boundary")
+        if(name == "Boundary" || name == "FluidInput")
         {
             std::vector<double> coord;
+            std::vector<std::size_t> dummyNodesTagsBoundary;
             gmsh::model::mesh::getNodesForPhysicalGroup(m_dim - 1, physGroup1D.second,
-                                                        nodesTagsBoundary, coord);
+                                                        dummyNodesTagsBoundary, coord);
 
-            for(std::size_t i = 0 ; i < nodesTagsBoundary.size() ; ++i)
+            for(std::size_t i = 0 ; i < dummyNodesTagsBoundary.size() ; ++i)
             {
-                Node node(m_dim, 3);
+                Node node(m_dim);
                 node.position[0] = coord[3*i];
                 node.position[1] = coord[3*i + 1];
-                node.states[0] = 0;
-                node.states[1] = 0;
-                node.states[2] = 0;
+
+                //If the nodes is already on the boundary, we do not add it twice
+                if(std::find(nodesList.begin(), nodesList.end(),
+                             node) != nodesList.end())
+                    continue;
+
                 node.isBound = true;
+                if(name == "FluidInput")
+                    node.isFluidInput = true;
 
                 nodesList.push_back(node);
 
@@ -272,6 +278,23 @@ void Mesh::loadFromFile(std::string fileName)
             }
         }
     }
+
+//    for(auto node : nodesList)
+//    {
+//        int counter = 0;
+//        for(auto node2 : nodesList)
+//        {
+//            if((node.position[0] == node2.position[0]) && (node.position[1] == node2.position[1]))
+//                counter++;
+//
+//            if(counter > 1)
+//            {
+//                std::cerr << node.position[0] << ", " << node.position[1] << std::endl;
+//                throw std::runtime_error("There are duplicates !");
+//
+//            }
+//        }
+//    }
 
     for(auto physGroup2D : physGroupHandles2D)
     {
@@ -286,17 +309,15 @@ void Mesh::loadFromFile(std::string fileName)
 
             for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
             {
-                //If the nodes is already on the boundary, we do not add it twice
-                if(std::find(nodesTagsBoundary.begin(), nodesTagsBoundary.end(),
-                             dummyNodesTags[i]) != nodesTagsBoundary.end())
-                    continue;
-
-                Node node(m_dim, 3);
+                Node node(m_dim);
                 node.position[0] = coord[3*i];
                 node.position[1] = coord[3*i + 1];
-                node.states[0] = 0;
-                node.states[1] = 0;
-                node.states[2] = 0;
+
+                //If the nodes is already on the boundary, we do not add it twice
+                if(std::find(nodesList.begin(), nodesList.end(),
+                             node) != nodesList.end())
+                    continue;
+
                 node.isBound = false;
 
                 nodesList.push_back(node);
@@ -309,6 +330,9 @@ void Mesh::loadFromFile(std::string fileName)
             }
         }
     }
+
+    if(nodesList.empty())
+        throw std::runtime_error("No nodes loaded! Did you add the physical groups in the .geo file?");
 
     gmsh::finalize();
 }

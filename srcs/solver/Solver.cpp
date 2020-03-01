@@ -37,6 +37,8 @@ m_mesh(mesh)
     m_p.time.currentDT = m_p.time.maxDT;
     m_p.time.nextWriteTrigger = m_p.time.simuDTToWrite;
 
+    m_p.initialCondition = j["SolverIncompressibleParams"]["initialCondition"].get<std::vector<double>>();
+
     std::vector<std::string> whatToWrite = j["SolverIncompressibleParams"]["whatToWrite"];
     for(auto what : whatToWrite)
     {
@@ -70,6 +72,29 @@ m_mesh(mesh)
 Solver::~Solver()
 {
     gmsh::finalize();
+}
+
+void Solver::_setInitialCondition()
+{
+	assert(!m_mesh.nodesList.empty);
+
+	#pragma omp parallel for default(shared)
+	for(std::size_t n = 0 ; n < m_mesh.nodesList.size() ; ++n)
+	{
+		m_mesh.nodesList[n].states.resize(3);
+		if(!m_mesh.nodesList[n].isBound || m_mesh.nodesList[n].isFluidInput)
+        {
+            m_mesh.nodesList[n].states[0] = m_p.initialCondition[0];
+            m_mesh.nodesList[n].states[1] = m_p.initialCondition[1];
+            m_mesh.nodesList[n].states[2] = m_p.initialCondition[2];
+        }
+        else
+        {
+            m_mesh.nodesList[n].states[0] = 0;
+            m_mesh.nodesList[n].states[1] = 0;
+            m_mesh.nodesList[n].states[2] = 0;
+        }
+	}
 }
 
 void Solver::solveProblem()
@@ -107,6 +132,8 @@ void Solver::solveProblem()
     double time = 0;
 
     unsigned int step = 0;
+
+    _setInitialCondition();
 
     m_mesh.remesh();
 
@@ -260,10 +287,14 @@ bool Solver::_solveSystem()
             m_mesh.nodesList[n].states[0] = qIter[n];
             m_mesh.nodesList[n].states[1] = qIter[n + m_mesh.nodesList.size()];
             m_mesh.nodesList[n].states[2] = qIter[n + 2*m_mesh.nodesList.size()];
-            m_mesh.nodesList[n].position[0] = nodesListSave[n].position[0]
-                                            + m_p.time.currentDT*m_mesh.nodesList[n].states[0];
-            m_mesh.nodesList[n].position[1] = nodesListSave[n].position[1]
-                                            + m_p.time.currentDT*m_mesh.nodesList[n].states[1];
+
+            if(!m_mesh.nodesList[n].isBound)
+            {
+                m_mesh.nodesList[n].position[0] = nodesListSave[n].position[0]
+                                                + m_p.time.currentDT*m_mesh.nodesList[n].states[0];
+                m_mesh.nodesList[n].position[1] = nodesListSave[n].position[1]
+                                                + m_p.time.currentDT*m_mesh.nodesList[n].states[1];
+            }
         }
 
         m_p.picard.currentNumIter++;
