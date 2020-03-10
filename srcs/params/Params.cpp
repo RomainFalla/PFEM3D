@@ -22,13 +22,6 @@ Params::~Params()
 
 void Params::loadFromFile(std::string fileName)
 {
-    std::cout   << "================================================================"
-                << std::endl
-                << "                         LOADING PARAMS                         "
-                << std::endl
-                << "================================================================"
-                << std::endl;
-
     std::ifstream paramFile(fileName);
 
     if(!paramFile.is_open())
@@ -48,7 +41,6 @@ void Params::loadFromFile(std::string fileName)
 
     omp_set_num_threads(m_threadsOMP);
     Eigen::setNbThreads(m_threadsOMP);
-    std::cout << "Number of threads: " << m_threadsOMP << std::endl;
 #else
     m_threadsOMP = 1;
 #endif

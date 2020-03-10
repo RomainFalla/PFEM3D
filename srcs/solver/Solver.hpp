@@ -44,6 +44,8 @@ struct TimeParams
     double simuTime;            /**< Physical time which we want to simulate. */
     double simuDTToWrite;       /**< For which time interval should the program write data. */
     double nextWriteTrigger;    /**< Next physical time at which the program will write data. */
+    double currentTime;
+    unsigned int currentStep;
 };
 
 /**
@@ -60,6 +62,9 @@ struct SolverIncompressibleParams
     std::array<bool, 5> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
     std::string resultsName;    /**< File name in which the results will be written. */
     std::vector<double> initialCondition;    /**< Initial condition on u, v and p (mainly to have inlet) **/
+#if defined(_OPENMP)
+    unsigned int nOMPThreads;
+#endif
 };
 
 /**
@@ -69,73 +74,84 @@ struct SolverIncompressibleParams
 class Solver
 {
     public:
-        Solver(const Params& params, Mesh& mesh, std::string resultsName);
+        Solver(const Params& params, std::string mshName, std::string resultsName);
         ~Solver();
+
+        /**
+         * \brief Display the parameters in SolverIncompressibleParams structure.
+         */
+        void displaySolverParams();
+
+        /**
+         * \brief Get a Eigen vector containg the states of the node.
+         * \param beginState The first state which will becontained in q.
+         * \param endState The last state which will be contained in q.
+         */
+        inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;
+
+
+        /**
+         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
+         */
+        void setInitialCondition();
+
+        /**
+         * \brief Set the states of the nodes from a Eigen vector.
+         * \param q a Eigen vector containing the value of the new states. Its size is (endState-beginState+1).
+         * \param beginState The first state contained in q.
+         * \param endState The last state contained in q.
+         */
+        void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState);
+
+        /**
+         * \brief Solve the Picard algorithm for one time step.
+         * \return true if the algorithm converged, false otherwise.
+         */
+        bool solveCurrentTimeStep();
 
         /**
          * \brief Solve the problem for a certain set of parameters.
          */
         void solveProblem();
 
+        /**
+         * \brief Write solutions to a file.
+         */
+        void writeData() const;
+
     private:
-        /**
-         * \brief Return a vector of boolean to know which line of the A matrix should
-         * transformed into ... 0 1 0 ... and which element of the b vector set to qprev.
-         * \return Vector of boolean in which an element is true if the node is a
-         *         boundary node (u and v should be conserved) or the node is a free
-         *         node (u, v, p) should be conservec.
-         */
-        std::vector<bool> _getIndices() const;
+        SolverIncompressibleParams m_p;     /**< Solver parameters. */
+        bool m_verboseOutput;               /**< Should the output be verbose? */
 
-        /**
-         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
-         */
-        void _setInitialCondition();
-
-        /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithm.
-         */
-        void _buildPicardSystem();
-
-        /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithm.
-         */
-        void _computeTauPSPG();
-
-        /**
-         * \brief Solve the Picard algorithm for one time step.
-         * \return true if the algorithm converged, false otherwise.
-         */
-        bool _solveSystem();
-
-        /**
-         * \brief Write data to a file.
-         * \param time Current physical time
-         * \param step Current step.
-         */
-        void _write(double time, unsigned int step);
-        //void _writeFinalize();
-
-        Mesh& m_mesh;                       /**< The mesh the solver is using. */
+        Mesh m_mesh;                       /**< The mesh the solver is using. */
 
         Eigen::VectorXd m_qprev;            /**< The precedent solution */
-        Eigen::SparseMatrix<double> m_A;    /**< The matrix A representing the problem:
-                                                 [M/dt+K -D^T; C/dt-D L]. */
-        Eigen::VectorXd m_b;                /**< The vector b representing the problem:
-                                                 [M/dt*qprev + F; H]. */
-
-        Eigen::SparseMatrix<double> m_M;     /**< The mass matrix. */
-        Eigen::SparseMatrix<double> m_K;     /**< The viscosity matrix. */
-        Eigen::SparseMatrix<double> m_D;     /**< The pressure matrix. */
-        Eigen::VectorXd m_F;                 /**< The volume force vector. */
-
-        std::vector<double> m_tauPSPG;       /**< tau_PSPG parameters for each element. */
+        Eigen::SparseMatrix<double> m_A;    /**< The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L]. */
+        Eigen::VectorXd m_b;                /**< The vector b representing the problem: [M/dt*qprev + F; H]. */
+        Eigen::SparseMatrix<double> m_M;    /**< The mass matrix. */
+        Eigen::SparseMatrix<double> m_K;    /**< The viscosity matrix. */
+        Eigen::SparseMatrix<double> m_D;    /**< The pressure matrix. */
+        Eigen::VectorXd m_F;                /**< The volume force vector. */
+        std::vector<double> m_tauPSPG;      /**< tau_PSPG parameters for each element. */
 
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
 
-        SolverIncompressibleParams m_p;     /**< Solver parameters. */
+        /**
+         * \brief Apply boundary conditions to the matrix A (so that the speed of
+         */
+        void applyBoundaryConditions();
 
-        bool m_verboseOutput;               /**< Should the output be verbose? */
+        /**
+         * \brief Build the matrix A and the vector b of the Picard Algorithm.
+         */
+        void buildPicardSystem();
+
+        /**
+         * \brief Build the matrix A and the vector b of the Picard Algorithm.
+         */
+        void computeTauPSPG();
 };
+
+#include "Solver.inl"
 
 #endif // SOLVER_HPP_INCLUDED
