@@ -76,7 +76,7 @@ Solver::~Solver()
 
 void Solver::_setInitialCondition()
 {
-	assert(!m_mesh.nodesList.empty);
+	assert(!m_mesh.nodesList.empty());
 
 	#pragma omp parallel for default(shared)
 	for(std::size_t n = 0 ; n < m_mesh.nodesList.size() ; ++n)
