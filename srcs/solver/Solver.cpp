@@ -85,7 +85,9 @@ Solver::~Solver()
 
 void Solver::applyBoundaryConditions()
 {
-	  assert(!m_mesh.nodesList.empty());
+    assert(m_A.rows() == m_A.cols());
+    assert(m_A.rows() == 3*m_mesh.getNodesNumber());
+    assert(m_b.rows() == 3*m_mesh.getNodesNumber());
 
     m_A.prune([this](int i, int j, float)
     {
