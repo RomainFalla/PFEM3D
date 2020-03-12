@@ -176,14 +176,14 @@ void Solver::displaySolverParams()
 
 void Solver::setInitialCondition()
 {
-	assert(m_mesh.getNodesNumber() != 0);
+    assert(m_mesh.getNodesNumber() != 0);
 
-	m_mesh.setStatesNumber(3);
+    m_mesh.setStatesNumber(3);
 
-	#pragma omp parallel for default(shared)
-	for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-	{
-		if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
+    #pragma omp parallel for default(shared)
+    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    {
+        if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
         {
             m_mesh.setNodeState(n, 0, m_p.initialCondition[0]);
             m_mesh.setNodeState(n, 1, m_p.initialCondition[1]);
@@ -195,7 +195,7 @@ void Solver::setInitialCondition()
             m_mesh.setNodeState(n, 1, 0);
             m_mesh.setNodeState(n, 2, 0);
         }
-	}
+    }
 }
 
 void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState)
@@ -249,8 +249,6 @@ void Solver::solveProblem()
 
         if(solveCurrentTimeStep())
         {
-            m_p.time.currentTime += m_p.time.currentDT;
-
             if(m_p.time.currentTime >= m_p.time.nextWriteTrigger)
             {
                 writeData();
@@ -390,6 +388,8 @@ bool Solver::solveCurrentTimeStep()
             return false;
         }
     }
+
+    m_p.time.currentTime += m_p.time.currentDT;
 
     return true;
 }
