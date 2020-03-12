@@ -4,10 +4,9 @@
 #include <string>
 #include <fstream>
 
-#include "mesh/Node.hpp"
-#include "mesh/Mesh.hpp"
 #include "params/Params.hpp"
 #include "solver/Solver.hpp"
+#include "solver/SolverCompressible.hpp"
 
 /**
  * @param  argv[1] .json file that contains the parameters.
@@ -30,19 +29,10 @@ int main(int argc, char **argv)
         params.loadFromFile(std::string(argv[1]));
 
         auto startTime = std::chrono::high_resolution_clock::now();
-        Mesh mesh(params);
-        mesh.loadFromFile(std::string(argv[2]));
+        Solver solver(params, std::string(argv[2]), std::string(argv[3]));
+        solver.solveProblem();
         auto endTime = std::chrono::high_resolution_clock::now();
         auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-        std::cout << "Ellapsed time for mesh loading: "
-                  << static_cast<double>(ellapsedTime.count())/1000.0
-                  << " s" << std::endl;
-
-        startTime = std::chrono::high_resolution_clock::now();
-        Solver solver(params, mesh, std::string(argv[3]));
-        solver.solveProblem();
-        endTime = std::chrono::high_resolution_clock::now();
-        ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
         std::cout << "Ellapsed time for problem solving: "
                   << static_cast<double>(ellapsedTime.count())/1000.0
                   << " s" << std::endl;

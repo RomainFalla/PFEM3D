@@ -1,5 +1,30 @@
 #include "Mesh.hpp"
 
+inline std::vector<Eigen::MatrixXd> Mesh::getB(std::size_t elm) const
+{
+    assert(elm < m_elementList.size() && "elm should be between 0 and size - 1 !");
+    assert(!m_invJ.empty());
+
+    std::vector<Eigen::MatrixXd> Bs;
+
+    for(auto point: GP2Dpoints<double>)
+    {
+        Eigen::MatrixXd B(3, 6); B.setZero();
+
+        B(0,0) = B(2,0) =  - m_invJ[elm][0][0] - m_invJ[elm][1][0];
+        B(0,1) = B(2,1) =  m_invJ[elm][0][0];
+        B(0,2) = B(2,2) =  m_invJ[elm][1][0];
+
+        B(1,3) = B(2,3) =  - m_invJ[elm][0][1] - m_invJ[elm][1][1];
+        B(1,4) = B(2,4) =  m_invJ[elm][0][1];
+        B(1,5) = B(2,5) =  m_invJ[elm][1][1];
+
+        Bs.push_back(B) ;
+    }
+
+    return Bs;
+}
+
 inline double Mesh::getDetJ(std::size_t elm) const
 {
     assert(elm < m_elementList.size() && "elm should be between 0 and size - 1 !");
@@ -23,7 +48,12 @@ inline double Mesh::getInvJ(std::size_t elm, unsigned short i, unsigned short j)
     assert(elm < m_elementList.size() && "elm should be between 0 and size - 1 !");
     assert(!m_invJ.empty());
     assert(i < 2 && j < 2 && "i and j should be 0 or 1 in 2D");
-    return m_invJ[elm](i, j);
+    return m_invJ[elm][i][j];
+}
+
+inline unsigned short Mesh::getMeshDim() const
+{
+    return m_dim;
 }
 
 inline std::vector<Eigen::MatrixXd> Mesh::getN() const
@@ -44,63 +74,37 @@ inline std::vector<Eigen::MatrixXd> Mesh::getN() const
     return Ns;
 }
 
-inline std::vector<Eigen::MatrixXd> Mesh::getB(std::size_t elm) const
+inline std::size_t Mesh::getNodesNumber() const
 {
-    assert(elm < m_elementList.size() && "elm should be between 0 and size - 1 !");
-    assert(!m_invJ.empty());
-
-    std::vector<Eigen::MatrixXd> Bs;
-
-    for(auto point: GP2Dpoints<double>)
-    {
-        Eigen::MatrixXd B(3, 6); B.setZero();
-
-        B(0,0) = B(2,0) =  - m_invJ[elm](0,0) - m_invJ[elm](1,0);
-        B(0,1) = B(2,1) =  m_invJ[elm](0,0);
-        B(0,2) = B(2,2) =  m_invJ[elm](1,0);
-
-        B(1,3) = B(2,3) =  - m_invJ[elm](0,1) - m_invJ[elm](1,1);
-        B(1,4) = B(2,4) =  m_invJ[elm](0,1);
-        B(1,5) = B(2,5) =  m_invJ[elm](1,1);
-
-        Bs.push_back(B) ;
-    }
-
-    return Bs;
+    return m_nodesList.size();
 }
 
-/**
- * \brief Compute the mesh dimension.
- * \return The mesh dimension (1, 2 or 3).
- */
-inline unsigned short Mesh::_computeMeshDim() const
+inline double Mesh::getNodePosition(std::size_t nodeIndex, unsigned short coordinate) const
 {
-    int elementDim = -1;
-
-    // loop over the dimension i to get the maximum element dimension in the mesh
-    for(unsigned short i = 0 ; i <= 3 ; ++i)
-    {
-        std::vector<int> eleTypes;
-        gmsh::model::mesh::getElementTypes(eleTypes, i);
-
-        switch(eleTypes.size())
-        {
-            case 0:
-                break;
-            case 1:
-                elementDim = i;
-                break;
-            default:
-                elementDim = i;
-                std::cerr   << "Hybrid meshes not handled in this example!"
-                            << std::endl;
-        }
-    }
-
-    return elementDim;
+    return m_nodesList[nodeIndex].position[coordinate];
 }
 
-inline unsigned short Mesh::getMeshDim() const
+inline double Mesh::getNodeState(std::size_t nodeIndex, unsigned short state) const
 {
-    return m_dim;
+    return m_nodesList[nodeIndex].states[state];
+}
+
+inline bool Mesh::isNodeFree(std::size_t nodeIndex) const
+{
+    return m_nodesList[nodeIndex].isFree;
+}
+
+inline bool Mesh::isNodeBound(std::size_t nodeIndex) const
+{
+    return m_nodesList[nodeIndex].isBound;
+}
+
+inline bool Mesh::isNodeFluidInput(std::size_t nodeIndex) const
+{
+    return m_nodesList[nodeIndex].isFluidInput;
+}
+
+inline void Mesh::setNodeState(std::size_t nodeIndex, unsigned short stateIndex, double state)
+{
+    m_nodesList[nodeIndex].states[stateIndex] = state;
 }

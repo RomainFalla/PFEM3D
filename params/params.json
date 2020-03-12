@@ -24,7 +24,8 @@
 			"rho": 1000,
 			"mu": 1e-3	
 		},
-		"whatToWrite": ["p", "ke"]
+		"whatToWrite": ["p", "ke"],
+		"initialCondition" : [0, 0, 0]
 	},
 	"verboseOutput": false
 }
