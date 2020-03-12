@@ -3,8 +3,12 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <fstream>
 #include <limits>
+
+#if defined(_OPENMP)
+    #include <cstdlib>
+    #include <omp.h>
+#endif
 
 #include <gmsh.h>
 #include <nlohmann/json.hpp>
@@ -13,12 +17,10 @@
 #include "../quadrature/gausslegendre.hpp"
 
 
-Solver::Solver(const Params& params, std::string mshName, std::string resultsName) :
-m_mesh(params)
+Solver::Solver(const nlohmann::json& j, std::string mshName, std::string resultsName) :
+m_mesh(j)
 {
     m_mesh.loadFromFile(mshName);
-
-    nlohmann::json j = params.getJSON();
 
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
@@ -44,9 +46,22 @@ m_mesh(params)
     m_p.time.currentStep = 0;
 
     m_p.initialCondition        = j["SolverIncompressibleParams"]["initialCondition"].get<std::vector<double>>();
+
+    // set the desired number of OpenMP threads
 #if defined(_OPENMP)
-    m_p.nOMPThreads             = params.getNumOMPThreads();
+    const char* pNumThreads = std::getenv("OMP_NUM_THREADS");
+
+    if(pNumThreads == nullptr)
+        m_p.nOMPThreads = 1;
+    else
+        m_p.nOMPThreads = std::atoi(pNumThreads);
+
+    omp_set_num_threads(m_p.nOMPThreads);
+    Eigen::setNbThreads(m_p.nOMPThreads);
+#else
+     m_p.nOMPThreads = 1;
 #endif
+
 
     std::vector<std::string> whatToWrite = j["SolverIncompressibleParams"]["whatToWrite"];
     for(auto what : whatToWrite)
@@ -73,7 +88,7 @@ m_mesh(params)
     gmsh::option::setNumber("General.Terminal", 0);
 #endif // DEBUG
 
-    gmsh::option::setNumber("General.NumThreads", params.getNumOMPThreads());
+    gmsh::option::setNumber("General.NumThreads", m_p.nOMPThreads);
 
     m_p.resultsName = resultsName;
 }

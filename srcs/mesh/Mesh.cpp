@@ -17,8 +17,6 @@
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
 
-#include <nlohmann/json.hpp>
-
 #include "Mesh.hpp"
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
@@ -37,13 +35,11 @@ typedef CGAL::Delaunay_triangulation_2<Kernel,asTds>         asTriangulation_2;
 typedef CGAL::Alpha_shape_2<asTriangulation_2>               Alpha_shape_2;
 
 
-Mesh::Mesh(const Params& params)
+Mesh::Mesh(const nlohmann::json& j)
 #ifdef DEBUG_GEOMVIEW
 : m_gv(CGAL::Bbox_3(0, 0, -10, 10, 10, 10))
 #endif // DEBUG_GEOMVIEW
 {
-	nlohmann::json j = params.getJSON();
-
     m_verboseOutput = j["verboseOutput"].get<bool>();
 
 	m_p.hchar = j["RemeshingParams"]["hchar"].get<double>();

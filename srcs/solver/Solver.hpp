@@ -6,7 +6,6 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-#include "../params/Params.hpp"
 #include "../mesh/Mesh.hpp"
 
 /**
@@ -74,7 +73,7 @@ struct SolverIncompressibleParams
 class Solver
 {
     public:
-        Solver(const Params& params, std::string mshName, std::string resultsName);
+        Solver(const nlohmann::json& j, std::string mshName, std::string resultsName);
         ~Solver();
 
         /**

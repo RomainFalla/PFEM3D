@@ -11,9 +11,10 @@
 #include <gmsh.h>
 #include <Eigen/Dense>
 
+#include <nlohmann/json.hpp>
+
 #include "../quadrature/gausslegendre.hpp"
 #include "Node.hpp"
-#include "../params/Params.hpp"
 
 /**
  * \struct RemeshingParams
@@ -35,7 +36,7 @@ struct RemeshingParams
 class Mesh
 {
     public:
-        Mesh(const Params& params);
+        Mesh(const nlohmann::json& j);
         ~Mesh();
 
         /**
