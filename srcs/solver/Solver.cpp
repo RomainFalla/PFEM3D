@@ -91,6 +91,22 @@ m_mesh(j)
     gmsh::option::setNumber("General.NumThreads", m_p.nOMPThreads);
 
     m_p.resultsName = resultsName;
+
+    m_N = getN();
+
+    m_sumNTN.resize(6,6); m_sumNTN.setZero();
+    for(unsigned short k = 0 ; k < m_N.size() ; ++k)
+        m_sumNTN += m_N[k].transpose()*m_N[k]*GP2Dweight<double>[k];
+
+    m_m.resize(3);
+    m_m << 1, 1, 0;
+
+    m_ddev.resize(3, 3);
+    m_ddev << 2, 0, 0,
+              0, 2, 0,
+              0, 0, 1;
+
+    m_ddev *= m_p.fluid.mu;
 }
 
 Solver::~Solver()
@@ -405,29 +421,6 @@ void Solver::buildPicardSystem()
            matrices.H + (matrices.C*qPrev(1:2*Nn))/p.dt];
     */
 
-    std::vector<Eigen::MatrixXd> N = m_mesh.getN();
-    std::vector<std::vector<Eigen::MatrixXd>> B(m_mesh.getElementNumber());
-
-    #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
-    {
-        B[elm] = m_mesh.getB(elm);
-    }
-
-    assert(N.size() == 3);
-
-    const Eigen::MatrixXd BrightP = (Eigen::MatrixXd(6,3) << 1, 0, 0,
-                                                             0, 1, 0,
-                                                             0, 0, 1,
-                                                             1, 0, 0,
-                                                             0, 1, 0,
-                                                             0, 0, 1).finished();
-
-    const Eigen::MatrixXd BleftP = (Eigen::MatrixXd(2,3) << 1, 0, 0,
-                                                            0, 1, 0).finished();
-
-    std::vector<Eigen::Triplet<double>> index;
-
     m_A.resize(3*m_mesh.getNodesNumber(), 3*m_mesh.getNodesNumber());
     m_A.data().squeeze();
     std::vector<Eigen::Triplet<double>> indexA;
@@ -464,44 +457,41 @@ void Solver::buildPicardSystem()
     Eigen::VectorXd H(m_mesh.getNodesNumber());
     H.setZero();
 
-    Eigen::MatrixXd MPrev(6, 6); MPrev.setZero();
-    for (unsigned short k = 0 ; k < N.size() ; ++k)
-        MPrev += N[k].transpose()*N[k]*GP2Dweight<double>[k];
-
-    MPrev *= 0.5*(m_p.fluid.rho/m_p.time.currentDT);
-
-    const Eigen::DiagonalMatrix<double, 3> ddev(2*m_p.fluid.mu, 2*m_p.fluid.mu, m_p.fluid.mu);
-
-    const Eigen::Vector3d m(1, 1, 0);
+    Eigen::MatrixXd MPrev = m_sumNTN*0.5*(m_p.fluid.rho/m_p.time.currentDT);
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
     {
+        Eigen::MatrixXd Be = getB(elm);
+        Eigen::MatrixXd Bep(2,3);
+        Bep << Be.topLeftCorner<1,3>(),
+               Be.bottomRightCorner<1,3>();
+
         //Me = S Nv^T Nv dV
         Eigen::MatrixXd Me = MPrev*m_mesh.getDetJ(elm);
 
         //Ke = S Bv^T ddev Bv dV
-        Eigen::MatrixXd Ke = 0.5*B[elm][0].transpose()*ddev*B[elm][0]*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
+        Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
 
         //De = S Np^T m Bv dV
         Eigen::MatrixXd De(3,6); De.setZero();
 
-        for (unsigned short k = 0 ; k < N.size() ; ++k)
-            De += (N[k].topLeftCorner<1,3>()).transpose()*m.transpose()*B[elm][k]*GP2Dweight<double>[k];
+        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+            De += (m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
 
         De *= 0.5*m_mesh.getDetJ(elm);
 
         //Ce = tauPSPG S Bp^T Nv dV
         Eigen::MatrixXd Ce(3,6); Ce.setZero();
 
-        for (unsigned short k = 0 ; k < N.size() ; ++k)
-            Ce +=(BleftP*B[elm][k]*BrightP).transpose()*N[k]*GP2Dweight<double>[k];
+        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+            Ce += Bep.transpose()*m_N[k]*GP2Dweight<double>[k];
 
         Ce *= (0.5*m_tauPSPG[elm]/m_p.time.currentDT)*m_mesh.getDetJ(elm);
 
         //Le = tauPSPG S Bp^T Bp dV
         Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_p.fluid.rho)
-                             *(BleftP*B[elm][0]*BrightP).transpose()*(BleftP*B[elm][0]*BrightP)
+                             *Bep.transpose()*Bep
                              *m_mesh.getDetJ(elm);
 
         const Eigen::Vector2d b(0, -m_p.gravity);
@@ -509,13 +499,13 @@ void Solver::buildPicardSystem()
         //Fe = S Nv^T bodyforce dV
         Eigen::MatrixXd Fe(6,1); Fe.setZero();
 
-        for (unsigned short k = 0 ; k < N.size() ; ++k)
-            Fe += N[k].transpose()*b*GP2Dweight<double>[k];
+        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+            Fe += m_N[k].transpose()*b*GP2Dweight<double>[k];
 
         Fe *= 0.5*m_p.fluid.rho*m_mesh.getDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
-        Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*(BleftP*B[elm][0]*BrightP).transpose()
+        Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*Bep.transpose()
                              *b*m_mesh.getDetJ(elm);
 
         //Big push_back ^^

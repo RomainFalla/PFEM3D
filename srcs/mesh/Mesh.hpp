@@ -40,38 +40,24 @@ class Mesh
         ~Mesh();
 
         /**
-         * \brief Get the gradient shape function matrix (linear shape functions,
-         *        not multiplied by the Jacobian determinant) for a certain element.
          * \param elm The element index.
-         * \return The gradient shape function matrix in the format:
-         *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
-         */
-        inline std::vector<Eigen::MatrixXd> getB(std::size_t elm) const;
-
-        /**
-         * \brief Get the determinant of the of the Jacobian matrix for gauss
-         *        integration for a certain elm.
-         * \param elm The element index.
-         * \return The determinantf the of the Jacobian matrix
+         * \return The determinant of the of the Jacobian matrix
          */
         inline double getDetJ(std::size_t elm) const;
 
         /**
-         * \brief Get the vector containing the index of the nodes in nodesList
-                  making a certain element.
          * \param elm The index of the element.
-         * \return The vector of index in nodesList.
+         * \return The vector containing the index of the nodes in nodesList
+         *         making a certain element.
          */
         inline std::vector<std::size_t> getElement(std::size_t elm) const;
 
         /**
-         * \brief Return the number of element in the mesh.
          * \return The number of element in the mesh.
          */
         inline std::size_t getElementNumber() const;
 
         /**
-         * \brief Get the ij element of the Jacobian matrix for a certain element.
          * \param elm The element index.
          * \param i The row index in the Jacobian matrix.
          * \param j The column index in the Jacobian matrix.
@@ -80,34 +66,23 @@ class Mesh
         inline double getInvJ(std::size_t elm, unsigned short i, unsigned short j) const;
 
         /**
-         * \brief Get the mesh dimension (2 or 3).
          * \return The mesh dimension.
          */
         inline unsigned short getMeshDim() const;
 
         /**
-         * \brief Get theshape function matrix (linear shape functions, not
-         *        multiplied by the Jacobian determinant).
-         * \return The gradient shape function matrix in the format:
-         *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
-         */
-        inline std::vector<Eigen::MatrixXd> getN() const;
-
-        /**
-         * \brief Get the number of nodes in the mesh.
+         * \return The number of nodes in the mesh.
          */
         inline std::size_t getNodesNumber() const;
 
         /**
-         * \brief Get a coordinate of a node.
          * \param nodeIndex The index of the node in the nodes list.
          * \param coordinate The wanted coordinate (0, 1, ...).
-         * \return The coordinate og the node.
+         * \return The coordinate of the node.
          */
         inline double getNodePosition(std::size_t nodeIndex, unsigned short coordinate) const;
 
         /**
-         * \brief Get a state of a node.
          * \param nodeIndex The index of the node in the nodes list.
          * \param state The wanted sate (0, 1, 2, 3, ...).
          * \return The value of the state for that node.
@@ -142,7 +117,7 @@ class Mesh
         void loadFromFile(std::string fileName);
 
         /**
-         * \brief Peform remeshing on the mesh.
+         * \brief Perform remeshing on the mesh.
          */
         void remesh();
 

@@ -83,7 +83,7 @@ bool Mesh::addNodes()
                                        + m_nodesList[m_elementList[i][2]].position[k])/3.0;
             }
 
-			newNode.states.resize(nUnknowns);
+            newNode.states.resize(nUnknowns);
             for(unsigned short k = 0 ; k < nUnknowns ; ++k)
             {
                 newNode.states[k] = (m_nodesList[m_elementList[i][0]].states[k]
@@ -225,17 +225,10 @@ unsigned short Mesh::computeMeshDim() const
 
 void Mesh::loadFromFile(std::string fileName)
 {
-    std::cout   << "================================================================"
-                << std::endl
-                << "                         LOADING THE MESH                       "
-                << std::endl
-                << "================================================================"
-                << std::endl;
-
     m_nodesList.clear();
 
     gmsh::initialize();
-    gmsh::option::setNumber("General.Terminal", 1);
+    gmsh::option::setNumber("General.Terminal", 0);
 
     std::ifstream file(fileName);
     if(file.is_open())

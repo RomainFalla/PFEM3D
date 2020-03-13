@@ -124,6 +124,11 @@ class Solver
 
         Mesh m_mesh;                       /**< The mesh the solver is using. */
 
+        std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ) */
+        Eigen::MatrixXd m_sumNTN;
+        Eigen::VectorXd m_m;
+        Eigen::MatrixXd m_ddev;
+
         Eigen::VectorXd m_qprev;            /**< The precedent solution */
         Eigen::SparseMatrix<double> m_A;    /**< The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L]. */
         Eigen::VectorXd m_b;                /**< The vector b representing the problem: [M/dt*qprev + F; H]. */
@@ -149,6 +154,19 @@ class Solver
          * \brief Build the matrix A and the vector b of the Picard Algorithm.
          */
         void computeTauPSPG();
+
+        /**
+         * \param elementIndex The index of the element in the element list.
+         * \return The gradient shape function matrix for the element in the format:
+         *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
+         */
+        inline Eigen::MatrixXd getB(std::size_t elementIndex) const;
+
+        /**
+         * \return The gradient shape function matrix for each gauss point in the format:
+         *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
+         */
+        inline std::vector<Eigen::MatrixXd> getN() const;
 };
 
 #include "Solver.inl"
