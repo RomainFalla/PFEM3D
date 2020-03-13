@@ -6,7 +6,6 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-#include "../params/Params.hpp"
 #include "../mesh/Mesh.hpp"
 
 /**
@@ -60,6 +59,7 @@ struct SolverIncompressibleParams
     PicardParams picard;    /**< Picard algorithm parameters. */
     TimeParams time;        /**< Time integration parameters. */
     std::array<bool, 5> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
+    std::string writeAs;
     std::string resultsName;    /**< File name in which the results will be written. */
     std::vector<double> initialCondition;    /**< Initial condition on u, v and p (mainly to have inlet) **/
 #if defined(_OPENMP)
@@ -74,17 +74,17 @@ struct SolverIncompressibleParams
 class Solver
 {
     public:
-        Solver(const Params& params, std::string mshName, std::string resultsName);
+        Solver(const nlohmann::json& j, std::string mshName, std::string resultsName);
         ~Solver();
 
         /**
          * \brief Display the parameters in SolverIncompressibleParams structure.
          */
-        void displaySolverParams();
+        void displaySolverParams() const;
 
         /**
-         * \brief Get a Eigen vector containg the states of the node.
-         * \param beginState The first state which will becontained in q.
+         * \return A Eigen vector containing the states of the node.
+         * \param beginState The first state which will be contained in q.
          * \param endState The last state which will be contained in q.
          */
         inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;
@@ -125,6 +125,11 @@ class Solver
 
         Mesh m_mesh;                       /**< The mesh the solver is using. */
 
+        std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ) */
+        Eigen::MatrixXd m_sumNTN;
+        Eigen::VectorXd m_m;
+        Eigen::MatrixXd m_ddev;
+
         Eigen::VectorXd m_qprev;            /**< The precedent solution */
         Eigen::SparseMatrix<double> m_A;    /**< The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L]. */
         Eigen::VectorXd m_b;                /**< The vector b representing the problem: [M/dt*qprev + F; H]. */
@@ -150,6 +155,19 @@ class Solver
          * \brief Build the matrix A and the vector b of the Picard Algorithm.
          */
         void computeTauPSPG();
+
+        /**
+         * \param elementIndex The index of the element in the element list.
+         * \return The gradient shape function matrix for the element in the format:
+         *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
+         */
+        inline Eigen::MatrixXd getB(std::size_t elementIndex) const;
+
+        /**
+         * \return The gradient shape function matrix for each gauss point in the format:
+         *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
+         */
+        inline std::vector<Eigen::MatrixXd> getN() const;
 };
 
 #include "Solver.inl"

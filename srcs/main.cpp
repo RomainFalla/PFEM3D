@@ -4,9 +4,9 @@
 #include <string>
 #include <fstream>
 
-#include "params/Params.hpp"
+#include <nlohmann/json.hpp>
+
 #include "solver/Solver.hpp"
-#include "solver/SolverCompressible.hpp"
 
 /**
  * @param  argv[1] .json file that contains the parameters.
@@ -25,11 +25,18 @@ int main(int argc, char **argv)
 
     try
     {
-        Params params;
-        params.loadFromFile(std::string(argv[1]));
+        std::string paramsFileName = std::string(argv[1]);
+        std::ifstream paramFile(paramsFileName);
+        nlohmann::json j;
+
+        if(!paramFile.is_open())
+            throw std::runtime_error("The params file cannot be read!");
+
+        paramFile >> j;
+        paramFile.close();
 
         auto startTime = std::chrono::high_resolution_clock::now();
-        Solver solver(params, std::string(argv[2]), std::string(argv[3]));
+        Solver solver(j, std::string(argv[2]), std::string(argv[3]));
         solver.solveProblem();
         auto endTime = std::chrono::high_resolution_clock::now();
         auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);

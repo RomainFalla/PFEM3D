@@ -17,8 +17,6 @@
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
 
-#include <nlohmann/json.hpp>
-
 #include "Mesh.hpp"
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
@@ -37,13 +35,11 @@ typedef CGAL::Delaunay_triangulation_2<Kernel,asTds>         asTriangulation_2;
 typedef CGAL::Alpha_shape_2<asTriangulation_2>               Alpha_shape_2;
 
 
-Mesh::Mesh(const Params& params)
+Mesh::Mesh(const nlohmann::json& j)
 #ifdef DEBUG_GEOMVIEW
 : m_gv(CGAL::Bbox_3(0, 0, -10, 10, 10, 10))
 #endif // DEBUG_GEOMVIEW
 {
-	nlohmann::json j = params.getJSON();
-
     m_verboseOutput = j["verboseOutput"].get<bool>();
 
 	m_p.hchar = j["RemeshingParams"]["hchar"].get<double>();
@@ -87,7 +83,7 @@ bool Mesh::addNodes()
                                        + m_nodesList[m_elementList[i][2]].position[k])/3.0;
             }
 
-			newNode.states.resize(nUnknowns);
+            newNode.states.resize(nUnknowns);
             for(unsigned short k = 0 ; k < nUnknowns ; ++k)
             {
                 newNode.states[k] = (m_nodesList[m_elementList[i][0]].states[k]
@@ -229,17 +225,10 @@ unsigned short Mesh::computeMeshDim() const
 
 void Mesh::loadFromFile(std::string fileName)
 {
-    std::cout   << "================================================================"
-                << std::endl
-                << "                         LOADING THE MESH                       "
-                << std::endl
-                << "================================================================"
-                << std::endl;
-
     m_nodesList.clear();
 
     gmsh::initialize();
-    gmsh::option::setNumber("General.Terminal", 1);
+    gmsh::option::setNumber("General.Terminal", 0);
 
     std::ifstream file(fileName);
     if(file.is_open())
@@ -468,6 +457,9 @@ void Mesh::restoreNodesList()
     m_nodesList = m_nodesListSave;
 
     m_nodesListSave.clear();
+
+    computeDetJ();
+    computeInvJ();
 }
 
 void Mesh::saveNodesList()

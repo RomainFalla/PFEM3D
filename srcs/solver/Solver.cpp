@@ -3,8 +3,12 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <fstream>
 #include <limits>
+
+#if defined(_OPENMP)
+    #include <cstdlib>
+    #include <omp.h>
+#endif
 
 #include <gmsh.h>
 #include <nlohmann/json.hpp>
@@ -13,13 +17,9 @@
 #include "../quadrature/gausslegendre.hpp"
 
 
-Solver::Solver(const Params& params, std::string mshName, std::string resultsName) :
-m_mesh(params)
+Solver::Solver(const nlohmann::json& j, std::string mshName, std::string resultsName) :
+m_mesh(j)
 {
-    m_mesh.loadFromFile(mshName);
-
-    nlohmann::json j = params.getJSON();
-
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
     m_p.hchar                   = j["RemeshingParams"]["hchar"].get<double>();
@@ -40,13 +40,27 @@ m_mesh(params)
     m_p.time.simuDTToWrite      = j["SolverIncompressibleParams"]["TimeParams"]["simuDTToWrite"].get<double>();
     m_p.time.currentDT          = m_p.time.maxDT;
     m_p.time.nextWriteTrigger   = m_p.time.simuDTToWrite;
-    m_p.time.currentTime = 0.0;
-    m_p.time.currentStep = 0;
+    m_p.time.currentTime        = 0.0;
+    m_p.time.currentStep        = 0;
 
     m_p.initialCondition        = j["SolverIncompressibleParams"]["initialCondition"].get<std::vector<double>>();
+
+    // set the desired number of OpenMP threads
 #if defined(_OPENMP)
-    m_p.nOMPThreads             = params.getNumOMPThreads();
+    const char* pNumThreads = std::getenv("OMP_NUM_THREADS");
+
+    if(pNumThreads == nullptr)
+        m_p.nOMPThreads = 1;
+    else
+        m_p.nOMPThreads = std::atoi(pNumThreads);
+
+    omp_set_num_threads(m_p.nOMPThreads);
+    Eigen::setNbThreads(m_p.nOMPThreads);
+#else
+     m_p.nOMPThreads = 1;
 #endif
+
+    m_mesh.loadFromFile(mshName);
 
     std::vector<std::string> whatToWrite = j["SolverIncompressibleParams"]["whatToWrite"];
     for(auto what : whatToWrite)
@@ -65,6 +79,10 @@ m_mesh(params)
             throw std::runtime_error("Unknown quantity to write!");
     }
 
+    m_p.writeAs = j["SolverIncompressibleParams"]["writeAs"];
+    if(!(m_p.writeAs == "Nodes" || m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements"))
+        throw std::runtime_error("Unexpected date type to write!");
+
     gmsh::initialize();
 
 #ifndef NDEBUG
@@ -73,9 +91,25 @@ m_mesh(params)
     gmsh::option::setNumber("General.Terminal", 0);
 #endif // DEBUG
 
-    gmsh::option::setNumber("General.NumThreads", params.getNumOMPThreads());
+    gmsh::option::setNumber("General.NumThreads", m_p.nOMPThreads);
 
     m_p.resultsName = resultsName;
+
+    m_N = getN();
+
+    m_sumNTN.resize(6,6); m_sumNTN.setZero();
+    for(unsigned short k = 0 ; k < m_N.size() ; ++k)
+        m_sumNTN += m_N[k].transpose()*m_N[k]*GP2Dweight<double>[k];
+
+    m_m.resize(3);
+    m_m << 1, 1, 0;
+
+    m_ddev.resize(3, 3);
+    m_ddev << 2, 0, 0,
+              0, 2, 0,
+              0, 0, 1;
+
+    m_ddev *= m_p.fluid.mu;
 }
 
 Solver::~Solver()
@@ -104,7 +138,7 @@ void Solver::applyBoundaryConditions()
         }
     });
 
-    #pragma omp parallel for default(shared)
+    //Do not parallelize this
     for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         if(m_mesh.isNodeFree(n))
@@ -133,7 +167,7 @@ void Solver::applyBoundaryConditions()
     }
 }
 
-void Solver::displaySolverParams()
+void Solver::displaySolverParams() const
 {
     std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
@@ -143,7 +177,7 @@ void Solver::displaySolverParams()
     std::cout << "Density: " << m_p.fluid.rho << " kg/m^3" << std::endl;
     std::cout << "Viscosity: " << m_p.fluid.mu << " Pa s" << std::endl;
     std::cout << "Picard relative tolerance: " << m_p.picard.relTol  << std::endl;
-    std::cout << "Maxixum picard iteration number: " << m_p.picard.maxIter << std::endl;
+    std::cout << "Maximum picard iteration number: " << m_p.picard.maxIter << std::endl;
     std::cout << "End simulation time: " << m_p.time.simuTime << " s" << std::endl;
     std::cout << "Write solution every: " << m_p.time.simuDTToWrite << " s" << std::endl;
     std::cout << "Adapt time step: " << (m_p.time.adaptDT ? "yes" : "no") << std::endl;
@@ -159,14 +193,14 @@ void Solver::displaySolverParams()
 
 void Solver::setInitialCondition()
 {
-	assert(m_mesh.getNodesNumber() != 0);
+    assert(m_mesh.getNodesNumber() != 0);
 
-	m_mesh.setStatesNumber(3);
+    m_mesh.setStatesNumber(3);
 
-	#pragma omp parallel for default(shared)
-	for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-	{
-		if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
+    #pragma omp parallel for default(shared)
+    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    {
+        if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
         {
             m_mesh.setNodeState(n, 0, m_p.initialCondition[0]);
             m_mesh.setNodeState(n, 1, m_p.initialCondition[1]);
@@ -178,7 +212,7 @@ void Solver::setInitialCondition()
             m_mesh.setNodeState(n, 1, 0);
             m_mesh.setNodeState(n, 2, 0);
         }
-	}
+    }
 }
 
 void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState)
@@ -206,9 +240,6 @@ void Solver::solveProblem()
 
     std::cout << "----------------------------------------------------------------" << std::endl;
 
-    if(!m_verboseOutput)
-        std::cout << std::fixed << std::setprecision(3);
-
     setInitialCondition();
 
     writeData();
@@ -221,19 +252,20 @@ void Solver::solveProblem()
         {
             std::cout << "----------------------------------------------------------------" << std::endl;
             std::cout << "Solving time step: " << m_p.time.currentTime + m_p.time.currentDT
-                      << "/" << m_p.time.simuTime << " s" << std::endl;
+                      << "/" << m_p.time.simuTime << " s, dt = " << m_p.time.currentDT << std::endl;
             std::cout << "----------------------------------------------------------------" << std::endl;
         }
         else
         {
+            std::cout << std::fixed << std::setprecision(3);
             std::cout << "\r" << "Solving time step: " << m_p.time.currentTime + m_p.time.currentDT
-                      << "/" << m_p.time.simuTime << " s" << std::flush;
+                      << "/" << m_p.time.simuTime << " s, dt = ";
+            std::cout << std::scientific;
+            std::cout << m_p.time.currentDT << " s" << std::flush;
         }
 
         if(solveCurrentTimeStep())
         {
-            m_p.time.currentTime += m_p.time.currentDT;
-
             if(m_p.time.currentTime >= m_p.time.nextWriteTrigger)
             {
                 writeData();
@@ -276,8 +308,6 @@ void Solver::solveProblem()
         m_p.time.currentStep++;
     }
 
-    writeData();
-
     std::cout << std::endl;
 }
 
@@ -306,7 +336,9 @@ bool Solver::solveCurrentTimeStep()
 
         m_solverLU.compute(m_A);
         if(m_solverLU.info() == Eigen::Success)
+        {
             qIter = m_solverLU.solve(m_b);
+        }
         else
         {
             m_mesh.restoreNodesList();
@@ -316,7 +348,6 @@ bool Solver::solveCurrentTimeStep()
         setNodesStatesfromQ(qIter, 0, 2);
         Eigen::VectorXd deltaPos = qIter*m_p.time.currentDT;
         m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + 2*m_mesh.getNodesNumber()));
-
         m_p.picard.currentNumIter++;
 
         if(m_p.picard.currentNumIter == 1)
@@ -374,6 +405,8 @@ bool Solver::solveCurrentTimeStep()
         }
     }
 
+    m_p.time.currentTime += m_p.time.currentDT;
+
     return true;
 }
 
@@ -387,29 +420,6 @@ void Solver::buildPicardSystem()
       b = [matrices.F + (matrices.M*qPrev(1:2*Nn))/p.dt;...
            matrices.H + (matrices.C*qPrev(1:2*Nn))/p.dt];
     */
-
-    std::vector<Eigen::MatrixXd> N = m_mesh.getN();
-    std::vector<std::vector<Eigen::MatrixXd>> B(m_mesh.getElementNumber());
-
-    #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
-    {
-        B[elm] = m_mesh.getB(elm);
-    }
-
-    assert(N.size() == 3);
-
-    const Eigen::MatrixXd BrightP = (Eigen::MatrixXd(6,3) << 1, 0, 0,
-                                                             0, 1, 0,
-                                                             0, 0, 1,
-                                                             1, 0, 0,
-                                                             0, 1, 0,
-                                                             0, 0, 1).finished();
-
-    const Eigen::MatrixXd BleftP = (Eigen::MatrixXd(2,3) << 1, 0, 0,
-                                                            0, 1, 0).finished();
-
-    std::vector<Eigen::Triplet<double>> index;
 
     m_A.resize(3*m_mesh.getNodesNumber(), 3*m_mesh.getNodesNumber());
     m_A.data().squeeze();
@@ -447,44 +457,41 @@ void Solver::buildPicardSystem()
     Eigen::VectorXd H(m_mesh.getNodesNumber());
     H.setZero();
 
-    Eigen::MatrixXd MPrev(6, 6); MPrev.setZero();
-    for (unsigned short k = 0 ; k < N.size() ; ++k)
-        MPrev += N[k].transpose()*N[k]*GP2Dweight<double>[k];
-
-    MPrev *= 0.5*(m_p.fluid.rho/m_p.time.currentDT);
-
-    const Eigen::DiagonalMatrix<double, 3> ddev(2*m_p.fluid.mu, 2*m_p.fluid.mu, m_p.fluid.mu);
-
-    const Eigen::Vector3d m(1, 1, 0);
+    Eigen::MatrixXd MPrev = m_sumNTN*0.5*(m_p.fluid.rho/m_p.time.currentDT);
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
     {
+        Eigen::MatrixXd Be = getB(elm);
+        Eigen::MatrixXd Bep(2,3);
+        Bep << Be.topLeftCorner<1,3>(),
+               Be.bottomRightCorner<1,3>();
+
         //Me = S Nv^T Nv dV
         Eigen::MatrixXd Me = MPrev*m_mesh.getDetJ(elm);
 
         //Ke = S Bv^T ddev Bv dV
-        Eigen::MatrixXd Ke = 0.5*B[elm][0].transpose()*ddev*B[elm][0]*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
+        Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
 
         //De = S Np^T m Bv dV
         Eigen::MatrixXd De(3,6); De.setZero();
 
-        for (unsigned short k = 0 ; k < N.size() ; ++k)
-            De += (N[k].topLeftCorner<1,3>()).transpose()*m.transpose()*B[elm][k]*GP2Dweight<double>[k];
+        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+            De += (m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
 
         De *= 0.5*m_mesh.getDetJ(elm);
 
         //Ce = tauPSPG S Bp^T Nv dV
         Eigen::MatrixXd Ce(3,6); Ce.setZero();
 
-        for (unsigned short k = 0 ; k < N.size() ; ++k)
-            Ce +=(BleftP*B[elm][k]*BrightP).transpose()*N[k]*GP2Dweight<double>[k];
+        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+            Ce += Bep.transpose()*m_N[k]*GP2Dweight<double>[k];
 
         Ce *= (0.5*m_tauPSPG[elm]/m_p.time.currentDT)*m_mesh.getDetJ(elm);
 
         //Le = tauPSPG S Bp^T Bp dV
         Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_p.fluid.rho)
-                             *(BleftP*B[elm][0]*BrightP).transpose()*(BleftP*B[elm][0]*BrightP)
+                             *Bep.transpose()*Bep
                              *m_mesh.getDetJ(elm);
 
         const Eigen::Vector2d b(0, -m_p.gravity);
@@ -492,13 +499,13 @@ void Solver::buildPicardSystem()
         //Fe = S Nv^T bodyforce dV
         Eigen::MatrixXd Fe(6,1); Fe.setZero();
 
-        for (unsigned short k = 0 ; k < N.size() ; ++k)
-            Fe += N[k].transpose()*b*GP2Dweight<double>[k];
+        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+            Fe += m_N[k].transpose()*b*GP2Dweight<double>[k];
 
         Fe *= 0.5*m_p.fluid.rho*m_mesh.getDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
-        Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*(BleftP*B[elm][0]*BrightP).transpose()
+        Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*Bep.transpose()
                              *b*m_mesh.getDetJ(elm);
 
         //Big push_back ^^
@@ -693,7 +700,10 @@ void Solver::writeData() const
 {
     gmsh::model::add("theModel");
     gmsh::model::setCurrent("theModel");
-    gmsh::model::addDiscreteEntity(0, 1);
+    if(m_p.writeAs == "Nodes" || m_p.writeAs == "NodesElements")
+        gmsh::model::addDiscreteEntity(0, 1);
+    if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
+        gmsh::model::addDiscreteEntity(2, 2);
 
     if(m_p.whatToWrite[0])
         gmsh::view::add("u", 1);
@@ -723,20 +733,24 @@ void Solver::writeData() const
 
     gmsh::model::mesh::addNodes(0, 1, nodesTags, nodesCoord);
 
-//    std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
-//    std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
-//    #pragma omp parallel for default(shared)
-//    for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
-//    {
-//        elementTags[i] = i + 1;
-//        nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
-//        nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
-//        nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
-//    }
-//
-//    gmsh::model::mesh::addElementsByType(1, 2, elementTags, nodesTagsPerElement);
+    if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
+    {
+        std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
+        std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
+        #pragma omp parallel for default(shared)
+        for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
+        {
+            elementTags[i] = i + 1;
+            nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
+            nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
+            nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
+        }
 
-    gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
+        gmsh::model::mesh::addElementsByType(2, 2, elementTags, nodesTagsPerElement);
+    }
+
+    if(m_p.writeAs == "Nodes" || m_p.writeAs == "NodesElements")
+        gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
 
     std::vector<std::vector<double>> dataU;
     std::vector<std::vector<double>> dataV;
