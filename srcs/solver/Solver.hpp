@@ -59,6 +59,7 @@ struct SolverIncompressibleParams
     PicardParams picard;    /**< Picard algorithm parameters. */
     TimeParams time;        /**< Time integration parameters. */
     std::array<bool, 5> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
+    std::string writeAs;
     std::string resultsName;    /**< File name in which the results will be written. */
     std::vector<double> initialCondition;    /**< Initial condition on u, v and p (mainly to have inlet) **/
 #if defined(_OPENMP)
@@ -79,11 +80,11 @@ class Solver
         /**
          * \brief Display the parameters in SolverIncompressibleParams structure.
          */
-        void displaySolverParams();
+        void displaySolverParams() const;
 
         /**
-         * \brief Get a Eigen vector containg the states of the node.
-         * \param beginState The first state which will becontained in q.
+         * \return A Eigen vector containing the states of the node.
+         * \param beginState The first state which will be contained in q.
          * \param endState The last state which will be contained in q.
          */
         inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;

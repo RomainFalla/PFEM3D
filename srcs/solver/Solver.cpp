@@ -20,8 +20,6 @@
 Solver::Solver(const nlohmann::json& j, std::string mshName, std::string resultsName) :
 m_mesh(j)
 {
-    m_mesh.loadFromFile(mshName);
-
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
     m_p.hchar                   = j["RemeshingParams"]["hchar"].get<double>();
@@ -42,8 +40,8 @@ m_mesh(j)
     m_p.time.simuDTToWrite      = j["SolverIncompressibleParams"]["TimeParams"]["simuDTToWrite"].get<double>();
     m_p.time.currentDT          = m_p.time.maxDT;
     m_p.time.nextWriteTrigger   = m_p.time.simuDTToWrite;
-    m_p.time.currentTime = 0.0;
-    m_p.time.currentStep = 0;
+    m_p.time.currentTime        = 0.0;
+    m_p.time.currentStep        = 0;
 
     m_p.initialCondition        = j["SolverIncompressibleParams"]["initialCondition"].get<std::vector<double>>();
 
@@ -62,6 +60,7 @@ m_mesh(j)
      m_p.nOMPThreads = 1;
 #endif
 
+    m_mesh.loadFromFile(mshName);
 
     std::vector<std::string> whatToWrite = j["SolverIncompressibleParams"]["whatToWrite"];
     for(auto what : whatToWrite)
@@ -79,6 +78,10 @@ m_mesh(j)
         else
             throw std::runtime_error("Unknown quantity to write!");
     }
+
+    m_p.writeAs = j["SolverIncompressibleParams"]["writeAs"];
+    if(!(m_p.writeAs == "Nodes" || m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements"))
+        throw std::runtime_error("Unexpected date type to write!");
 
     gmsh::initialize();
 
@@ -166,7 +169,7 @@ void Solver::applyBoundaryConditions()
     }
 }
 
-void Solver::displaySolverParams()
+void Solver::displaySolverParams() const
 {
     std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
@@ -176,7 +179,7 @@ void Solver::displaySolverParams()
     std::cout << "Density: " << m_p.fluid.rho << " kg/m^3" << std::endl;
     std::cout << "Viscosity: " << m_p.fluid.mu << " Pa s" << std::endl;
     std::cout << "Picard relative tolerance: " << m_p.picard.relTol  << std::endl;
-    std::cout << "Maxixum picard iteration number: " << m_p.picard.maxIter << std::endl;
+    std::cout << "Maximum picard iteration number: " << m_p.picard.maxIter << std::endl;
     std::cout << "End simulation time: " << m_p.time.simuTime << " s" << std::endl;
     std::cout << "Write solution every: " << m_p.time.simuDTToWrite << " s" << std::endl;
     std::cout << "Adapt time step: " << (m_p.time.adaptDT ? "yes" : "no") << std::endl;
@@ -337,7 +340,9 @@ bool Solver::solveCurrentTimeStep()
 
         m_solverLU.compute(m_A);
         if(m_solverLU.info() == Eigen::Success)
+        {
             qIter = m_solverLU.solve(m_b);
+        }
         else
         {
             m_mesh.restoreNodesList();
@@ -347,7 +352,6 @@ bool Solver::solveCurrentTimeStep()
         setNodesStatesfromQ(qIter, 0, 2);
         Eigen::VectorXd deltaPos = qIter*m_p.time.currentDT;
         m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + 2*m_mesh.getNodesNumber()));
-
         m_p.picard.currentNumIter++;
 
         if(m_p.picard.currentNumIter == 1)
@@ -700,7 +704,10 @@ void Solver::writeData() const
 {
     gmsh::model::add("theModel");
     gmsh::model::setCurrent("theModel");
-    gmsh::model::addDiscreteEntity(0, 1);
+    if(m_p.writeAs == "Nodes" || m_p.writeAs == "NodesElements")
+        gmsh::model::addDiscreteEntity(0, 1);
+    if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
+        gmsh::model::addDiscreteEntity(2, 2);
 
     if(m_p.whatToWrite[0])
         gmsh::view::add("u", 1);
@@ -730,20 +737,24 @@ void Solver::writeData() const
 
     gmsh::model::mesh::addNodes(0, 1, nodesTags, nodesCoord);
 
-//    std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
-//    std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
-//    #pragma omp parallel for default(shared)
-//    for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
-//    {
-//        elementTags[i] = i + 1;
-//        nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
-//        nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
-//        nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
-//    }
-//
-//    gmsh::model::mesh::addElementsByType(1, 2, elementTags, nodesTagsPerElement);
+    if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
+    {
+        std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
+        std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
+        #pragma omp parallel for default(shared)
+        for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
+        {
+            elementTags[i] = i + 1;
+            nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
+            nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
+            nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
+        }
 
-    gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
+        gmsh::model::mesh::addElementsByType(2, 2, elementTags, nodesTagsPerElement);
+    }
+
+    if(m_p.writeAs == "Nodes" || m_p.writeAs == "NodesElements")
+        gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
 
     std::vector<std::vector<double>> dataU;
     std::vector<std::vector<double>> dataV;
