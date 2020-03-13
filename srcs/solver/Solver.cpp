@@ -242,9 +242,6 @@ void Solver::solveProblem()
 
     std::cout << "----------------------------------------------------------------" << std::endl;
 
-    if(!m_verboseOutput)
-        std::cout << std::fixed << std::setprecision(3);
-
     setInitialCondition();
 
     writeData();
@@ -257,13 +254,16 @@ void Solver::solveProblem()
         {
             std::cout << "----------------------------------------------------------------" << std::endl;
             std::cout << "Solving time step: " << m_p.time.currentTime + m_p.time.currentDT
-                      << "/" << m_p.time.simuTime << " s" << std::endl;
+                      << "/" << m_p.time.simuTime << " s, dt = " << m_p.time.currentDT << std::endl;
             std::cout << "----------------------------------------------------------------" << std::endl;
         }
         else
         {
+            std::cout << std::fixed << std::setprecision(3);
             std::cout << "\r" << "Solving time step: " << m_p.time.currentTime + m_p.time.currentDT
-                      << "/" << m_p.time.simuTime << " s" << std::flush;
+                      << "/" << m_p.time.simuTime << " s, dt = ";
+            std::cout << std::scientific;
+            std::cout << m_p.time.currentDT << " s" << std::flush;
         }
 
         if(solveCurrentTimeStep())
