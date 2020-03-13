@@ -140,7 +140,7 @@ void Solver::applyBoundaryConditions()
         }
     });
 
-    #pragma omp parallel for default(shared)
+    //Do not parallelize this
     for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         if(m_mesh.isNodeFree(n))
