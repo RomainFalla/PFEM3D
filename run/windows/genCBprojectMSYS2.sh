@@ -28,9 +28,9 @@ cp -r ../params/ bin
 cp -r ${GMSHSDK}/lib/gmsh-4.5.dll bin
 cp -r ../run/windows/start.bat bin
 
-sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/main.dir/build.make
-sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/main.dir/build.make
-sed -i 's? C:/building/msys64/mingw64/lib/libmpfr.a C:/building/msys64/mingw64/lib/libgmp.dll.a?  C:/tools/msys64/mingw64/lib/libmpfr.a C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/main.dir/linklibs.rsp
+sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/pfem.dir/build.make
+sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/pfem.dir/build.make
+sed -i 's? C:/building/msys64/mingw64/lib/libmpfr.a C:/building/msys64/mingw64/lib/libgmp.dll.a?  C:/tools/msys64/mingw64/lib/libmpfr.a C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/pfem.dir/linklibs.rsp
 
 sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/Mesh.dir/build.make
 sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/Mesh.dir/build.make

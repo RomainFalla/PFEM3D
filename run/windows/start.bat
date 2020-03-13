@@ -2,5 +2,5 @@
 
 @ECHO OFF
 SET OMP_NUM_THREADS=2
-main.exe params/params.json geometry/square.msh results.msh
+pfem.exe params/params.json geometry/square.msh results.msh
 PAUSE
