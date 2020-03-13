@@ -457,6 +457,9 @@ void Mesh::restoreNodesList()
     m_nodesList = m_nodesListSave;
 
     m_nodesListSave.clear();
+
+    computeDetJ();
+    computeInvJ();
 }
 
 void Mesh::saveNodesList()
