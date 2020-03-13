@@ -310,8 +310,6 @@ void Solver::solveProblem()
         m_p.time.currentStep++;
     }
 
-    writeData();
-
     std::cout << std::endl;
 }
 
