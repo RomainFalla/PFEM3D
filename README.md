@@ -28,4 +28,4 @@ An older version of CGAL is downloaded due to a bug in the latest version propos
 Do not forget to download gmsh (it will be downloaded automatically if you use the `run/windows/genCBproject.sh` file).
 
 ### MacOS
-Nothing should prevent the project to be build on macOS and it is nearly like linux (it is highly recommende to install a compiler supporting OpenMP).
+Nothing should prevent the project to be built on macOS and it is nearly like linux (it is highly recommende to install a compiler supporting OpenMP).
