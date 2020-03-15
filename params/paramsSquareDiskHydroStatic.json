@@ -1,14 +1,15 @@
 {
-	"RemeshingParams": {
+	"ProblemType": "Incompressible",
+	"Remeshing": {
 		"hchar": 0.25,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
 		"boundingBox": [-2, -1, 12, 100]
 	},
-	"SolverIncompressibleParams": {
+	"Solver": {
 		"gravity": 9.81,
-		"TimeParams": {
+		"Time": {
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
     		"coeffDTdecrease": 2.0,
@@ -16,15 +17,16 @@
     		"simuTime": 4,
     		"simuDTToWrite": 0.025
 		},
-		"PicardParams": {
+		"Picard": {
 			"relTol": 5e-6,
     		"maxIter": 10
 		},
-		"FluidParams": {
+		"Fluid": {
 			"rho": 1000,
 			"mu": 1e-3	
 		},
 		"whatToWrite": ["p", "ke"],
+		"writeAs": "NodesElements",
 		"initialCondition" : [0, 0, 0]
 	},
 	"verboseOutput": false

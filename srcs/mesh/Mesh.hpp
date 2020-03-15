@@ -40,12 +40,6 @@ class Mesh
         ~Mesh();
 
         /**
-         * \param elm The element index.
-         * \return The determinant of the of the Jacobian matrix
-         */
-        inline double getDetJ(std::size_t elm) const;
-
-        /**
          * \param elm The index of the element.
          * \return The vector containing the index of the nodes in nodesList
          *         making a certain element.
@@ -53,9 +47,10 @@ class Mesh
         inline std::vector<std::size_t> getElement(std::size_t elm) const;
 
         /**
-         * \return The number of element in the mesh.
+         * \param elm The element index.
+         * \return The determinant of the of the Jacobian matrix
          */
-        inline std::size_t getElementNumber() const;
+        inline double getElementDetJ(std::size_t elm) const;
 
         /**
          * \param elm The element index.
@@ -63,7 +58,31 @@ class Mesh
          * \param j The column index in the Jacobian matrix.
          * \return The ij element of the Jacobian matrix for a certain element.
          */
-        inline double getInvJ(std::size_t elm, unsigned short i, unsigned short j) const;
+        inline double getElementInvJ(std::size_t elm, unsigned short i, unsigned short j) const;
+
+        /**
+         * \return The number of elements in the mesh.
+         */
+        inline std::size_t getElementsNumber() const;
+
+        /**
+         * \param elm The element index.
+         * \return The determinant of the of the Jacobian matrix
+         */
+        inline double getFreeSurfaceDetJ(std::size_t edge) const;
+
+
+        /**
+         * \param edge The index of the edge.
+         * \return The vector containing the index of the nodes in nodesList
+         *         making a certain edge.
+         */
+        inline std::vector<std::size_t> getFreeSurfaceEdge(std::size_t edge) const;
+
+        /**
+         * \return The number of free surface edges in the mesh.
+         */
+        inline std::size_t getFreeSurfaceEdgesNumber() const;
 
         /**
          * \return The mesh dimension.
@@ -165,9 +184,11 @@ class Mesh
 
         std::vector<Node> m_nodesList;      /**< List of nodes of the mesh. */
         std::vector<Node> m_nodesListSave;  /**< A copy of the nodes list (usefull for non-linear algorithm). */
-        std::vector<std::vector<std::size_t>> m_elementList;    /**< The list of element (triplet of index in the nodesList. */
-        std::vector<double> m_detJ;         /**< The Jacobian matrix determinant of each element. */
-        std::vector<std::vector<std::vector<double>>> m_invJ;   /**< The inverse Jacobian matrix of each element. */
+        std::vector<std::vector<std::size_t>> m_elementsList;    /**< The list of element (triplet of index in the nodesList. */
+        std::vector<std::vector<std::size_t>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
+        std::vector<double> m_elementDetJ;         /**< The Jacobian matrix determinant of each element. */
+        std::vector<std::vector<std::vector<double>>> m_elementInvJ;   /**< The inverse Jacobian matrix of each element. */
+        std::vector<double> m_freeSurfaceEdgeDetJ;         /**< The Jacobian matrix determinant of each free surface edge. */
 
 #ifdef DEBUG_GEOMVIEW
         CGAL::Geomview_stream m_gv; /**< A geomview stream object to interact with geomview if installed. */
@@ -185,17 +206,23 @@ class Mesh
          */
         bool checkBoundingBox();
 
-                /**
+        /**
          * \brief Compute the determinant of the of the Jacobian matrix for gauss
          *        integration for each triangle.
          */
-        void computeDetJ();
+        void computeElementDetJ();
 
         /**
          * \brief Compute the inverse Jacobian matrix for gauss integration for each
          *        triangle.
          */
-        void computeInvJ();
+        void computeElementInvJ();
+
+        /**
+         * \brief Compute the determinant of the of the Jacobian matrix for gauss
+         *        integration for each edge.
+         */
+        void computeFreeSurfaceEdgeDetJ();
 
          /**
          * \brief Compute the mesh dimension from the .msh file.

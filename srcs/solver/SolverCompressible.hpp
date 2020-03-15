@@ -1,5 +1,5 @@
-#ifndef SOLVER_HPP_INCLUDED
-#define SOLVER_HPP_INCLUDED
+#ifndef SOLVERCOMPRESSIBLE_HPP_INCLUDED
+#define SOLVERCOMPRESSIBLE_HPP_INCLUDED
 
 #include <vector>
 
@@ -9,36 +9,27 @@
 #include "../mesh/Mesh.hpp"
 
 /**
- * \struct FluidParams
+ * \struct FluidCompressibleParams
  * \brief Incompressible fluid parameters.
  */
-struct FluidParams
+struct FluidCompressibleParams
 {
-    double rho; /**< The fluid density (kg/m^3). */
+    double rho0; /**< The fluid density (kg/m^3). */
     double mu;  /**< The fluid viscosity (Pa s). */
+    double K0;
+    double K0prime;
+    double pInfty;
 };
 
 /**
- * \struct PicardParams
- * \brief Picard algorithm parameters.
- */
-struct PicardParams
-{
-    double relTol;                  /**< Relative tolerance of the algorithm. */
-    unsigned int maxIter;           /**< Maximum number of iterations for the algorithm. */
-    unsigned int currentNumIter;    /**< Current number of Picard algorithm iterations. */
-};
-
-/**
- * \struct TimeParams
+ * \struct TimeCompressibleParams
  * \brief Time integration parameters.
  */
-struct TimeParams
+struct TimeCompressibleParams
 {
     bool adaptDT;               /**< Should the time step be changed during the computation? */
     double currentDT;           /**< Current time step. */
-    double coeffDTincrease;     /**< Coefficient to multiply the current time step with if we increase it. */
-    double coeffDTdecrease;     /**< Coefficient to divide the current time step with if we decrease it. */
+    double securityCoeff;
     double maxDT;               /**< Maximu allowed time step. */
     double simuTime;            /**< Physical time which we want to simulate. */
     double simuDTToWrite;       /**< For which time interval should the program write data. */
@@ -48,17 +39,16 @@ struct TimeParams
 };
 
 /**
- * \struct SolverIncompressibleParams
- * \brief Incompressible solver parameters.
+ * \struct SolverCompressibleParams
+ * \brief Compressible solver parameters.
  */
-struct SolverIncompressibleParams
+struct SolverCompressibleParams
 {
     double hchar;           /**< Characteristic size of an element. */
     double gravity;         /**< Acceleration of the gravity (g > 0). */
-    FluidParams fluid;      /**< Fluid parameters. */
-    PicardParams picard;    /**< Picard algorithm parameters. */
-    TimeParams time;        /**< Time integration parameters. */
-    std::array<bool, 5> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
+    FluidCompressibleParams fluid;      /**< Fluid parameters. */
+    TimeCompressibleParams time;        /**< Time integration parameters. */
+    std::array<bool, 6> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity, rho). */
     std::string writeAs;
     std::string resultsName;    /**< File name in which the results will be written. */
     std::vector<double> initialCondition;    /**< Initial condition on u, v and p (mainly to have inlet) **/
@@ -68,17 +58,17 @@ struct SolverIncompressibleParams
 };
 
 /**
- * \class Solver
- * \brief Represents a solver for an incompressible Newtonian fluid.
+ * \class SolverCompressible
+ * \brief Represents a solver for an compressible Newtonian fluid.
  */
-class Solver
+class SolverCompressible
 {
     public:
-        Solver(const nlohmann::json& j, std::string mshName, std::string resultsName);
-        ~Solver();
+        SolverCompressible(const nlohmann::json& j, std::string mshName, std::string resultsName);
+        ~SolverCompressible();
 
         /**
-         * \brief Display the parameters in SolverIncompressibleParams structure.
+         * \brief Display the parameters in SolverCompressibleParams structure.
          */
         void displaySolverParams() const;
 
@@ -120,41 +110,44 @@ class Solver
         void writeData() const;
 
     private:
-        SolverIncompressibleParams m_p;     /**< Solver parameters. */
+        SolverCompressibleParams m_p;     /**< Solver parameters. */
         bool m_verboseOutput;               /**< Should the output be verbose? */
 
         Mesh m_mesh;                       /**< The mesh the solver is using. */
 
-        std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ) */
+        std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ). */
         Eigen::MatrixXd m_sumNTN;
         Eigen::VectorXd m_m;
         Eigen::MatrixXd m_ddev;
 
-        Eigen::VectorXd m_qprev;            /**< The precedent solution */
-        Eigen::SparseMatrix<double> m_A;    /**< The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L]. */
-        Eigen::VectorXd m_b;                /**< The vector b representing the problem: [M/dt*qprev + F; H]. */
-        Eigen::SparseMatrix<double> m_M;    /**< The mass matrix. */
-        Eigen::SparseMatrix<double> m_K;    /**< The viscosity matrix. */
-        Eigen::SparseMatrix<double> m_D;    /**< The pressure matrix. */
-        Eigen::VectorXd m_F;                /**< The volume force vector. */
-        std::vector<double> m_tauPSPG;      /**< tau_PSPG parameters for each element. */
+        Eigen::VectorXd m_qVPrev;           /**< The precedent speed. */
+        Eigen::VectorXd m_qAccPrev;         /**< The precedent acceleration. */
+        Eigen::SparseMatrix<double> m_M;    /**< The mass matrix for momentum equation.. */
+        Eigen::VectorXd m_F;                /**< The rhs of the momentum equation. */
+        Eigen::SparseMatrix<double> m_Mrho; /**< The mass matrix of the continuity. */
+        Eigen::VectorXd m_Frho;             /**< The rhos of the continuity equation.. */
 
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
 
         /**
-         * \brief Apply boundary conditions to the matrix A (so that the speed of
+         * \brief Apply boundary conditions to the matrix M and vector F
          */
-        void applyBoundaryConditions();
+        void applyBoundaryConditionsMom();
 
         /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithm.
+         * \brief Apply boundary conditions to the matrix Mrho and vector Frho
          */
-        void buildPicardSystem();
+        void applyBoundaryConditionsCont();
 
         /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithm.
+         * \brief Build the matrix M and the vector F.
          */
-        void computeTauPSPG();
+        void buildMatricesMom();
+
+        /**
+         * \brief Build the matrix Mrho and the vector Frho.
+         */
+        void buildMatricesCont();
 
         /**
          * \param elementIndex The index of the element in the element list.
@@ -168,8 +161,14 @@ class Solver
          *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
          */
         inline std::vector<Eigen::MatrixXd> getN() const;
+
+        /**
+         * \param qRho The vector of nodal density.
+         * \return The vector of nodal pressure, following a Tait-Murnagham state equation.
+         */
+        inline Eigen::VectorXd getPFromRhoTaitMurnagham(Eigen::VectorXd qRho) const;
 };
 
-#include "Solver.inl"
+#include "SolverCompressible.inl"
 
-#endif // SOLVER_HPP_INCLUDED
+#endif // SOLVERCOMPRESSIBLE_HPP_INCLUDED

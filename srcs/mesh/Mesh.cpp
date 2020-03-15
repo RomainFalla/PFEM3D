@@ -42,14 +42,14 @@ Mesh::Mesh(const nlohmann::json& j)
 {
     m_verboseOutput = j["verboseOutput"].get<bool>();
 
-	m_p.hchar = j["RemeshingParams"]["hchar"].get<double>();
-	m_p.alpha = j["RemeshingParams"]["alpha"].get<double>();
-	m_p.omega = j["RemeshingParams"]["omega"].get<double>();
-	m_p.gamma = j["RemeshingParams"]["gamma"].get<double>();
-	m_p.boundingBox = j["RemeshingParams"]["boundingBox"].get<std::vector<double>>();
+    m_p.hchar       = j["Remeshing"]["hchar"].get<double>();
+    m_p.alpha       = j["Remeshing"]["alpha"].get<double>();
+    m_p.omega       = j["Remeshing"]["omega"].get<double>();
+    m_p.gamma       = j["Remeshing"]["gamma"].get<double>();
+    m_p.boundingBox = j["Remeshing"]["boundingBox"].get<std::vector<double>>();
 
 #ifdef DEBUG_GEOMVIEW
-	m_gv.set_line_width(4);
+    m_gv.set_line_width(4);
     m_gv.set_bg_color(CGAL::Color(0, 200, 200));
 #endif // DEBUG_GEOMVIEW
 }
@@ -61,34 +61,34 @@ Mesh::~Mesh()
 
 bool Mesh::addNodes()
 {
-    assert(!m_elementList.empty() && !m_nodesList.empty() && "There is no mesh!");
-    assert(m_detJ.size() == m_elementList.size() && "The determinant are not computed!");
+    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
+    assert(m_elementDetJ.size() == m_elementsList.size() && "The determinant are not computed!");
 
     static const unsigned short dim = m_nodesList[0].position.size();
     static const unsigned short nUnknowns = m_nodesList[0].states.size();
 
     bool addedNodes = false;
 
-    for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
+    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
     {
         //If an element is too big, we add a node at his center
-        if(m_detJ[i]/2 > m_p.omega*m_p.hchar*m_p.hchar)
+        if(m_elementDetJ[i]/2 > m_p.omega*m_p.hchar*m_p.hchar)
         {
             Node newNode(dim);
 
             for(unsigned short k = 0 ; k < dim ; ++k)
             {
-                newNode.position[k] = (m_nodesList[m_elementList[i][0]].position[k]
-                                       + m_nodesList[m_elementList[i][1]].position[k]
-                                       + m_nodesList[m_elementList[i][2]].position[k])/3.0;
+                newNode.position[k] = (m_nodesList[m_elementsList[i][0]].position[k]
+                                       + m_nodesList[m_elementsList[i][1]].position[k]
+                                       + m_nodesList[m_elementsList[i][2]].position[k])/3.0;
             }
 
             newNode.states.resize(nUnknowns);
             for(unsigned short k = 0 ; k < nUnknowns ; ++k)
             {
-                newNode.states[k] = (m_nodesList[m_elementList[i][0]].states[k]
-                                     + m_nodesList[m_elementList[i][1]].states[k]
-                                     + m_nodesList[m_elementList[i][2]].states[k])/3.0;
+                newNode.states[k] = (m_nodesList[m_elementsList[i][0]].states[k]
+                                     + m_nodesList[m_elementsList[i][1]].states[k]
+                                     + m_nodesList[m_elementsList[i][2]].states[k])/3.0;
             }
 
             m_nodesList.push_back(newNode);
@@ -108,7 +108,7 @@ bool Mesh::addNodes()
 
 bool Mesh::checkBoundingBox()
 {
-    assert(!m_elementList.empty() && !m_nodesList.empty() && "There is no mesh !");
+    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
     bool outofBBNodes = false;
 
@@ -146,53 +146,74 @@ bool Mesh::checkBoundingBox()
     return outofBBNodes;
 }
 
-void Mesh::computeDetJ()
+void Mesh::computeElementDetJ()
 {
-    assert(!m_elementList.empty() && !m_nodesList.empty() && "There is no mesh !");
+    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
-    m_detJ.clear();
-    m_detJ.resize(m_elementList.size());
+    m_elementDetJ.clear();
+    m_elementDetJ.resize(m_elementsList.size());
 
-    #pragma omp parallel for default(none) shared(m_detJ, m_elementList, m_nodesList)
-    for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
+    #pragma omp parallel for default(shared)
+    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
     {
-        m_detJ[i] = (m_nodesList[m_elementList[i][1]].position[0]
-                         - m_nodesList[m_elementList[i][0]].position[0])
-                         *(m_nodesList[m_elementList[i][2]].position[1]
-                         - m_nodesList[m_elementList[i][0]].position[1])
-                        - (m_nodesList[m_elementList[i][2]].position[0]
-                         - m_nodesList[m_elementList[i][0]].position[0])
-                         *(m_nodesList[m_elementList[i][1]].position[1]
-                         - m_nodesList[m_elementList[i][0]].position[1]);
+        m_elementDetJ[i] = (m_nodesList[m_elementsList[i][1]].position[0]
+                         - m_nodesList[m_elementsList[i][0]].position[0])
+                         *(m_nodesList[m_elementsList[i][2]].position[1]
+                         - m_nodesList[m_elementsList[i][0]].position[1])
+                        - (m_nodesList[m_elementsList[i][2]].position[0]
+                         - m_nodesList[m_elementsList[i][0]].position[0])
+                         *(m_nodesList[m_elementsList[i][1]].position[1]
+                         - m_nodesList[m_elementsList[i][0]].position[1]);
     }
 }
 
-void Mesh::computeInvJ()
+void Mesh::computeElementInvJ()
 {
-    assert(!m_elementList.empty() && !m_nodesList.empty() && "There is no mesh!");
-    assert(m_detJ.size() == m_elementList.size() && "The determinant are not computed!");
+    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
+    assert(m_elementDetJ.size() == m_elementsList.size() && "The determinant are not computed!");
 
-    m_invJ.clear();
-    m_invJ.resize(m_elementList.size());
+    m_elementInvJ.clear();
+    m_elementInvJ.resize(m_elementsList.size());
 
-    #pragma omp parallel for default(none) shared(m_invJ, m_detJ, m_elementList, m_nodesList)
-    for(std::size_t i = 0 ; i < m_elementList.size() ; ++i)
+    #pragma omp parallel for default(shared)
+    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
     {
-        m_invJ[i].resize(2);
-        m_invJ[i][0].resize(2);
-        m_invJ[i][1].resize(2);
+        m_elementInvJ[i].resize(2);
+        m_elementInvJ[i][0].resize(2);
+        m_elementInvJ[i][1].resize(2);
 
-        m_invJ[i][0][0] = (m_nodesList[m_elementList[i][2]].position[1]
-                             - m_nodesList[m_elementList[i][0]].position[1])/m_detJ[i];
+        m_elementInvJ[i][0][0] = (m_nodesList[m_elementsList[i][2]].position[1]
+                               - m_nodesList[m_elementsList[i][0]].position[1])/m_elementDetJ[i];
 
-        m_invJ[i][0][1] = (- m_nodesList[m_elementList[i][2]].position[0]
-                             + m_nodesList[m_elementList[i][0]].position[0])/m_detJ[i];
+        m_elementInvJ[i][0][1] = (- m_nodesList[m_elementsList[i][2]].position[0]
+                               + m_nodesList[m_elementsList[i][0]].position[0])/m_elementDetJ[i];
 
-        m_invJ[i][1][0] = (- m_nodesList[m_elementList[i][1]].position[1]
-                             + m_nodesList[m_elementList[i][0]].position[1])/m_detJ[i];
+        m_elementInvJ[i][1][0] = (- m_nodesList[m_elementsList[i][1]].position[1]
+                               + m_nodesList[m_elementsList[i][0]].position[1])/m_elementDetJ[i];
 
-        m_invJ[i][1][1] = (m_nodesList[m_elementList[i][1]].position[0]
-                             - m_nodesList[m_elementList[i][0]].position[0])/m_detJ[i];
+        m_elementInvJ[i][1][1] = (m_nodesList[m_elementsList[i][1]].position[0]
+                               - m_nodesList[m_elementsList[i][0]].position[0])/m_elementDetJ[i];
+    }
+}
+
+void Mesh::computeFreeSurfaceEdgeDetJ()
+{
+    assert(!m_freeSurfaceEdgesList.empty() && !m_nodesList.empty() && "There is no mesh !");
+
+    m_freeSurfaceEdgeDetJ.clear();
+    m_freeSurfaceEdgeDetJ.resize(m_freeSurfaceEdgesList.size());
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t i = 0 ; i < m_freeSurfaceEdgesList.size() ; ++i)
+    {
+        m_freeSurfaceEdgeDetJ[i] = (m_nodesList[m_elementsList[i][1]].position[0]
+                                     - m_nodesList[m_elementsList[i][0]].position[0])
+                                     *(m_nodesList[m_elementsList[i][2]].position[1]
+                                     - m_nodesList[m_elementsList[i][0]].position[1])
+                                    - (m_nodesList[m_elementsList[i][2]].position[0]
+                                     - m_nodesList[m_elementsList[i][0]].position[0])
+                                     *(m_nodesList[m_elementsList[i][1]].position[1]
+                                     - m_nodesList[m_elementsList[i][0]].position[1]);
     }
 }
 
@@ -294,23 +315,6 @@ void Mesh::loadFromFile(std::string fileName)
         }
     }
 
-//    for(auto node : m_nodesList)
-//    {
-//        int counter = 0;
-//        for(auto node2 : m_nodesList)
-//        {
-//            if((node.position[0] == node2.position[0]) && (node.position[1] == node2.position[1]))
-//                counter++;
-//
-//            if(counter > 1)
-//            {
-//                std::cerr << node.position[0] << ", " << node.position[1] << std::endl;
-//                throw std::runtime_error("There are duplicates !");
-//
-//            }
-//        }
-//    }
-
     for(auto physGroup2D : physGroupHandles2D)
     {
         std::string name;
@@ -352,8 +356,9 @@ void Mesh::loadFromFile(std::string fileName)
     gmsh::finalize();
 
     triangulateAlphaShape();
-    computeDetJ();
-    computeInvJ();
+    computeFreeSurfaceEdgeDetJ();
+    computeElementDetJ();
+    computeElementInvJ();
 }
 
 void Mesh::remesh()
@@ -366,18 +371,19 @@ void Mesh::remesh()
     if(removeNodes())
     {
         triangulateAlphaShape();
-        computeDetJ();
+        computeElementDetJ();
     }
 
     addNodes();
     triangulateAlphaShape();
-    computeDetJ();
-    computeInvJ();
+    computeFreeSurfaceEdgeDetJ();
+    computeElementDetJ();
+    computeElementInvJ();
 }
 
 bool Mesh::removeNodes()
 {
-    assert(!m_elementList.empty() && !m_nodesList.empty() && "There is no mesh !");
+    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
     bool removeNodes = false;
 
@@ -458,8 +464,9 @@ void Mesh::restoreNodesList()
 
     m_nodesListSave.clear();
 
-    computeDetJ();
-    computeInvJ();
+    computeFreeSurfaceEdgeDetJ();
+    computeElementDetJ();
+    computeElementInvJ();
 }
 
 void Mesh::saveNodesList()
@@ -483,7 +490,8 @@ void Mesh::triangulateAlphaShape()
     if(m_nodesList.empty())
         throw std::runtime_error("You should load the mesh from a file before trying to remesh !");
 
-    m_elementList.clear();
+    m_elementsList.clear();
+    m_freeSurfaceEdgesList.clear();
 
     // We have to construct an intermediate representation for CGAL. We also reset
     // nodes properties.
@@ -544,7 +552,7 @@ void Mesh::triangulateAlphaShape()
             if(std::find(temp.begin(), temp.end(), element[1]) == temp.end())
                 m_nodesList[element[2]].neighbourNodes.push_back(element[1]);
 
-            m_elementList.push_back(element);
+            m_elementsList.push_back(element);
         }
     }
 
@@ -552,14 +560,29 @@ void Mesh::triangulateAlphaShape()
         it != as.alpha_shape_vertices_end() ; ++it)
     {
         // We compute the free surface nodes
-        const Alpha_shape_2::Vertex_handle vert = *it;;
+        const Alpha_shape_2::Vertex_handle vert = *it;
         if(!m_nodesList[vert->info()].isBound)
             m_nodesList[vert->info()].isOnFreeSurface = true;
     }
 
+    for(Alpha_shape_2::Alpha_shape_edges_iterator it = as.alpha_shape_edges_begin() ;
+        it != as.alpha_shape_edges_end() ; ++it)
+    {
+        // We compute the free surface nodes
+        const Alpha_shape_2::Edge edgeAS = *it;
+        const std::vector<std::size_t> edge{edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
+                                            edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
+
+        if(!m_nodesList[edgeAS.first->vertex((edgeAS.second+1)%3)->info()].isBound &&
+           !m_nodesList[edgeAS.first->vertex((edgeAS.second+2)%3)->info()].isBound)
+        {
+            m_freeSurfaceEdgesList.push_back(edge);
+        }
+    }
+
     // If an element is only composed of boundary nodes and the neighBournodes of
     // each of the three is equal to 2, this is a spurious triangle, we delete it
-    m_elementList.erase(std::remove_if(m_elementList.begin(),  m_elementList.end(),
+    m_elementsList.erase(std::remove_if(m_elementsList.begin(),  m_elementsList.end(),
                             [this](const std::vector<std::size_t>& element)
                             {
                                 if(this->m_nodesList[element[0]].isBound &&
@@ -577,9 +600,9 @@ void Mesh::triangulateAlphaShape()
                                 else
                                     return false;
 
-                            }), m_elementList.end());
+                            }), m_elementsList.end());
 
-    if(m_elementList.empty())
+    if(m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
 
 #ifdef DEBUG_GEOMVIEW
@@ -640,8 +663,9 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
         }
     }
 
-    computeDetJ();
-    computeInvJ();
+    computeFreeSurfaceEdgeDetJ();
+    computeElementDetJ();
+    computeElementInvJ();
 }
 
 void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
@@ -660,8 +684,7 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
         }
     }
 
-    computeDetJ();
-    computeInvJ();
+    computeFreeSurfaceEdgeDetJ();
+    computeElementDetJ();
+    computeElementInvJ();
 }
-
-

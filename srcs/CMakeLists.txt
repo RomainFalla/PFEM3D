@@ -3,13 +3,14 @@ SET(LIBMESHSRCS
 
 SET(LIBSOLVERSRCS
 ./mesh/Node.hpp ./mesh/Mesh.hpp ./mesh/Mesh.inl ./quadrature/gausslegendre.hpp
-./solver/Solver.hpp ./solver/Solver.inl ./solver/Solver.cpp)
+./solver/SolverIncompressible.cpp ./solver/SolverIncompressible.hpp ./solver/SolverIncompressible.inl
+./solver/SolverCompressible.cpp ./solver/SolverCompressible.hpp ./solver/SolverCompressible.inl)
 
 SET(SRCS
 main.cpp
 ./mesh/Node.hpp ./mesh/Mesh.hpp ./mesh/Mesh.inl ./quadrature/gausslegendre.hpp
-./solver/Solver.hpp ./solver/Solver.inl
-)
+./solver/SolverCompressible.hpp ./solver/SolverCompressible.inl
+./solver/SolverIncompressible.hpp ./solver/SolverIncompressible.inl)
 
 ADD_LIBRARY(Mesh SHARED ${LIBMESHSRCS})
 TARGET_LINK_LIBRARIES(Mesh ${GMSH_LIBRARIES})

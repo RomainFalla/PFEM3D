@@ -13,37 +13,37 @@
 #include <gmsh.h>
 #include <nlohmann/json.hpp>
 
-#include "Solver.hpp"
+#include "SolverIncompressible.hpp"
 #include "../quadrature/gausslegendre.hpp"
 
 
-Solver::Solver(const nlohmann::json& j, std::string mshName, std::string resultsName) :
+SolverIncompressible::SolverIncompressible(const nlohmann::json& j, std::string mshName, std::string resultsName) :
 m_mesh(j)
 {
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
-    m_p.hchar                   = j["RemeshingParams"]["hchar"].get<double>();
+    m_p.hchar                   = j["Remeshing"]["hchar"].get<double>();
 
-    m_p.gravity                 = j["SolverIncompressibleParams"]["gravity"].get<double>();
+    m_p.gravity                 = j["Solver"]["gravity"].get<double>();
 
-    m_p.fluid.rho               = j["SolverIncompressibleParams"]["FluidParams"]["rho"].get<double>();
-    m_p.fluid.mu                = j["SolverIncompressibleParams"]["FluidParams"]["mu"].get<double>();
+    m_p.fluid.rho               = j["Solver"]["Fluid"]["rho"].get<double>();
+    m_p.fluid.mu                = j["Solver"]["Fluid"]["mu"].get<double>();
 
-    m_p.picard.relTol           = j["SolverIncompressibleParams"]["PicardParams"]["relTol"].get<double>();
-    m_p.picard.maxIter          = j["SolverIncompressibleParams"]["PicardParams"]["maxIter"].get<unsigned int>();
+    m_p.picard.relTol           = j["Solver"]["Picard"]["relTol"].get<double>();
+    m_p.picard.maxIter          = j["Solver"]["Picard"]["maxIter"].get<unsigned int>();
 
-    m_p.time.adaptDT            = j["SolverIncompressibleParams"]["TimeParams"]["adaptDT"].get<bool>();
-    m_p.time.coeffDTincrease    = j["SolverIncompressibleParams"]["TimeParams"]["coeffDTincrease"].get<double>();
-    m_p.time.coeffDTdecrease    = j["SolverIncompressibleParams"]["TimeParams"]["coeffDTdecrease"].get<double>();
-    m_p.time.maxDT              = j["SolverIncompressibleParams"]["TimeParams"]["maxDT"].get<double>();
-    m_p.time.simuTime           = j["SolverIncompressibleParams"]["TimeParams"]["simuTime"].get<double>();
-    m_p.time.simuDTToWrite      = j["SolverIncompressibleParams"]["TimeParams"]["simuDTToWrite"].get<double>();
+    m_p.time.adaptDT            = j["Solver"]["Time"]["adaptDT"].get<bool>();
+    m_p.time.coeffDTincrease    = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
+    m_p.time.coeffDTdecrease    = j["Solver"]["Time"]["coeffDTdecrease"].get<double>();
+    m_p.time.maxDT              = j["Solver"]["Time"]["maxDT"].get<double>();
+    m_p.time.simuTime           = j["Solver"]["Time"]["simuTime"].get<double>();
+    m_p.time.simuDTToWrite      = j["Solver"]["Time"]["simuDTToWrite"].get<double>();
     m_p.time.currentDT          = m_p.time.maxDT;
     m_p.time.nextWriteTrigger   = m_p.time.simuDTToWrite;
     m_p.time.currentTime        = 0.0;
     m_p.time.currentStep        = 0;
 
-    m_p.initialCondition        = j["SolverIncompressibleParams"]["initialCondition"].get<std::vector<double>>();
+    m_p.initialCondition        = j["Solver"]["initialCondition"].get<std::vector<double>>();
 
     // set the desired number of OpenMP threads
 #if defined(_OPENMP)
@@ -62,7 +62,7 @@ m_mesh(j)
 
     m_mesh.loadFromFile(mshName);
 
-    std::vector<std::string> whatToWrite = j["SolverIncompressibleParams"]["whatToWrite"];
+    std::vector<std::string> whatToWrite = j["Solver"]["whatToWrite"];
     for(auto what : whatToWrite)
     {
         if(what == "u")
@@ -79,7 +79,7 @@ m_mesh(j)
             throw std::runtime_error("Unknown quantity to write!");
     }
 
-    m_p.writeAs = j["SolverIncompressibleParams"]["writeAs"];
+    m_p.writeAs = j["Solver"]["writeAs"];
     if(!(m_p.writeAs == "Nodes" || m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements"))
         throw std::runtime_error("Unexpected date type to write!");
 
@@ -112,14 +112,14 @@ m_mesh(j)
     m_ddev *= m_p.fluid.mu;
 }
 
-Solver::~Solver()
+SolverIncompressible::~SolverIncompressible()
 {
     gmsh::finalize();
 }
 
-void Solver::applyBoundaryConditions()
+void SolverIncompressible::applyBoundaryConditions()
 {
-	  assert(!m_mesh.nodesList.empty());
+    assert(m_mesh.getNodesNumber() != 0);
 
     m_A.prune([this](int i, int j, float)
     {
@@ -151,7 +151,7 @@ void Solver::applyBoundaryConditions()
                 m_b(n) = m_qprev(n);
                 m_A.coeffRef(n, n) = 1;
 
-                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*m_p.hchar*m_p.hchar*0.5;;
+                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*m_p.hchar*m_p.hchar*0.5;
                 m_A.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
             }
         }
@@ -167,7 +167,7 @@ void Solver::applyBoundaryConditions()
     }
 }
 
-void Solver::displaySolverParams() const
+void SolverIncompressible::displaySolverParams() const
 {
     std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
@@ -191,7 +191,7 @@ void Solver::displaySolverParams() const
         std::cout << "Time step: " << m_p.time.maxDT << " s" << std::endl;
 }
 
-void Solver::setInitialCondition()
+void SolverIncompressible::setInitialCondition()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
@@ -213,9 +213,11 @@ void Solver::setInitialCondition()
             m_mesh.setNodeState(n, 2, 0);
         }
     }
+
+    m_qprev = getQFromNodesStates(0, 2);
 }
 
-void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState)
+void SolverIncompressible::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState)
 {
     assert (q.rows() == (endState - beginState + 1)*m_mesh.getNodesNumber());
 
@@ -227,7 +229,7 @@ void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginS
     }
 }
 
-void Solver::solveProblem()
+void SolverIncompressible::solveProblem()
 {
     std::cout   << "================================================================"
                 << std::endl
@@ -243,8 +245,6 @@ void Solver::solveProblem()
     setInitialCondition();
 
     writeData();
-
-    m_qprev = getQFromNodesStates(0, 2);
 
     while(m_p.time.currentTime < m_p.time.simuTime)
     {
@@ -280,12 +280,6 @@ void Solver::solveProblem()
                                                      m_p.time.currentDT*m_p.time.coeffDTincrease);
                 }
             }
-
-            //Remeshing step
-            m_mesh.remesh();
-
-            //We have to compute qPrev here due to new nodes !
-            m_qprev = getQFromNodesStates(0, 2);
         }
         else
         {
@@ -304,14 +298,12 @@ void Solver::solveProblem()
                 throw std::runtime_error("The solver does not seem to converge");
             }
         }
-
-        m_p.time.currentStep++;
     }
 
     std::cout << std::endl;
 }
 
-bool Solver::solveCurrentTimeStep()
+bool SolverIncompressible::solveCurrentTimeStep()
 {
     m_mesh.saveNodesList();
 
@@ -406,13 +398,20 @@ bool Solver::solveCurrentTimeStep()
     }
 
     m_p.time.currentTime += m_p.time.currentDT;
+    m_p.time.currentStep++;
+
+    //Remeshing step
+    m_mesh.remesh();
+
+    //We have to compute qPrev here due to new nodes !
+    m_qprev = getQFromNodesStates(0, 2);
 
     return true;
 }
 
-void Solver::buildPicardSystem()
+void SolverIncompressible::buildPicardSystem()
 {
-    assert(m_tauPSPG.size() == m_mesh.getElementNumber());
+    assert(m_tauPSPG.size() == m_mesh.getElementsNumber());
 
     /*A = [(matrices.M)/p.dt + matrices.K, -transpose(matrices.D);...
          (matrices.C)/p.dt + matrices.D, matrices.L];
@@ -432,7 +431,7 @@ void Solver::buildPicardSystem()
     m_M.resize(2*m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
     m_M.data().squeeze();
     std::vector<Eigen::Triplet<double>> indexM;
-    indexM.reserve(2*3*3*m_mesh.getElementNumber());
+    indexM.reserve(2*3*3*m_mesh.getElementsNumber());
 
     std::vector<Eigen::Triplet<double>> indexK;
     std::vector<Eigen::Triplet<double>> indexD;
@@ -440,16 +439,16 @@ void Solver::buildPicardSystem()
     {
         m_K.resize(2*m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
         m_K.data().squeeze();
-        indexK.reserve(6*6*m_mesh.getElementNumber());
+        indexK.reserve(6*6*m_mesh.getElementsNumber());
 
         m_D.resize(m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
         m_D.data().squeeze();
-        indexD.reserve(3*6*m_mesh.getElementNumber());
+        indexD.reserve(3*6*m_mesh.getElementsNumber());
     }
 
     Eigen::SparseMatrix<double> C(m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
     std::vector<Eigen::Triplet<double>> indexC;
-    indexC.reserve(3*6*m_mesh.getElementNumber());
+    indexC.reserve(3*6*m_mesh.getElementsNumber());
 
     m_F.resize(2*m_mesh.getNodesNumber());
     m_F.setZero();
@@ -460,18 +459,18 @@ void Solver::buildPicardSystem()
     Eigen::MatrixXd MPrev = m_sumNTN*0.5*(m_p.fluid.rho/m_p.time.currentDT);
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Eigen::MatrixXd Be = getB(elm);
         Eigen::MatrixXd Bep(2,3);
         Bep << Be.topLeftCorner<1,3>(),
                Be.bottomRightCorner<1,3>();
 
-        //Me = S Nv^T Nv dV
-        Eigen::MatrixXd Me = MPrev*m_mesh.getDetJ(elm);
+        //Me = S rho Nv^T Nv dV
+        Eigen::MatrixXd Me = MPrev*m_mesh.getElementDetJ(elm);
 
         //Ke = S Bv^T ddev Bv dV
-        Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getDetJ(elm); //same matrices for all gauss point ^^
+        Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
 
         //De = S Np^T m Bv dV
         Eigen::MatrixXd De(3,6); De.setZero();
@@ -479,7 +478,7 @@ void Solver::buildPicardSystem()
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
             De += (m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
 
-        De *= 0.5*m_mesh.getDetJ(elm);
+        De *= 0.5*m_mesh.getElementDetJ(elm);
 
         //Ce = tauPSPG S Bp^T Nv dV
         Eigen::MatrixXd Ce(3,6); Ce.setZero();
@@ -487,12 +486,12 @@ void Solver::buildPicardSystem()
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
             Ce += Bep.transpose()*m_N[k]*GP2Dweight<double>[k];
 
-        Ce *= (0.5*m_tauPSPG[elm]/m_p.time.currentDT)*m_mesh.getDetJ(elm);
+        Ce *= (0.5*m_tauPSPG[elm]/m_p.time.currentDT)*m_mesh.getElementDetJ(elm);
 
         //Le = tauPSPG S Bp^T Bp dV
         Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_p.fluid.rho)
                              *Bep.transpose()*Bep
-                             *m_mesh.getDetJ(elm);
+                             *m_mesh.getElementDetJ(elm);
 
         const Eigen::Vector2d b(0, -m_p.gravity);
 
@@ -502,11 +501,11 @@ void Solver::buildPicardSystem()
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
             Fe += m_N[k].transpose()*b*GP2Dweight<double>[k];
 
-        Fe *= 0.5*m_p.fluid.rho*m_mesh.getDetJ(elm);
+        Fe *= 0.5*m_p.fluid.rho*m_mesh.getElementDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
         Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*Bep.transpose()
-                             *b*m_mesh.getDetJ(elm);
+                             *b*m_mesh.getElementDetJ(elm);
 
         //Big push_back ^^
         #pragma omp critical
@@ -641,7 +640,7 @@ void Solver::buildPicardSystem()
 
 
                 /************************************************************************
-                                                Build f
+                                                Build h
                 ************************************************************************/
                 H(m_mesh.getElement(elm)[i]) += He(i);
             }
@@ -666,9 +665,9 @@ void Solver::buildPicardSystem()
     m_b << m_F + m_M*m_qprev.head(2*m_mesh.getNodesNumber()), H + C*m_qprev.head(2*m_mesh.getNodesNumber());
 }
 
-void Solver::computeTauPSPG()
+void SolverIncompressible::computeTauPSPG()
 {
-    m_tauPSPG.resize(m_mesh.getElementNumber());
+    m_tauPSPG.resize(m_mesh.getElementsNumber());
 
     double U = 0;
     std::size_t trueNnodes = 0;
@@ -686,9 +685,9 @@ void Solver::computeTauPSPG()
     U /= static_cast<double>(trueNnodes);
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementNumber() ; ++elm)
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
-        const double h = std::sqrt(2*m_mesh.getDetJ(elm)/M_PI);
+        const double h = std::sqrt(2*m_mesh.getElementDetJ(elm)/M_PI);
 
         m_tauPSPG[elm] = 1/std::sqrt((2/m_p.time.currentDT)*(2/m_p.time.currentDT)
                                  + (2*U/h)*(2*U/h)
@@ -696,7 +695,7 @@ void Solver::computeTauPSPG()
     }
 }
 
-void Solver::writeData() const
+void SolverIncompressible::writeData() const
 {
     gmsh::model::add("theModel");
     gmsh::model::setCurrent("theModel");
@@ -735,10 +734,10 @@ void Solver::writeData() const
 
     if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
     {
-        std::vector<std::size_t> elementTags(m_mesh.getElementNumber());
-        std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementNumber());
+        std::vector<std::size_t> elementTags(m_mesh.getElementsNumber());
+        std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementsNumber());
         #pragma omp parallel for default(shared)
-        for(std::size_t i = 0 ; i < m_mesh.getElementNumber() ; ++i)
+        for(std::size_t i = 0 ; i < m_mesh.getElementsNumber() ; ++i)
         {
             elementTags[i] = i + 1;
             nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
@@ -795,7 +794,7 @@ void Solver::writeData() const
         }
         if(m_p.whatToWrite[4])
         {
-            const std::vector<double> velocity{m_mesh.getNodeState(n, 0), m_mesh.getNodeState(n, 1), 0};;
+            const std::vector<double> velocity{m_mesh.getNodeState(n, 0), m_mesh.getNodeState(n, 1), 0};
             dataVelocity[n] = velocity;
         }
     }
