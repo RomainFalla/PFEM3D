@@ -122,7 +122,7 @@ void SolverCompressible::applyBoundaryConditionsMom()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    m_M.prune([this](int i, int j, float)
+    m_invM.prune([this](int i, int j, float)
     {
         if(i < m_mesh.getNodesNumber())
         {
@@ -141,10 +141,10 @@ void SolverCompressible::applyBoundaryConditionsMom()
         if(m_mesh.isNodeBound(n) || m_mesh.isNodeFree(n))
         {
             m_F(n) = 0;
-            m_M.coeffRef(n, n) = 1;
+            m_invM.coeffRef(n, n) = 1;
 
             m_F(n + m_mesh.getNodesNumber()) = 0;
-            m_M.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
+            m_invM.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
         }
     }
 }
@@ -153,7 +153,7 @@ void SolverCompressible::applyBoundaryConditionsCont()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    m_Mrho.prune([this](int i, int j, float)
+    m_invMrho.prune([this](int i, int j, float)
     {
         return !this->m_mesh.isNodeFree(i);
     });
@@ -163,8 +163,11 @@ void SolverCompressible::applyBoundaryConditionsCont()
     {
         if(m_mesh.isNodeFree(n))
         {
-            m_Frho(n) = 0;
-            m_Mrho.coeffRef(n, n) = 1;
+            if(m_mesh.isNodeBound(n))
+                m_Frho(n) = 0;
+            else
+                m_Frho(n) = m_mesh.getNodeState(n, 3);
+            m_invMrho.coeffRef(n, n) = 1;
         }
     }
 }
@@ -215,7 +218,11 @@ void SolverCompressible::setInitialCondition()
             m_mesh.setNodeState(n, 2, 0);
         }
 
-        m_mesh.setNodeState(n, 3, m_p.initialCondition[3]);
+        if(m_mesh.isNodeFree(n))
+            m_mesh.setNodeState(n, 3, 0);
+        else
+            m_mesh.setNodeState(n, 3, m_p.initialCondition[3]);
+
         m_mesh.setNodeState(n, 4, 0);
         m_mesh.setNodeState(n, 5, 0);
     }
@@ -311,6 +318,8 @@ void SolverCompressible::solveProblem()
 
 bool SolverCompressible::solveCurrentTimeStep()
 {
+    buildFrho();
+
     Eigen::VectorXd qV1half = m_qVPrev + 0.5*m_p.time.currentDT*m_qAccPrev;
 
     for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
@@ -328,16 +337,15 @@ bool SolverCompressible::solveCurrentTimeStep()
     applyBoundaryConditionsCont();
 
     Eigen::VectorXd qRho(m_mesh.getNodesNumber());
-    m_solverLU.compute(m_Mrho);
-    qRho = getQFromNodesStates(3, 3) + m_solverLU.solve(m_Frho)*m_p.time.currentDT;
+    qRho = m_invMrho*m_Frho;
+    setNodesStatesfromQ(qRho, 3, 3);
     Eigen::VectorXd qP = getPFromRhoTaitMurnagham(qRho);
     setNodesStatesfromQ(qP, 2, 2);
 
     buildMatricesMom();
     applyBoundaryConditionsMom();
 
-    m_solverLU.compute(m_M);
-    m_qAccPrev = m_solverLU.solve(m_F);
+    m_qAccPrev = m_invM*m_F;
 
     m_qVPrev = qV1half + 0.5*m_p.time.currentDT*m_qAccPrev;
 
@@ -357,15 +365,9 @@ bool SolverCompressible::solveCurrentTimeStep()
     return true;
 }
 
-void SolverCompressible::buildMatricesCont()
+void SolverCompressible::buildFrho()
 {
-    m_Mrho.resize(m_mesh.getNodesNumber(), m_mesh.getNodesNumber());
-    m_Mrho.data().squeeze();
-    std::vector<Eigen::Triplet<double>> indexMrho;
-    indexMrho.reserve(3*3*m_mesh.getElementsNumber());
-
-    m_Frho.resize(m_mesh.getNodesNumber());
-    m_Frho.setZero();
+    m_Frho.resize(m_mesh.getElementsNumber()); m_Frho.setZero();
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
@@ -374,59 +376,73 @@ void SolverCompressible::buildMatricesCont()
                             m_mesh.getNodeState(m_mesh.getElement(elm)[1], 3),
                             m_mesh.getNodeState(m_mesh.getElement(elm)[2], 3));
 
-        Eigen::VectorXd V(6);
-        V << m_mesh.getNodeState(m_mesh.getElement(elm)[0], 0),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[1], 0),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[2], 0),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[0], 1),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[1], 1),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[2], 1);
-
-        Eigen::MatrixXd Be = getB(elm);
-
         Eigen::MatrixXd Mrhoe = 0.5*m_mesh.getElementDetJ(elm)*m_sumNTN;
 
-        //De = S rho Np^T m Bv dV
-        Eigen::MatrixXd Drhoe(3,6); Drhoe.setZero();
-
-        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Drhoe += (m_N[k].topLeftCorner<1,3>()*Rho)*(m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
-
-        Drhoe *= 0.5*m_mesh.getElementDetJ(elm);
-
-        Eigen::MatrixXd FeRhoTot(3,1); FeRhoTot.setZero();
-        FeRhoTot = -Drhoe*V;
+        Eigen::VectorXd Frhoe = Mrhoe*Rho;
 
         //Big push_back ^^
         #pragma omp critical
         {
             for(unsigned short i = 0 ; i < 3 ; ++i)
             {
-                for(unsigned short j = 0 ; j < 3 ; ++j)
-                {
-                    /********************************************************************
+                /********************************************************************
                                                  Build M
-                    ********************************************************************/
-                    indexMrho.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                               m_mesh.getElement(elm)[j],
-                                                               Mrhoe(i,j)));
-                }
+                ********************************************************************/
+                m_Frho(m_mesh.getElement(elm)[i]) += Frhoe(i);
+            }
+        }
+    }
+}
 
-                /************************************************************************
-                                                Build f
-                ************************************************************************/
-                m_Frho(m_mesh.getElement(elm)[i]) += FeRhoTot(i);
+void SolverCompressible::buildMatricesCont()
+{
+    m_invMrho.resize(m_mesh.getNodesNumber(), m_mesh.getNodesNumber());
+    m_invMrho.data().squeeze();
+    std::vector<Eigen::Triplet<double>> indexMrho;
+    indexMrho.reserve(3*3*m_mesh.getElementsNumber());
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    {
+        Eigen::MatrixXd Mrhoe = 0.5*m_mesh.getElementDetJ(elm)*m_sumNTN;
+
+        for(std::size_t i = 0 ; i < Mrhoe.rows() ; ++i)
+        {
+            for(std::size_t j = 0 ; j < Mrhoe.cols() ; ++j)
+            {
+                if(i != j)
+                {
+                    Mrhoe(i, i) += Mrhoe(i, j);
+                    Mrhoe(i, j) = 0;
+                }
+            }
+        }
+
+        //Big push_back ^^
+        #pragma omp critical
+        {
+            for(unsigned short i = 0 ; i < 3 ; ++i)
+            {
+                /********************************************************************
+                                                 Build M
+                ********************************************************************/
+                indexMrho.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
+                                                           m_mesh.getElement(elm)[i],
+                                                           1/Mrhoe(i,i)));
             }
         }
     }
 
-    m_Mrho.setFromTriplets(indexMrho.begin(), indexMrho.end());
+    m_invMrho.setFromTriplets(indexMrho.begin(), indexMrho.end(),
+                              [](double OneOverM1, double OneOverM2){
+                                  return 1/(1/OneOverM1 + 1/OneOverM2);
+                              });
 }
 
 void SolverCompressible::buildMatricesMom()
 {
-    m_M.resize(2*m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
-    m_M.data().squeeze();
+    m_invM.resize(2*m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
+    m_invM.data().squeeze();
     std::vector<Eigen::Triplet<double>> indexM;
     indexM.reserve(2*3*3*m_mesh.getElementsNumber());
 
@@ -460,6 +476,18 @@ void SolverCompressible::buildMatricesMom()
 
         Me *= 0.5*m_mesh.getElementDetJ(elm);
 
+        for(std::size_t i = 0 ; i < Me.rows() ; ++i)
+        {
+            for(std::size_t j = 0 ; j < Me.cols() ; ++j)
+            {
+                if(i != j)
+                {
+                    Me(i, i) += Me(i, j);
+                    Me(i, j) = 0;
+                }
+            }
+        }
+
         //Ke = S Bv^T ddev Bv dV
         Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
 
@@ -489,19 +517,16 @@ void SolverCompressible::buildMatricesMom()
         {
             for(unsigned short i = 0 ; i < 3 ; ++i)
             {
-                for(unsigned short j = 0 ; j < 3 ; ++j)
-                {
-                    /********************************************************************
-                                                 Build M
-                    ********************************************************************/
-                    indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j],
-                                                            Me(i,j)));
+                /********************************************************************
+                                             Build M
+                ********************************************************************/
+                indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
+                                                        m_mesh.getElement(elm)[i],
+                                                        1/Me(i,i)));
 
-                    indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Me(i+3,j+3)));
-                }
+                indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
+                                                        m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
+                                                        1/Me(i+3,i+3)));
 
                 /************************************************************************
                                                 Build f
@@ -513,7 +538,10 @@ void SolverCompressible::buildMatricesMom()
         }
     }
 
-    m_M.setFromTriplets(indexM.begin(), indexM.end());
+    m_invM.setFromTriplets(indexM.begin(), indexM.end(),
+                          [](double OneOverM1, double OneOverM2){
+                              return 1/(1/OneOverM1 + 1/OneOverM2);
+                          });
 }
 
 void SolverCompressible::writeData() const

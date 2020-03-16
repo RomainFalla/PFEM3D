@@ -122,9 +122,9 @@ class SolverCompressible
 
         Eigen::VectorXd m_qVPrev;           /**< The precedent speed. */
         Eigen::VectorXd m_qAccPrev;         /**< The precedent acceleration. */
-        Eigen::SparseMatrix<double> m_M;    /**< The mass matrix for momentum equation.. */
+        Eigen::SparseMatrix<double> m_invM;    /**< The mass matrix for momentum equation.. */
         Eigen::VectorXd m_F;                /**< The rhs of the momentum equation. */
-        Eigen::SparseMatrix<double> m_Mrho; /**< The mass matrix of the continuity. */
+        Eigen::SparseMatrix<double> m_invMrho; /**< The mass matrix of the continuity. */
         Eigen::VectorXd m_Frho;             /**< The rhos of the continuity equation.. */
 
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
@@ -138,6 +138,11 @@ class SolverCompressible
          * \brief Apply boundary conditions to the matrix Mrho and vector Frho
          */
         void applyBoundaryConditionsCont();
+
+        /**
+         * \brief Build the rhs of the continuity equation.
+         */
+        void buildFrho();
 
         /**
          * \brief Build the matrix M and the vector F.
