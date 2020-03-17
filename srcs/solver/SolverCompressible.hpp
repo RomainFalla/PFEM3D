@@ -122,9 +122,9 @@ class SolverCompressible
 
         Eigen::VectorXd m_qVPrev;           /**< The precedent speed. */
         Eigen::VectorXd m_qAccPrev;         /**< The precedent acceleration. */
-        Eigen::SparseMatrix<double> m_invM;    /**< The mass matrix for momentum equation.. */
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;    /**< The mass matrix for momentum equation.. */
         Eigen::VectorXd m_F;                /**< The rhs of the momentum equation. */
-        Eigen::SparseMatrix<double> m_invMrho; /**< The mass matrix of the continuity. */
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invMrho; /**< The mass matrix of the continuity. */
         Eigen::VectorXd m_Frho;             /**< The rhos of the continuity equation.. */
 
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
