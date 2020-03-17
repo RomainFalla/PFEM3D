@@ -45,6 +45,7 @@ struct TimeCompressibleParams
 struct SolverCompressibleParams
 {
     double gravity;         /**< Acceleration of the gravity (g > 0). */
+    bool strongContinuity;
     FluidCompressibleParams fluid;      /**< Fluid parameters. */
     TimeCompressibleParams time;        /**< Time integration parameters. */
     std::array<bool, 6> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity, rho). */

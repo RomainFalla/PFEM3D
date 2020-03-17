@@ -23,6 +23,7 @@ m_mesh(j)
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
     m_p.gravity                 = j["Solver"]["gravity"].get<double>();
+    m_p.strongContinuity        = j["Solver"]["strongContinuity"].get<bool>();
 
     m_p.fluid.rho0              = j["Solver"]["Fluid"]["rho0"].get<double>();
     m_p.fluid.mu                = j["Solver"]["Fluid"]["mu"].get<double>();
@@ -376,10 +377,44 @@ void SolverCompressible::buildMatricesCont()
 {
     m_invMrho.resize(m_mesh.getNodesNumber()); m_invMrho.setZero();
 
+    if(!m_p.strongContinuity)
+    {
+        m_Frho.resize(m_mesh.getNodesNumber()); m_Frho.setZero();
+    }
+
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Eigen::MatrixXd Mrhoe = 0.5*m_mesh.getElementDetJ(elm)*m_sumNTN;
+
+        Eigen::MatrixXd FeRhoTot(3,1); FeRhoTot.setZero();
+
+        if(!m_p.strongContinuity)
+        {
+            Eigen::Vector3d Rho(m_mesh.getNodeState(m_mesh.getElement(elm)[0], 3),
+                            m_mesh.getNodeState(m_mesh.getElement(elm)[1], 3),
+                            m_mesh.getNodeState(m_mesh.getElement(elm)[2], 3));
+
+            Eigen::VectorXd V(6);
+            V << m_mesh.getNodeState(m_mesh.getElement(elm)[0], 0),
+                 m_mesh.getNodeState(m_mesh.getElement(elm)[1], 0),
+                 m_mesh.getNodeState(m_mesh.getElement(elm)[2], 0),
+                 m_mesh.getNodeState(m_mesh.getElement(elm)[0], 1),
+                 m_mesh.getNodeState(m_mesh.getElement(elm)[1], 1),
+                 m_mesh.getNodeState(m_mesh.getElement(elm)[2], 1);
+
+            Eigen::MatrixXd Be = getB(elm);
+
+            //De = S rho Np^T m Bv dV
+            Eigen::MatrixXd Drhoe(3,6); Drhoe.setZero();
+
+            for (unsigned short k = 0 ; k < m_N.size() ; ++k)
+                Drhoe += (m_N[k].topLeftCorner<1,3>()*Rho)*(m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
+
+            Drhoe *= 0.5*m_mesh.getElementDetJ(elm);
+
+            FeRhoTot = Mrhoe*Rho - m_p.time.currentDT*Drhoe*V;
+        }
 
         for(std::size_t i = 0 ; i < Mrhoe.rows() ; ++i)
         {
@@ -402,6 +437,11 @@ void SolverCompressible::buildMatricesCont()
                                                  Build M
                 ********************************************************************/
                 m_invMrho.diagonal()[m_mesh.getElement(elm)[i]] += Mrhoe(i,i);
+
+                if(!m_p.strongContinuity)
+                {
+                    m_Frho(m_mesh.getElement(elm)[i]) += FeRhoTot(i);
+                }
             }
         }
     }
