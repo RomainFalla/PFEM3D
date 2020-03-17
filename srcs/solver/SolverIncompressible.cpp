@@ -22,8 +22,6 @@ m_mesh(j)
 {
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
-    m_p.hchar                   = j["Remeshing"]["hchar"].get<double>();
-
     m_p.gravity                 = j["Solver"]["gravity"].get<double>();
 
     m_p.fluid.rho               = j["Solver"]["Fluid"]["rho"].get<double>();
@@ -151,7 +149,7 @@ void SolverIncompressible::applyBoundaryConditions()
                 m_b(n) = m_qprev(n);
                 m_A.coeffRef(n, n) = 1;
 
-                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*m_p.hchar*m_p.hchar*0.5;
+                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*m_mesh.getHchar()*m_mesh.getHchar()*0.5;
                 m_A.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
             }
         }

@@ -44,6 +44,11 @@ inline std::size_t  Mesh::getFreeSurfaceEdgesNumber() const
     return m_freeSurfaceEdgesList.size();
 }
 
+inline double Mesh::getHchar() const
+{
+    return m_p.hchar;
+}
+
 inline unsigned short Mesh::getMeshDim() const
 {
     return m_dim;

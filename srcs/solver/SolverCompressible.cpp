@@ -22,8 +22,6 @@ m_mesh(j)
 {
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
-    m_p.hchar                   = j["Remeshing"]["hchar"].get<double>();
-
     m_p.gravity                 = j["Solver"]["gravity"].get<double>();
 
     m_p.fluid.rho0              = j["Solver"]["Fluid"]["rho0"].get<double>();
@@ -288,7 +286,7 @@ void SolverCompressible::solveProblem()
             c = std::sqrt(c);
 
             m_p.time.currentDT = std::min(m_p.time.maxDT,
-                                          m_p.time.securityCoeff*m_p.hchar/std::max(U, c));
+                                          m_p.time.securityCoeff*m_mesh.getHchar()/std::max(U, c));
         }
     }
 
@@ -297,7 +295,8 @@ void SolverCompressible::solveProblem()
 
 bool SolverCompressible::solveCurrentTimeStep()
 {
-    buildFrho();
+    if(m_p.strongContinuity)
+        buildFrho();
 
     Eigen::VectorXd qV1half = m_qVPrev + 0.5*m_p.time.currentDT*m_qAccPrev;
 
@@ -305,7 +304,7 @@ bool SolverCompressible::solveCurrentTimeStep()
     {
         if(m_mesh.isNodeFree(n) && !m_mesh.isNodeBound(n))
             qV1half[n + m_mesh.getNodesNumber()] -= m_p.time.currentDT*m_p.gravity*m_mesh.getNodeState(n, 3)*
-                                                    m_p.hchar*m_p.hchar*0.5;
+                                                    m_mesh.getHchar()*m_mesh.getHchar()*0.5;
     }
 
     setNodesStatesfromQ(qV1half, 0, 1);

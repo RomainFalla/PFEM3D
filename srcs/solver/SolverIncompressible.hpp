@@ -53,7 +53,6 @@ struct TimeIncompressibleParams
  */
 struct SolverIncompressibleParams
 {
-    double hchar;           /**< Characteristic size of an element. */
     double gravity;         /**< Acceleration of the gravity (g > 0). */
     FluidIncompressibleParams fluid;      /**< Fluid parameters. */
     PicardParams picard;    /**< Picard algorithm parameters. */

@@ -44,7 +44,6 @@ struct TimeCompressibleParams
  */
 struct SolverCompressibleParams
 {
-    double hchar;           /**< Characteristic size of an element. */
     double gravity;         /**< Acceleration of the gravity (g > 0). */
     FluidCompressibleParams fluid;      /**< Fluid parameters. */
     TimeCompressibleParams time;        /**< Time integration parameters. */

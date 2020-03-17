@@ -85,6 +85,11 @@ class Mesh
         inline std::size_t getFreeSurfaceEdgesNumber() const;
 
         /**
+         * \return The characteristic size of the mesh.
+         */
+        inline double getHchar() const;
+
+        /**
          * \return The mesh dimension.
          */
         inline unsigned short getMeshDim() const;
