@@ -1,7 +1,7 @@
 {
     "ProblemType": "Compressible",
 	"Remeshing": {
-		"hchar": 0.25,
+		"hchar": 0.125,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
@@ -9,12 +9,14 @@
 	},
 	"Solver": {
 		"gravity": 9.81,
+		"strongContinuity": true,
 		"Time": {
 			"adaptDT": true,
     		"securityCoeff": 0.1,
     		"maxDT": 0.01,
-    		"simuTime": 4,
-    		"simuDTToWrite": 0.025
+			"initialDT": 1e-8,
+    		"endTime": 4,
+    		"timeBetweenWriting": 0.025
 		},
 		"Fluid": {
 			"rho0": 1000,

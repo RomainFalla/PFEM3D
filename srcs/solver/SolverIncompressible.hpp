@@ -7,73 +7,17 @@
 #include <Eigen/Sparse>
 
 #include "../mesh/Mesh.hpp"
+#include "Solver.hpp"
 
-/**
- * \struct FluidIncompressibleParams
- * \brief Incompressible fluid parameters.
- */
-struct FluidIncompressibleParams
-{
-    double rho; /**< The fluid density (kg/m^3). */
-    double mu;  /**< The fluid viscosity (Pa s). */
-};
-
-/**
- * \struct PicardParams
- * \brief Picard algorithm parameters.
- */
-struct PicardParams
-{
-    double relTol;                  /**< Relative tolerance of the algorithm. */
-    unsigned int maxIter;           /**< Maximum number of iterations for the algorithm. */
-    unsigned int currentNumIter;    /**< Current number of Picard algorithm iterations. */
-};
-
-/**
- * \struct TimeIncompressibleParams
- * \brief Time integration parameters.
- */
-struct TimeIncompressibleParams
-{
-    bool adaptDT;               /**< Should the time step be changed during the computation? */
-    double currentDT;           /**< Current time step. */
-    double coeffDTincrease;     /**< Coefficient to multiply the current time step with if we increase it. */
-    double coeffDTdecrease;     /**< Coefficient to divide the current time step with if we decrease it. */
-    double maxDT;               /**< Maximu allowed time step. */
-    double simuTime;            /**< Physical time which we want to simulate. */
-    double simuDTToWrite;       /**< For which time interval should the program write data. */
-    double nextWriteTrigger;    /**< Next physical time at which the program will write data. */
-    double currentTime;
-    unsigned int currentStep;
-};
-
-/**
- * \struct SolverIncompressibleParams
- * \brief Incompressible solver parameters.
- */
-struct SolverIncompressibleParams
-{
-    double gravity;         /**< Acceleration of the gravity (g > 0). */
-    FluidIncompressibleParams fluid;      /**< Fluid parameters. */
-    PicardParams picard;    /**< Picard algorithm parameters. */
-    TimeIncompressibleParams time;        /**< Time integration parameters. */
-    std::array<bool, 5> whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
-    std::string writeAs;
-    std::string resultsName;    /**< File name in which the results will be written. */
-    std::vector<double> initialCondition;    /**< Initial condition on u, v and p (mainly to have inlet) **/
-#if defined(_OPENMP)
-    unsigned int nOMPThreads;
-#endif
-};
 
 /**
  * \class SolverIncompressible
  * \brief Represents a solver for an incompressible Newtonian fluid.
  */
-class SolverIncompressible
+class SolverIncompressible : public Solver
 {
     public:
-        SolverIncompressible(const nlohmann::json& j, std::string mshName, std::string resultsName);
+        SolverIncompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName);
         ~SolverIncompressible();
 
         /**
@@ -82,25 +26,9 @@ class SolverIncompressible
         void displaySolverParams() const;
 
         /**
-         * \return A Eigen vector containing the states of the node.
-         * \param beginState The first state which will be contained in q.
-         * \param endState The last state which will be contained in q.
-         */
-        inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;
-
-
-        /**
          * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
          */
         void setInitialCondition();
-
-        /**
-         * \brief Set the states of the nodes from a Eigen vector.
-         * \param q a Eigen vector containing the value of the new states. Its size is (endState-beginState+1).
-         * \param beginState The first state contained in q.
-         * \param endState The last state contained in q.
-         */
-        void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState);
 
         /**
          * \brief Solve the Picard algorithm for one time step.
@@ -119,10 +47,14 @@ class SolverIncompressible
         void writeData() const;
 
     private:
-        SolverIncompressibleParams m_p;     /**< Solver parameters. */
-        bool m_verboseOutput;               /**< Should the output be verbose? */
-
-        Mesh m_mesh;                       /**< The mesh the solver is using. */
+        double m_rho; /**< The fluid density (kg/m^3). */
+        double m_mu;  /**< The fluid viscosity (Pa s). */
+        double m_picardRelTol;                  /**< Relative tolerance of the algorithm. */
+        unsigned int m_picardMaxIter;           /**< Maximum number of iterations for the algorithm. */
+        unsigned int m_picardCurrentNumIter;    /**< Current number of Picard algorithm iterations. */
+        std::array<bool, 5> m_whatToWrite {false}; /**< Which data will be written (u, v, p, ke, velocity). */
+        double m_coeffDTincrease;
+        double m_coeffDTdecrease;
 
         std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ). */
         Eigen::MatrixXd m_sumNTN;
@@ -154,21 +86,6 @@ class SolverIncompressible
          * \brief Build the matrix A and the vector b of the Picard Algorithm.
          */
         void computeTauPSPG();
-
-        /**
-         * \param elementIndex The index of the element in the element list.
-         * \return The gradient shape function matrix for the element in the format:
-         *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
-         */
-        inline Eigen::MatrixXd getB(std::size_t elementIndex) const;
-
-        /**
-         * \return The gradient shape function matrix for each gauss point in the format:
-         *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
-         */
-        inline std::vector<Eigen::MatrixXd> getN() const;
 };
-
-#include "SolverIncompressible.inl"
 
 #endif // SOLVERINCOMPRESSIBLE_HPP_INCLUDED

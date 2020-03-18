@@ -17,69 +17,35 @@
 #include "../quadrature/gausslegendre.hpp"
 
 
-SolverIncompressible::SolverIncompressible(const nlohmann::json& j, std::string mshName, std::string resultsName) :
-m_mesh(j)
+SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName) :
+Solver(j, mshName, resultsName)
 {
-    m_verboseOutput             = j["verboseOutput"].get<bool>();
+    m_rho               = j["Solver"]["Fluid"]["rho"].get<double>();
+    m_mu                = j["Solver"]["Fluid"]["mu"].get<double>();
 
-    m_p.gravity                 = j["Solver"]["gravity"].get<double>();
+    m_picardRelTol           = j["Solver"]["Picard"]["relTol"].get<double>();
+    m_picardMaxIter          = j["Solver"]["Picard"]["maxIter"].get<unsigned int>();
 
-    m_p.fluid.rho               = j["Solver"]["Fluid"]["rho"].get<double>();
-    m_p.fluid.mu                = j["Solver"]["Fluid"]["mu"].get<double>();
+    m_coeffDTincrease    = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
+    m_coeffDTdecrease    = j["Solver"]["Time"]["coeffDTdecrease"].get<double>();
 
-    m_p.picard.relTol           = j["Solver"]["Picard"]["relTol"].get<double>();
-    m_p.picard.maxIter          = j["Solver"]["Picard"]["maxIter"].get<unsigned int>();
-
-    m_p.time.adaptDT            = j["Solver"]["Time"]["adaptDT"].get<bool>();
-    m_p.time.coeffDTincrease    = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
-    m_p.time.coeffDTdecrease    = j["Solver"]["Time"]["coeffDTdecrease"].get<double>();
-    m_p.time.maxDT              = j["Solver"]["Time"]["maxDT"].get<double>();
-    m_p.time.simuTime           = j["Solver"]["Time"]["simuTime"].get<double>();
-    m_p.time.simuDTToWrite      = j["Solver"]["Time"]["simuDTToWrite"].get<double>();
-    m_p.time.currentDT          = m_p.time.maxDT;
-    m_p.time.nextWriteTrigger   = m_p.time.simuDTToWrite;
-    m_p.time.currentTime        = 0.0;
-    m_p.time.currentStep        = 0;
-
-    m_p.initialCondition        = j["Solver"]["initialCondition"].get<std::vector<double>>();
-
-    // set the desired number of OpenMP threads
-#if defined(_OPENMP)
-    const char* pNumThreads = std::getenv("OMP_NUM_THREADS");
-
-    if(pNumThreads == nullptr)
-        m_p.nOMPThreads = 1;
-    else
-        m_p.nOMPThreads = std::atoi(pNumThreads);
-
-    omp_set_num_threads(m_p.nOMPThreads);
-    Eigen::setNbThreads(m_p.nOMPThreads);
-#else
-     m_p.nOMPThreads = 1;
-#endif
-
-    m_mesh.loadFromFile(mshName);
 
     std::vector<std::string> whatToWrite = j["Solver"]["whatToWrite"];
     for(auto what : whatToWrite)
     {
         if(what == "u")
-            m_p.whatToWrite[0] = true;
+            m_whatToWrite[0] = true;
         else if(what == "v")
-            m_p.whatToWrite[1] = true;
+            m_whatToWrite[1] = true;
         else if(what == "p")
-            m_p.whatToWrite[2] = true;
+            m_whatToWrite[2] = true;
         else if(what == "ke")
-            m_p.whatToWrite[3] = true;
+            m_whatToWrite[3] = true;
         else if(what == "velocity")
-            m_p.whatToWrite[4] = true;
+            m_whatToWrite[4] = true;
         else
             throw std::runtime_error("Unknown quantity to write!");
     }
-
-    m_p.writeAs = j["Solver"]["writeAs"];
-    if(!(m_p.writeAs == "Nodes" || m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements"))
-        throw std::runtime_error("Unexpected date type to write!");
 
     gmsh::initialize();
 
@@ -89,9 +55,7 @@ m_mesh(j)
     gmsh::option::setNumber("General.Terminal", 0);
 #endif // DEBUG
 
-    gmsh::option::setNumber("General.NumThreads", m_p.nOMPThreads);
-
-    m_p.resultsName = resultsName;
+    gmsh::option::setNumber("General.NumThreads", m_numOMPThreads);
 
     m_N = getN();
 
@@ -107,7 +71,7 @@ m_mesh(j)
               0, 2, 0,
               0, 0, 1;
 
-    m_ddev *= m_p.fluid.mu;
+    m_ddev *= m_mu;
 }
 
 SolverIncompressible::~SolverIncompressible()
@@ -149,7 +113,7 @@ void SolverIncompressible::applyBoundaryConditions()
                 m_b(n) = m_qprev(n);
                 m_A.coeffRef(n, n) = 1;
 
-                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_p.time.currentDT*m_p.gravity*m_p.fluid.rho*m_mesh.getHchar()*m_mesh.getHchar()*0.5;
+                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_currentDT*m_gravity*m_rho*m_mesh.getHchar()*m_mesh.getHchar()*0.5;
                 m_A.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
             }
         }
@@ -169,24 +133,24 @@ void SolverIncompressible::displaySolverParams() const
 {
     std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
-    std::cout << "Number of OpenMP threads: " << m_p.nOMPThreads << std::endl;
+    std::cout << "Number of OpenMP threads: " << m_numOMPThreads << std::endl;
 #endif
-    std::cout << "Gravity: " << m_p.gravity << " m/s^2" << std::endl;
-    std::cout << "Density: " << m_p.fluid.rho << " kg/m^3" << std::endl;
-    std::cout << "Viscosity: " << m_p.fluid.mu << " Pa s" << std::endl;
-    std::cout << "Picard relative tolerance: " << m_p.picard.relTol  << std::endl;
-    std::cout << "Maximum picard iteration number: " << m_p.picard.maxIter << std::endl;
-    std::cout << "End simulation time: " << m_p.time.simuTime << " s" << std::endl;
-    std::cout << "Write solution every: " << m_p.time.simuDTToWrite << " s" << std::endl;
-    std::cout << "Adapt time step: " << (m_p.time.adaptDT ? "yes" : "no") << std::endl;
-    if(m_p.time.adaptDT)
+    std::cout << "Gravity: " << m_gravity << " m/s^2" << std::endl;
+    std::cout << "Density: " << m_rho << " kg/m^3" << std::endl;
+    std::cout << "Viscosity: " << m_mu << " Pa s" << std::endl;
+    std::cout << "Picard relative tolerance: " << m_picardRelTol  << std::endl;
+    std::cout << "Maximum picard iteration number: " << m_picardMaxIter << std::endl;
+    std::cout << "End simulation time: " << m_endTime << " s" << std::endl;
+    std::cout << "Write solution every: " << m_timeBetweenWriting << " s" << std::endl;
+    std::cout << "Adapt time step: " << (m_adaptDT ? "yes" : "no") << std::endl;
+    if(m_adaptDT)
     {
-        std::cout << "Maximum time step: " << m_p.time.maxDT << " s" << std::endl;
-        std::cout << "Time step reduction coefficient: " << m_p.time.coeffDTdecrease << std::endl;
-        std::cout << "Time step increase coefficient: " << m_p.time.coeffDTincrease << std::endl;
+        std::cout << "Maximum time step: " << m_maxDT << " s" << std::endl;
+        std::cout << "Time step reduction coefficient: " << m_coeffDTdecrease << std::endl;
+        std::cout << "Time step increase coefficient: " << m_coeffDTincrease << std::endl;
     }
     else
-        std::cout << "Time step: " << m_p.time.maxDT << " s" << std::endl;
+        std::cout << "Time step: " << m_maxDT << " s" << std::endl;
 }
 
 void SolverIncompressible::setInitialCondition()
@@ -200,9 +164,9 @@ void SolverIncompressible::setInitialCondition()
     {
         if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
         {
-            m_mesh.setNodeState(n, 0, m_p.initialCondition[0]);
-            m_mesh.setNodeState(n, 1, m_p.initialCondition[1]);
-            m_mesh.setNodeState(n, 2, m_p.initialCondition[2]);
+            m_mesh.setNodeState(n, 0, m_initialCondition[0]);
+            m_mesh.setNodeState(n, 1, m_initialCondition[1]);
+            m_mesh.setNodeState(n, 2, m_initialCondition[2]);
         }
         else
         {
@@ -213,18 +177,6 @@ void SolverIncompressible::setInitialCondition()
     }
 
     m_qprev = getQFromNodesStates(0, 2);
-}
-
-void SolverIncompressible::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState)
-{
-    assert (q.rows() == (endState - beginState + 1)*m_mesh.getNodesNumber());
-
-    #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        for (unsigned short s = beginState ; s <= endState ; ++s)
-            m_mesh.setNodeState(n, s, q((s - beginState)*m_mesh.getNodesNumber() + n));
-    }
 }
 
 void SolverIncompressible::solveProblem()
@@ -244,44 +196,42 @@ void SolverIncompressible::solveProblem()
 
     writeData();
 
-    while(m_p.time.currentTime < m_p.time.simuTime)
+    while(m_currentTime < m_endTime)
     {
         if(m_verboseOutput)
         {
             std::cout << "----------------------------------------------------------------" << std::endl;
-            std::cout << "Solving time step: " << m_p.time.currentTime + m_p.time.currentDT
-                      << "/" << m_p.time.simuTime << " s, dt = " << m_p.time.currentDT << std::endl;
+            std::cout << "Solving time step: " << m_currentTime + m_currentDT
+                      << "/" << m_endTime << " s, dt = " << m_currentDT << std::endl;
             std::cout << "----------------------------------------------------------------" << std::endl;
         }
         else
         {
             std::cout << std::fixed << std::setprecision(3);
-            std::cout << "\r" << "Solving time step: " << m_p.time.currentTime + m_p.time.currentDT
-                      << "/" << m_p.time.simuTime << " s, dt = ";
+            std::cout << "\r" << "Solving time step: " << m_currentTime + m_currentDT
+                      << "/" << m_endTime << " s, dt = ";
             std::cout << std::scientific;
-            std::cout << m_p.time.currentDT << " s" << std::flush;
+            std::cout << m_currentDT << " s" << std::flush;
         }
 
         if(solveCurrentTimeStep())
         {
-            if(m_p.time.currentTime >= m_p.time.nextWriteTrigger)
+            if(m_currentTime >= m_nextWriteTrigger)
             {
                 writeData();
-                m_p.time.nextWriteTrigger += m_p.time.simuDTToWrite;
+                 m_nextWriteTrigger +=m_timeBetweenWriting;
             }
 
-            if(m_p.time.adaptDT)
+            if(m_adaptDT)
             {
-                if(m_p.picard.currentNumIter < m_p.picard.maxIter)
-                {
-                    m_p.time.currentDT = std::min(m_p.time.maxDT,
-                                                     m_p.time.currentDT*m_p.time.coeffDTincrease);
-                }
+                if(m_picardCurrentNumIter < m_picardMaxIter)
+                    m_currentDT = std::min(m_maxDT, m_currentDT*m_coeffDTincrease);
+
             }
         }
         else
         {
-            if(m_p.time.adaptDT)
+            if(m_adaptDT)
             {
                 if(m_verboseOutput)
                 {
@@ -289,7 +239,7 @@ void SolverIncompressible::solveProblem()
                               << std::endl;
                 }
 
-                m_p.time.currentDT /= m_p.time.coeffDTdecrease;
+                m_currentDT /= m_coeffDTdecrease;
             }
             else
             {
@@ -305,17 +255,17 @@ bool SolverIncompressible::solveCurrentTimeStep()
 {
     m_mesh.saveNodesList();
 
-    m_p.picard.currentNumIter = 0;
+    m_picardCurrentNumIter = 0;
     Eigen::VectorXd qIter(3*m_mesh.getNodesNumber()); qIter.setZero();
     Eigen::VectorXd qIterPrev(3*m_mesh.getNodesNumber()); qIterPrev.setZero();
     double res = std::numeric_limits<double>::max();
 
-    while(res > m_p.picard.relTol)
+    while(res > m_picardRelTol)
     {
         if(m_verboseOutput)
         {
             std::cout << "Picard algorithm (mesh position) - iteration ("
-                      << m_p.picard.currentNumIter << ")" << std::endl;
+                      << m_picardCurrentNumIter << ")" << std::endl;
         }
 
         qIterPrev = qIter;
@@ -336,11 +286,11 @@ bool SolverIncompressible::solveCurrentTimeStep()
         }
 
         setNodesStatesfromQ(qIter, 0, 2);
-        Eigen::VectorXd deltaPos = qIter*m_p.time.currentDT;
+        Eigen::VectorXd deltaPos = qIter*m_currentDT;
         m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + 2*m_mesh.getNodesNumber()));
-        m_p.picard.currentNumIter++;
+        m_picardCurrentNumIter++;
 
-        if(m_p.picard.currentNumIter == 1)
+        if(m_picardCurrentNumIter == 1)
             res = std::numeric_limits<double>::max();
         else
         {
@@ -365,7 +315,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
         if(m_verboseOutput)
         {
             std::cout << " * Relative 2-norm of q: " << res << " vs "
-                      << m_p.picard.relTol << std::endl;
+                      << m_picardRelTol << std::endl;
 
             Eigen::VectorXd mom = m_M*(qIter.head(2*m_mesh.getNodesNumber()) - m_qprev.head(2*m_mesh.getNodesNumber()))
                                 + m_K*qIter.head(2*m_mesh.getNodesNumber())
@@ -388,15 +338,15 @@ bool SolverIncompressible::solveCurrentTimeStep()
             std::cout << " * Error on mass: " << cont.norm() <<std::endl;
         }
 
-        if(m_p.picard.currentNumIter >= m_p.picard.maxIter || std::isnan(res))
+        if(m_picardCurrentNumIter >= m_picardMaxIter || std::isnan(res))
         {
             m_mesh.restoreNodesList();
             return false;
         }
     }
 
-    m_p.time.currentTime += m_p.time.currentDT;
-    m_p.time.currentStep++;
+    m_currentTime += m_currentDT;
+    m_currentStep++;
 
     //Remeshing step
     m_mesh.remesh();
@@ -454,7 +404,7 @@ void SolverIncompressible::buildPicardSystem()
     Eigen::VectorXd H(m_mesh.getNodesNumber());
     H.setZero();
 
-    Eigen::MatrixXd MPrev = m_sumNTN*0.5*(m_p.fluid.rho/m_p.time.currentDT);
+    Eigen::MatrixXd MPrev = m_sumNTN*0.5*(m_rho/m_currentDT);
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
@@ -484,14 +434,14 @@ void SolverIncompressible::buildPicardSystem()
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
             Ce += Bep.transpose()*m_N[k]*GP2Dweight<double>[k];
 
-        Ce *= (0.5*m_tauPSPG[elm]/m_p.time.currentDT)*m_mesh.getElementDetJ(elm);
+        Ce *= (0.5*m_tauPSPG[elm]/m_currentDT)*m_mesh.getElementDetJ(elm);
 
         //Le = tauPSPG S Bp^T Bp dV
-        Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_p.fluid.rho)
+        Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_rho)
                              *Bep.transpose()*Bep
                              *m_mesh.getElementDetJ(elm);
 
-        const Eigen::Vector2d b(0, -m_p.gravity);
+        const Eigen::Vector2d b(0, -m_gravity);
 
         //Fe = S Nv^T bodyforce dV
         Eigen::MatrixXd Fe(6,1); Fe.setZero();
@@ -499,7 +449,7 @@ void SolverIncompressible::buildPicardSystem()
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
             Fe += m_N[k].transpose()*b*GP2Dweight<double>[k];
 
-        Fe *= 0.5*m_p.fluid.rho*m_mesh.getElementDetJ(elm);
+        Fe *= 0.5*m_rho*m_mesh.getElementDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
         Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*Bep.transpose()
@@ -687,9 +637,9 @@ void SolverIncompressible::computeTauPSPG()
     {
         const double h = std::sqrt(2*m_mesh.getElementDetJ(elm)/M_PI);
 
-        m_tauPSPG[elm] = 1/std::sqrt((2/m_p.time.currentDT)*(2/m_p.time.currentDT)
+        m_tauPSPG[elm] = 1/std::sqrt((2/m_currentDT)*(2/m_currentDT)
                                  + (2*U/h)*(2*U/h)
-                                 + 9*(4*m_p.fluid.mu/(h*h*m_p.fluid.rho))*(4*m_p.fluid.mu/(h*h*m_p.fluid.rho)));
+                                 + 9*(4*m_mu/(h*h*m_rho))*(4*m_mu/(h*h*m_rho)));
     }
 }
 
@@ -697,24 +647,24 @@ void SolverIncompressible::writeData() const
 {
     gmsh::model::add("theModel");
     gmsh::model::setCurrent("theModel");
-    if(m_p.writeAs == "Nodes" || m_p.writeAs == "NodesElements")
+    if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
         gmsh::model::addDiscreteEntity(0, 1);
-    if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
+    if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
         gmsh::model::addDiscreteEntity(2, 2);
 
-    if(m_p.whatToWrite[0])
+    if(m_whatToWrite[0])
         gmsh::view::add("u", 1);
 
-    if(m_p.whatToWrite[1])
+    if(m_whatToWrite[1])
         gmsh::view::add("v", 2);
 
-    if(m_p.whatToWrite[2])
+    if(m_whatToWrite[2])
         gmsh::view::add("p", 3);
 
-    if(m_p.whatToWrite[3])
+    if(m_whatToWrite[3])
         gmsh::view::add("ke", 4);
 
-    if(m_p.whatToWrite[4])
+    if(m_whatToWrite[4])
         gmsh::view::add("velocity", 5);
 
     std::vector<std::size_t> nodesTags(m_mesh.getNodesNumber());
@@ -730,7 +680,7 @@ void SolverIncompressible::writeData() const
 
     gmsh::model::mesh::addNodes(0, 1, nodesTags, nodesCoord);
 
-    if(m_p.writeAs == "Elements" || m_p.writeAs == "NodesElements")
+    if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
     {
         std::vector<std::size_t> elementTags(m_mesh.getElementsNumber());
         std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementsNumber());
@@ -746,7 +696,7 @@ void SolverIncompressible::writeData() const
         gmsh::model::mesh::addElementsByType(2, 2, elementTags, nodesTagsPerElement);
     }
 
-    if(m_p.writeAs == "Nodes" || m_p.writeAs == "NodesElements")
+    if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
         gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
 
     std::vector<std::vector<double>> dataU;
@@ -755,65 +705,65 @@ void SolverIncompressible::writeData() const
     std::vector<std::vector<double>> dataKe;
     std::vector<std::vector<double>> dataVelocity;
 
-    if(m_p.whatToWrite[0])
+    if(m_whatToWrite[0])
         dataU.resize(m_mesh.getNodesNumber());
-    if(m_p.whatToWrite[1])
+    if(m_whatToWrite[1])
         dataV.resize(m_mesh.getNodesNumber());
-    if(m_p.whatToWrite[2])
+    if(m_whatToWrite[2])
         dataP.resize(m_mesh.getNodesNumber());
-    if(m_p.whatToWrite[3])
+    if(m_whatToWrite[3])
         dataKe.resize(m_mesh.getNodesNumber());
-    if(m_p.whatToWrite[4])
+    if(m_whatToWrite[4])
         dataVelocity.resize(m_mesh.getNodesNumber());
 
     #pragma omp parallel for default(shared)
     for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
-        if(m_p.whatToWrite[0])
+        if(m_whatToWrite[0])
         {
             const std::vector<double> u{m_mesh.getNodeState(n, 0)};
             dataU[n] = u;
         }
-        if(m_p.whatToWrite[1])
+        if(m_whatToWrite[1])
         {
             const std::vector<double> v{m_mesh.getNodeState(n, 1)};
             dataV[n] = v;
         }
-        if(m_p.whatToWrite[2])
+        if(m_whatToWrite[2])
         {
             const std::vector<double> p{m_mesh.getNodeState(n, 2)};
             dataP[n] = p;
         }
-        if(m_p.whatToWrite[3])
+        if(m_whatToWrite[3])
         {
             const std::vector<double> ke{0.5*(m_mesh.getNodeState(n, 0)*m_mesh.getNodeState(n, 0)
                                             + m_mesh.getNodeState(n, 1)*m_mesh.getNodeState(n, 1))};
             dataKe[n] = ke;
         }
-        if(m_p.whatToWrite[4])
+        if(m_whatToWrite[4])
         {
             const std::vector<double> velocity{m_mesh.getNodeState(n, 0), m_mesh.getNodeState(n, 1), 0};
             dataVelocity[n] = velocity;
         }
     }
 
-    if(m_p.whatToWrite[0])
-        gmsh::view::addModelData(1, m_p.time.currentStep, "theModel", "NodeData", nodesTags, dataU, m_p.time.currentTime, 1);
-    if(m_p.whatToWrite[1])
-        gmsh::view::addModelData(2, m_p.time.currentStep, "theModel", "NodeData", nodesTags, dataV, m_p.time.currentTime, 1);
-    if(m_p.whatToWrite[2])
-        gmsh::view::addModelData(3, m_p.time.currentStep, "theModel", "NodeData", nodesTags, dataP, m_p.time.currentTime, 1);
-    if(m_p.whatToWrite[3])
-        gmsh::view::addModelData(4, m_p.time.currentStep, "theModel", "NodeData", nodesTags, dataKe, m_p.time.currentTime, 1);
-    if(m_p.whatToWrite[4])
-        gmsh::view::addModelData(5, m_p.time.currentStep, "theModel", "NodeData", nodesTags, dataVelocity, m_p.time.currentTime, 3);
+    if(m_whatToWrite[0])
+        gmsh::view::addModelData(1, m_currentStep, "theModel", "NodeData", nodesTags, dataU, m_currentTime, 1);
+    if(m_whatToWrite[1])
+        gmsh::view::addModelData(2, m_currentStep, "theModel", "NodeData", nodesTags, dataV, m_currentTime, 1);
+    if(m_whatToWrite[2])
+        gmsh::view::addModelData(3, m_currentStep, "theModel", "NodeData", nodesTags, dataP, m_currentTime, 1);
+    if(m_whatToWrite[3])
+        gmsh::view::addModelData(4, m_currentStep, "theModel", "NodeData", nodesTags, dataKe, m_currentTime, 1);
+    if(m_whatToWrite[4])
+        gmsh::view::addModelData(5, m_currentStep, "theModel", "NodeData", nodesTags, dataVelocity, m_currentTime, 3);
 
-    const std::string baseName = m_p.resultsName.substr(0, m_p.resultsName.find(".msh"));
+    const std::string baseName = m_resultsName.substr(0, m_resultsName.find(".msh"));
 
-    for(unsigned short i = 0; i < m_p.whatToWrite.size(); ++i)
+    for(unsigned short i = 0; i < m_whatToWrite.size(); ++i)
     {
-        if(m_p.whatToWrite[i] == true)
-            gmsh::view::write(i + 1, baseName + "_" + std::to_string(m_p.time.currentTime) + ".msh" , true);
+        if(m_whatToWrite[i] == true)
+            gmsh::view::write(i + 1, baseName + "_" + std::to_string(m_currentTime) + ".msh" , true);
     }
 
     gmsh::model::remove();

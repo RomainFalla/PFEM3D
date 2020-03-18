@@ -14,8 +14,9 @@
     		"coeffDTincrease": 1.5,
     		"coeffDTdecrease": 2.0,
     		"maxDT": 0.01,
-    		"simuTime": 4,
-    		"simuDTToWrite": 0.025
+			"initialDT": 0.01,
+    		"endTime": 4,
+    		"timeBetweenWriting": 0.025
 		},
 		"Picard": {
 			"relTol": 5e-6,
