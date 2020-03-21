@@ -117,6 +117,12 @@ void SolverCompressible::applyBoundaryConditionsCont()
 
 void SolverCompressible::displaySolverParams() const
 {
+    std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
+    std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;
+    std::cout << "alpha: " << m_mesh.getAlpha() << std::endl;
+    std::cout << "hchar: " << m_mesh.getHchar() << std::endl;
+    std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
+    std::cout << "omega: " << m_mesh.getOmega() << std::endl;
     std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
     std::cout << "Number of OpenMP threads: " << m_numOMPThreads << std::endl;
@@ -178,7 +184,7 @@ void SolverCompressible::solveProblem()
 {
     std::cout   << "================================================================"
                 << std::endl
-                << "                     EXECUTING THE SOLVER                       "
+                << "               EXECUTING PFEM COMPRESSIBLE SOLVER               "
                 << std::endl
                 << "================================================================"
                 << std::endl;

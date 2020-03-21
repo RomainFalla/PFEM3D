@@ -40,6 +40,11 @@ class Mesh
         ~Mesh();
 
         /**
+         * \return The characteristic alpha-shape parameter.
+         */
+        inline double getAlpha() const;
+
+        /**
          * \param elm The index of the element.
          * \return The vector containing the index of the nodes in nodesList
          *         making a certain element.
@@ -83,6 +88,11 @@ class Mesh
          * \return The number of free surface edges in the mesh.
          */
         inline std::size_t getFreeSurfaceEdgesNumber() const;
+
+        /**
+         * \return The characteristic node removing parameter.
+         */
+        inline double getGamma() const;
 
         /**
          * \return The characteristic size of the mesh.
@@ -133,6 +143,11 @@ class Mesh
          * \return true is the node is a fluid input, false otherwize.
          */
         inline bool isNodeFluidInput(std::size_t nodeIndex) const;
+
+        /**
+         * \return The characteristic node adding parameter.
+         */
+        inline double getOmega() const;
 
         /**
          * \brief Load the nodes from a file using gmsh.

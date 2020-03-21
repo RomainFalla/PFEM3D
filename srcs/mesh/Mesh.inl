@@ -1,5 +1,10 @@
 #include "Mesh.hpp"
 
+inline double Mesh::getAlpha() const
+{
+    return m_p.alpha;
+}
+
 inline std::vector<std::size_t> Mesh::getElement(std::size_t elm) const
 {
     assert(elm < m_elementsList.size() && "elm should be between 0 and size - 1 !");
@@ -44,6 +49,11 @@ inline std::size_t  Mesh::getFreeSurfaceEdgesNumber() const
     return m_freeSurfaceEdgesList.size();
 }
 
+inline double Mesh::getGamma() const
+{
+    return m_p.gamma;
+}
+
 inline double Mesh::getHchar() const
 {
     return m_p.hchar;
@@ -67,6 +77,11 @@ inline double Mesh::getNodePosition(std::size_t nodeIndex, unsigned short coordi
 inline double Mesh::getNodeState(std::size_t nodeIndex, unsigned short state) const
 {
     return m_nodesList[nodeIndex].states[state];
+}
+
+inline double Mesh::getOmega() const
+{
+    return m_p.omega;
 }
 
 inline bool Mesh::isNodeFree(std::size_t nodeIndex) const
