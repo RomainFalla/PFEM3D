@@ -27,6 +27,14 @@ cp -r ../geometry/ bin
 cp -r ../params/ bin
 cp -r ${GMSHSDK}/lib/gmsh-4.5.dll bin
 cp -r ../run/windows/start.bat bin
+cp -r /c/tools/msys64/mingw64/bin/libgcc_s_seh-1.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libgmp-10.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libgmpxx-4.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libgomp-1.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libstdc++-6.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libwinpthread-1.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libCGAL.dll bin
+cp -r /c/tools/msys64/mingw64/bin/libCGAL_Core.dll bin
 
 sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/pfem.dir/build.make
 sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/pfem.dir/build.make
