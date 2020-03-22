@@ -6,13 +6,13 @@ inline Eigen::MatrixXd Solver::getB(std::size_t elementIndex) const
 
     Eigen::MatrixXd B(3, 6); B.setZero();
 
-    B(0,0) = B(2,0) = - m_mesh.getElementInvJ(elementIndex, 0, 0) - m_mesh.getElementInvJ(elementIndex, 1, 0);
-    B(0,1) = B(2,1) = m_mesh.getElementInvJ(elementIndex, 0, 0);
-    B(0,2) = B(2,2) = m_mesh.getElementInvJ(elementIndex, 1, 0);
+    B(0,0) = B(2,3) = - m_mesh.getElementInvJ(elementIndex, 0, 0) - m_mesh.getElementInvJ(elementIndex, 1, 0);
+    B(0,1) = B(2,4) = m_mesh.getElementInvJ(elementIndex, 0, 0);
+    B(0,2) = B(2,5) = m_mesh.getElementInvJ(elementIndex, 1, 0);
 
-    B(1,3) = B(2,3) = - m_mesh.getElementInvJ(elementIndex, 0, 1) - m_mesh.getElementInvJ(elementIndex, 1, 1);
-    B(1,4) = B(2,4) = m_mesh.getElementInvJ(elementIndex, 0, 1);
-    B(1,5) = B(2,5) = m_mesh.getElementInvJ(elementIndex, 1, 1);
+    B(1,3) = B(2,0) = - m_mesh.getElementInvJ(elementIndex, 0, 1) - m_mesh.getElementInvJ(elementIndex, 1, 1);
+    B(1,4) = B(2,1) = m_mesh.getElementInvJ(elementIndex, 0, 1);
+    B(1,5) = B(2,2) = m_mesh.getElementInvJ(elementIndex, 1, 1);
 
     return B;
 }

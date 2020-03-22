@@ -418,7 +418,7 @@ void SolverIncompressible::buildPicardSystem()
         Eigen::MatrixXd Be = getB(elm);
         Eigen::MatrixXd Bep(2,3);
         Bep << Be.topLeftCorner<1,3>(),
-               Be.bottomRightCorner<1,3>();
+               Be.bottomLeftCorner<1,3>();
 
         //Me = S rho Nv^T Nv dV
         Eigen::MatrixXd Me = MPrev*m_mesh.getElementDetJ(elm);
