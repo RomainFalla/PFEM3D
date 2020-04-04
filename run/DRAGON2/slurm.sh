@@ -19,4 +19,4 @@ export OMP_NUM_THREADS=4
 export MKL_NUM_THREADS=4
 
 cd $HOME/PFEM-master/build/bin
-srun ./main params/params.json geometry/square.msh results.msh
+srun ./pfem ../../params/params.json ../../geometry/square.msh results.msh
