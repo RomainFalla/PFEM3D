@@ -1,39 +1,18 @@
+#pragma once
 #ifndef MESH_HPP_INCLUDED
 #define MESH_HPP_INCLUDED
 
-#include <vector>
-
-#ifdef DEBUG_GEOMVIEW
-#include <CGAL/IO/Geomview_stream.h>
-#include <CGAL/IO/Triangulation_geomview_ostream_2.h>
-#include <CGAL/IO/Triangulation_geomview_ostream_3.h>
-#endif
-#include <gmsh.h>
-#include <Eigen/Dense>
-
 #include <nlohmann/json.hpp>
 
-#include "../quadrature/gausslegendre.hpp"
 #include "Node.hpp"
 
-/**
- * \struct RemeshingParams
- * \brief Contains the parameters relative to the remeshing.
- */
-struct RemeshingParams
-{
-    double hchar; /**< Characteristic size of an element (same as in .geo file). */
-    double alpha; /**< Alpha parameter of the alpha-shape algorithm (triangles are discared if  r_circumcircle > alpha*hchar). */
-    double omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
-    double gamma; /**< Control the deletetion of node if two are too close to each other (a node is deleted if d_nodes < gamma*hchar). */
-    std::vector<double> boundingBox; /**< Box delimiting the zone of nodes existence (format: [xmin, ymin, xmax, ymax]). */
-};
+#include "Mesh_export.h"
 
 /**
  * \class Mesh
  * \brief Represents a lagrangian mesh.
  */
-class Mesh
+class MESH_API Mesh
 {
     public:
         Mesh(const nlohmann::json& j);
@@ -70,29 +49,47 @@ class Mesh
          */
         inline std::size_t getElementsNumber() const;
 
-        /**
-         * \param elm The element index.
-         * \return The determinant of the of the Jacobian matrix
-         */
-        inline double getFreeSurfaceDetJ(std::size_t edge) const;
-
-
-        /**
-         * \param edge The index of the edge.
-         * \return The vector containing the index of the nodes in nodesList
-         *         making a certain edge.
-         */
-        inline std::vector<std::size_t> getFreeSurfaceEdge(std::size_t edge) const;
-
-        /**
-         * \return The number of free surface edges in the mesh.
-         */
-        inline std::size_t getFreeSurfaceEdgesNumber() const;
+//        /**
+//         * \param elm The element index.
+//         * \return The determinant of the of the Jacobian matrix
+//         */
+//        inline double getFreeSurfaceDetJ(std::size_t edge) const;
+//
+//
+//        /**
+//         * \param edge The index of the edge.
+//         * \return The vector containing the index of the nodes in nodesList
+//         *         making a certain edge.
+//         */
+//        inline std::vector<std::size_t> getFreeSurfaceEdge(std::size_t edge) const;
+//
+//        /**
+//         * \return The number of free surface edges in the mesh.
+//         */
+//        inline std::size_t getFreeSurfaceEdgesNumber() const;
 
         /**
          * \return The characteristic node removing parameter.
          */
         inline double getGamma() const;
+
+        /**
+         * \param point The index to the considered Gauss point.
+         * \param coordinate The index of the coordinate we want.
+         * \return The coordinate of the wanted Gauss point.
+         */
+        inline double getGaussPoints(unsigned short point, unsigned short coordinate) const;
+
+        /**
+         * \return The number of gauss point used (depends on the mesh dimension).
+         */
+        inline unsigned short getGaussPointsNumber() const;
+
+        /**
+         * \param point The index to the considered Gauss point.
+         * \return The weight associated to this Gauss Point.
+         */
+        inline double getGaussWeight(unsigned short point) const;
 
         /**
          * \return The characteristic size of the mesh.
@@ -124,6 +121,16 @@ class Mesh
         inline double getNodeState(std::size_t nodeIndex, unsigned short state) const;
 
         /**
+         * \return The characteristic node adding parameter.
+         */
+        inline double getOmega() const;
+
+        /**
+         * \return The size of the element in the reference coordinate system.
+         */
+        inline double getRefElementSize() const;
+
+        /**
          * \brief Check if a node is not attached to a fluid element.
          * \param nodeIndex The index of the node in the nodes list.
          * \return true is the node is free, false otherwize.
@@ -145,15 +152,10 @@ class Mesh
         inline bool isNodeFluidInput(std::size_t nodeIndex) const;
 
         /**
-         * \return The characteristic node adding parameter.
-         */
-        inline double getOmega() const;
-
-        /**
          * \brief Load the nodes from a file using gmsh.
          * \param fileName The name of the .msh file
          */
-        void loadFromFile(std::string fileName);
+        void loadFromFile(const std::string& fileName);
 
         /**
          * \brief Perform remeshing on the mesh.
@@ -194,25 +196,28 @@ class Mesh
          * \brief Set the number of states to be stored at node level.
          * \param statesNumber The number of state per nodes;
          */
-        void setStatesNumber(unsigned short statesNumber);
+        inline void setStatesNumber(unsigned short statesNumber);
 
     private:
-        RemeshingParams m_p;    /**< Parameters of the remeshing. */
         bool m_verboseOutput;   /**< Should the output be verbose? */
+
+        double m_hchar; /**< Characteristic size of an element (same as in .geo file). */
+        double m_alpha; /**< Alpha parameter of the alpha-shape algorithm (triangles are discared if  r_circumcircle > alpha*hchar). */
+        double m_omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
+        double m_gamma; /**< Control the deletetion of node if two are too close to each other (a node is deleted if d_nodes < gamma*hchar). */
+        std::vector<double> m_boundingBox; /**< Box delimiting the zone of nodes existence (format: [xmin, ymin, xmax, ymax]). */
 
         unsigned short m_dim;   /**< The mesh dimension. */
 
         std::vector<Node> m_nodesList;      /**< List of nodes of the mesh. */
         std::vector<Node> m_nodesListSave;  /**< A copy of the nodes list (usefull for non-linear algorithm). */
         std::vector<std::vector<std::size_t>> m_elementsList;    /**< The list of element (triplet of index in the nodesList. */
-        std::vector<std::vector<std::size_t>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
-        std::vector<double> m_elementDetJ;         /**< The Jacobian matrix determinant of each element. */
-        std::vector<std::vector<std::vector<double>>> m_elementInvJ;   /**< The inverse Jacobian matrix of each element. */
-        std::vector<double> m_freeSurfaceEdgeDetJ;         /**< The Jacobian matrix determinant of each free surface edge. */
+        //std::vector<std::vector<std::size_t>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
 
-#ifdef DEBUG_GEOMVIEW
-        CGAL::Geomview_stream m_gv; /**< A geomview stream object to interact with geomview if installed. */
-#endif
+        std::vector<double> m_elementsDetJ;         /**< The Jacobian matrix determinant of each element. */
+        std::vector<std::vector<std::vector<double>>> m_elementsInvJ;   /**< The inverse Jacobian matrix of each element. */
+        std::vector<std::vector<std::vector<double>>> m_elementsJ;   /**< The Jacobian matrix of each element. */
+        std::vector<double> m_freeSurfaceEdgeDetJ;         /**< The Jacobian matrix determinant of each free surface edge. */
 
         /**
          * \brief Add nodes in element whose area is too big (A_tringle > omega*hchar^2.
@@ -230,19 +235,25 @@ class Mesh
          * \brief Compute the determinant of the of the Jacobian matrix for gauss
          *        integration for each triangle.
          */
-        void computeElementDetJ();
+        void computeElementsDetJ();
 
         /**
          * \brief Compute the inverse Jacobian matrix for gauss integration for each
          *        triangle.
          */
-        void computeElementInvJ();
+        void computeElementsInvJ();
 
         /**
-         * \brief Compute the determinant of the of the Jacobian matrix for gauss
-         *        integration for each edge.
+         * \brief Compute the inverse Jacobian matrix for gauss integration for each
+         *        triangle.
          */
-        void computeFreeSurfaceEdgeDetJ();
+        void computeElementsJ();
+
+//        /**
+//         * \brief Compute the determinant of the of the Jacobian matrix for gauss
+//         *        integration for each edge.
+//         */
+//        void computeFreeSurfaceEdgeDetJ();
 
          /**
          * \brief Compute the mesh dimension from the .msh file.
@@ -252,9 +263,21 @@ class Mesh
 
         /**
          * \brief Remesh the nodes in nodesList using CGAL (Delaunay triangulation
-         *        and alpha-shape)
+         *        and alpha-shape).
          */
         void triangulateAlphaShape();
+
+        /**
+         * \brief Remesh the nodes in nodesList using CGAL (Delaunay triangulation
+         *        and alpha-shape) (2D).
+         */
+        void triangulateAlphaShape2D();
+
+        /**
+         * \brief Remesh the nodes in nodesList using CGAL (Delaunay triangulation
+         *        and alpha-shape) (3D).
+         */
+        void triangulateAlphaShape3D();
 
         /**
          * \brief Removes nodes if they are too close from each other

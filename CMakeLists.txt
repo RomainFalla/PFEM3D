@@ -1,10 +1,29 @@
+include(CheckCXXCompilerFlag)
+
 PROJECT(PFEM CXX)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 
 # build type is "" by default in Linux
-SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+IF(NOT CMAKE_BUILD_TYPE)
+    SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+ENDIF()
 
 MESSAGE(STATUS "Build Type is " ${CMAKE_BUILD_TYPE})
+
+# Use this only if you do not want to make portable libraries !
+IF(NOT USE_MARCH)
+	SET(USE_MARCH 0 CACHE STRING "" FORCE)
+ENDIF()
+
+IF(CMAKE_BUILD_TYPE MATCHES "Release")
+	IF(USE_MARCH)
+		CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+		IF(COMPILER_SUPPORTS_MARCH_NATIVE)
+			SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+			MESSAGE(STATUS "Using -march=native")
+		ENDIF()
+	ENDIF()
+ENDIF()
 
 # put all generated files in a single folder (required in windows for exe linked to dlls)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/ CACHE PATH "")
@@ -14,15 +33,14 @@ MARK_AS_ADVANCED(LIBRARY_OUTPUT_PATH EXECUTABLE_OUTPUT_PATH)
 # enable C++14
 SET(CMAKE_CXX_STANDARD 14) # newer way to set C++14 (requires cmake>3.1)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-#SET(CMAKE_CXX_FLAGS "-fopenmp") #enable openmp
+
+SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # compiler options
 IF(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS)
     ADD_DEFINITIONS(-D_USE_MATH_DEFINES) # for M_PI
 ENDIF()
-
-#ADD_DEFINITIONS(-DDEBUG_GEOMVIEW)
 
 IF(APPLE)
     # on macOS, do not give priority to frameworks/apps

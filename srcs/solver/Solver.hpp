@@ -1,20 +1,20 @@
+#pragma once
 #ifndef SOLVER_HPP_INCLUDED
 #define SOLVER_HPP_INCLUDED
 
-#include <cassert>
-#include <exception>
-#include <vector>
-
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <nlohmann/json.hpp>
 
 #include "../mesh/Mesh.hpp"
+
+#include "Solver_export.h"
 
 /**
  * \class Solver
  * \brief Represents a solver.
  */
-class Solver
+class SOLVER_API Solver
 {
     public:
         Solver(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName);
@@ -34,6 +34,13 @@ class Solver
          * \return Return the current physical time of the simulation in seconds.
          */
         inline double getCurrentTime() const;
+
+        /**
+         * \param elm The element index.
+         * \param state The considered state.
+         * \return Return a vector containing the state of a whole element.
+         */
+        inline Eigen::VectorXd getElementState(std::size_t elm, unsigned short state) const;
 
         /**
          * \return Return the maximum physical time at which the simulation will stop in seconds.
@@ -71,14 +78,23 @@ class Solver
          */
         inline void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState);
 
+        /**
+         * \brief Write solutions to a file.
+         */
+        void writeData() const;
+
     protected:
         bool m_verboseOutput;           /**< Should the output be verbose? */
         unsigned int m_numOMPThreads;   /**< Number of OpenMP threads used. */
+
+        unsigned short m_statesNumber;
 
         double m_gravity;               /**< Acceleration of the gravity (g > 0). */
 
         std::string m_resultsName;      /**< File name in which the results will be written. */
         std::string m_writeAs;
+        std::vector<std::string> m_whatCanBeWriten;
+        std::vector<bool> m_whatToWrite; /**< Which data will be written (u, v, p, ke, velocity). */
 
         std::vector<double> m_initialCondition; /**< Initial condition on the states **/
 
@@ -95,6 +111,8 @@ class Solver
         Mesh m_mesh;                       /**< The mesh the solver is using. */
 
         std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ). */
+        Eigen::VectorXd m_m;
+        Eigen::VectorXd m_bodyForces;
 
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
 

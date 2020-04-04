@@ -1,0 +1,33 @@
+{
+	"ProblemType": "Compressible",
+	"Remeshing": {
+		"hchar": 0.5,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-1, -1, -1, 11, 11, 100]
+	},
+	"Solver": {
+		"gravity": 9.81,
+		"strongContinuity": true,
+		"Time": {
+			"adaptDT": true,
+    		"securityCoeff": 0.1,
+    		"maxDT": 0.001,
+			"initialDT": 1e-8,
+    		"endTime": 0.2,
+    		"timeBetweenWriting": 0.1
+		},
+		"Fluid": {
+			"rho0": 1000,
+			"mu": 1e-3,
+            "K0": 20000000,
+            "K0prime": 7,
+            "pInfty": 0			
+		},
+		"whatToWrite": ["p", "ke", "rho"],
+		"writeAs": "NodesElements",
+		"initialCondition" : [0, 0, 0, 0, 1000]
+	},
+	"verboseOutput": false
+}

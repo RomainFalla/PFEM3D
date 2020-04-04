@@ -1,18 +1,14 @@
 #include <chrono>
-#include <exception>
 #include <iostream>
-#include <string>
 #include <fstream>
-
-#include <nlohmann/json.hpp>
 
 #include "solver/SolverIncompressible.hpp"
 #include "solver/SolverCompressible.hpp"
 
 /**
- * @param  argv[1] .json file that contains the parameters.
- * @param  argv[2] .msh file that contains the initial set of nodes.
- * @param  argv[3] name of the .msh file that will contain the results.
+ * \param  argv[1] .json file that contains the parameters.
+ * \param  argv[2] .msh file that contains the initial set of nodes.
+ * \param  argv[3] name of the .msh file that will contain the results.
  */
 int main(int argc, char **argv)
 {
@@ -57,7 +53,7 @@ int main(int argc, char **argv)
                   << static_cast<double>(ellapsedTime.count())/1000.0
                   << " s" << std::endl;
     }
-    catch(std::exception const & exception)
+    catch(const std::exception& exception)
     {
         std::cerr << "Something went wrong during program execution: "
                   << exception.what() << std::endl;

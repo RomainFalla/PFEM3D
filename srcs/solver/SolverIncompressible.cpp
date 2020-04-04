@@ -1,25 +1,23 @@
-#include <cassert>
-#include <chrono>
-#include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <limits>
-
-#if defined(_OPENMP)
-    #include <cstdlib>
-    #include <omp.h>
-#endif
 
 #include <gmsh.h>
-#include <nlohmann/json.hpp>
 
 #include "SolverIncompressible.hpp"
-#include "../quadrature/gausslegendre.hpp"
 
 
 SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName) :
 Solver(j, mshName, resultsName)
 {
+    unsigned short dim = m_mesh.getMeshDim();
+
+    m_statesNumber = dim + 1;
+
+    m_mesh.setStatesNumber(m_statesNumber);
+
+    if(m_initialCondition.size() != m_statesNumber)
+        throw std::runtime_error("Invalid number of initial condition!");
+
     m_rho               = j["Solver"]["Fluid"]["rho"].get<double>();
     m_mu                = j["Solver"]["Fluid"]["mu"].get<double>();
 
@@ -29,21 +27,27 @@ Solver(j, mshName, resultsName)
     m_coeffDTincrease    = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
     m_coeffDTdecrease    = j["Solver"]["Time"]["coeffDTdecrease"].get<double>();
 
+    if(dim == 2)
+        m_whatCanBeWriten = {"u", "v", "p", "ke", "velocity"};
+    else if(dim == 3)
+        m_whatCanBeWriten = {"u", "v", "w", "p", "ke", "velocity"};
 
     std::vector<std::string> whatToWrite = j["Solver"]["whatToWrite"];
-    for(auto what : whatToWrite)
+    m_whatToWrite.resize(dim + 3, false);
+
+    for(unsigned short i = 0 ; i < whatToWrite.size() ; ++i)
     {
-        if(what == "u")
-            m_whatToWrite[0] = true;
-        else if(what == "v")
-            m_whatToWrite[1] = true;
-        else if(what == "p")
-            m_whatToWrite[2] = true;
-        else if(what == "ke")
-            m_whatToWrite[3] = true;
-        else if(what == "velocity")
-            m_whatToWrite[4] = true;
-        else
+        bool found = false;
+        for(unsigned short j = 0 ; j < m_whatCanBeWriten.size() ; ++j)
+        {
+            if(whatToWrite[i] == m_whatCanBeWriten[j])
+            {
+                m_whatToWrite[j] = true;
+                found = true;
+                break;
+            }
+        }
+        if(!found)
             throw std::runtime_error("Unknown quantity to write!");
     }
 
@@ -57,19 +61,29 @@ Solver(j, mshName, resultsName)
 
     gmsh::option::setNumber("General.NumThreads", m_numOMPThreads);
 
-    m_N = getN();
-
-    m_sumNTN.resize(6,6); m_sumNTN.setZero();
+    m_sumNTN.resize(dim*(dim + 1), dim*(dim + 1)); m_sumNTN.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
-        m_sumNTN += m_N[k].transpose()*m_N[k]*GP2Dweight<double>[k];
+    {
+        m_sumNTN += m_N[k].transpose()*m_N[k]*m_mesh.getGaussWeight(k);
+    }
 
-    m_m.resize(3);
-    m_m << 1, 1, 0;
-
-    m_ddev.resize(3, 3);
-    m_ddev << 2, 0, 0,
-              0, 2, 0,
-              0, 0, 1;
+    if(dim == 2)
+    {
+        m_ddev.resize(3, 3);
+        m_ddev << 2, 0, 0,
+                  0, 2, 0,
+                  0, 0, 1;
+    }
+    else if(dim == 3)
+    {
+        m_ddev.resize(6, 6);
+        m_ddev << 2, 0, 0, 0, 0, 0,
+                  0, 2, 0, 0, 0, 0,
+                  0, 0, 2, 0, 0, 0,
+                  0, 0, 0, 1, 0, 0,
+                  0, 0, 0, 0, 1, 0,
+                  0, 0, 0, 0, 0, 1;
+    }
 
     m_ddev *= m_mu;
 }
@@ -83,56 +97,51 @@ void SolverIncompressible::applyBoundaryConditions()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    m_A.prune([this](int i, int j, float)
-    {
-        if(i < m_mesh.getNodesNumber())
-        {
-            return !(this->m_mesh.isNodeBound(i) || this->m_mesh.isNodeFree(i));
-        }
-        else if (i >= m_mesh.getNodesNumber() && i < 2*m_mesh.getNodesNumber())
-        {
-            return !(this->m_mesh.isNodeBound(i - m_mesh.getNodesNumber()) ||
-                    this->m_mesh.isNodeFree(i - m_mesh.getNodesNumber()));
-        }
-        else
-        {
-            return !(this->m_mesh.isNodeFree(i - 2*m_mesh.getNodesNumber()));
-        }
-    });
+    const unsigned short dim = m_mesh.getMeshDim();
 
     //Do not parallelize this
     for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         if(m_mesh.isNodeFree(n))
         {
-            m_b(n + 2*m_mesh.getNodesNumber()) = m_qprev(n + 2*m_mesh.getNodesNumber());
-            m_A.coeffRef(n + 2*m_mesh.getNodesNumber(), n + 2*m_mesh.getNodesNumber()) = 1;
+            m_A.row(n + dim*m_mesh.getNodesNumber()) *= 0;
+            m_b(n + dim*m_mesh.getNodesNumber()) = m_qprev(n + dim*m_mesh.getNodesNumber());
+            m_A.coeffRef(n + dim*m_mesh.getNodesNumber(), n + dim*m_mesh.getNodesNumber()) = 1;
 
             if(!m_mesh.isNodeBound(n))
             {
-                m_b(n) = m_qprev(n);
-                m_A.coeffRef(n, n) = 1;
+                for(unsigned short d = 0 ; d < dim - 1 ; ++d)
+                {
+                    m_A.row(n + d*m_mesh.getNodesNumber()) *= 0;
+                    m_b(n + d*m_mesh.getNodesNumber()) = m_qprev(n + d*m_mesh.getNodesNumber());
+                    m_A.coeffRef(n + d*m_mesh.getNodesNumber(), n + d*m_mesh.getNodesNumber()) = 1;
+                }
 
-                m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber()) - m_currentDT*m_gravity*m_rho*m_mesh.getHchar()*m_mesh.getHchar()*0.5;
-                m_A.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
+                m_A.row(n + (dim - 1)*m_mesh.getNodesNumber()) *= 0;
+                m_b(n + (dim - 1)*m_mesh.getNodesNumber()) = m_qprev(n + (dim - 1)*m_mesh.getNodesNumber()) - m_currentDT*m_gravity;
+                m_A.coeffRef(n + (dim - 1)*m_mesh.getNodesNumber(), n + (dim - 1)*m_mesh.getNodesNumber()) = 1;
             }
         }
 
         if(m_mesh.isNodeBound(n))
         {
-            m_b(n) = m_qprev(n);
-            m_A.coeffRef(n, n) = 1;
-
-            m_b(n + m_mesh.getNodesNumber()) = m_qprev(n + m_mesh.getNodesNumber());
-            m_A.coeffRef(n + m_mesh.getNodesNumber(), n + m_mesh.getNodesNumber()) = 1;
+            for(unsigned short d = 0 ; d < dim ; ++d)
+            {
+                m_A.row(n + d*m_mesh.getNodesNumber()) *= 0;
+                m_b(n + d*m_mesh.getNodesNumber()) = m_qprev(n + d*m_mesh.getNodesNumber());
+                m_A.coeffRef(n + d*m_mesh.getNodesNumber(), n + d*m_mesh.getNodesNumber()) = 1;
+            }
         }
     }
+
+    m_A.prune(0, 0);
 }
 
 void SolverIncompressible::displaySolverParams() const
 {
     std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
     std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;
+    std::cout << "Mesh dimension: " << m_mesh.getMeshDim() << "D" << std::endl;
     std::cout << "alpha: " << m_mesh.getAlpha() << std::endl;
     std::cout << "hchar: " << m_mesh.getHchar() << std::endl;
     std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
@@ -163,26 +172,23 @@ void SolverIncompressible::setInitialCondition()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    m_mesh.setStatesNumber(3);
-
     #pragma omp parallel for default(shared)
     for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
-        if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
+        for(unsigned short s = 0 ; s < m_mesh.getMeshDim() + 1 ; ++s)
         {
-            m_mesh.setNodeState(n, 0, m_initialCondition[0]);
-            m_mesh.setNodeState(n, 1, m_initialCondition[1]);
-            m_mesh.setNodeState(n, 2, m_initialCondition[2]);
-        }
-        else
-        {
-            m_mesh.setNodeState(n, 0, 0);
-            m_mesh.setNodeState(n, 1, 0);
-            m_mesh.setNodeState(n, 2, 0);
+            if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
+            {
+                m_mesh.setNodeState(n, s, m_initialCondition[s]);
+            }
+            else
+            {
+                m_mesh.setNodeState(n, s, 0);
+            }
         }
     }
 
-    m_qprev = getQFromNodesStates(0, 2);
+    m_qprev = getQFromNodesStates(0, m_statesNumber - 1);
 }
 
 void SolverIncompressible::solveProblem()
@@ -225,7 +231,7 @@ void SolverIncompressible::solveProblem()
             if(m_currentTime >= m_nextWriteTrigger)
             {
                 writeData();
-                 m_nextWriteTrigger +=m_timeBetweenWriting;
+                m_nextWriteTrigger +=m_timeBetweenWriting;
             }
 
             if(m_adaptDT)
@@ -259,11 +265,15 @@ void SolverIncompressible::solveProblem()
 
 bool SolverIncompressible::solveCurrentTimeStep()
 {
+    assert(m_qprev.size() == m_statesNumber*m_mesh.getNodesNumber());
+
+    const unsigned short dim = m_mesh.getMeshDim();
+
     m_mesh.saveNodesList();
 
     m_picardCurrentNumIter = 0;
-    Eigen::VectorXd qIter(3*m_mesh.getNodesNumber()); qIter.setZero();
-    Eigen::VectorXd qIterPrev(3*m_mesh.getNodesNumber()); qIterPrev.setZero();
+    Eigen::VectorXd qIter(m_statesNumber*m_mesh.getNodesNumber()); qIter.setZero();
+    Eigen::VectorXd qIterPrev(m_statesNumber*m_mesh.getNodesNumber()); qIterPrev.setZero();
     double res = std::numeric_limits<double>::max();
 
     while(res > m_picardRelTol)
@@ -291,9 +301,9 @@ bool SolverIncompressible::solveCurrentTimeStep()
             return false;
         }
 
-        setNodesStatesfromQ(qIter, 0, 2);
+        setNodesStatesfromQ(qIter, 0, m_statesNumber - 1);
         Eigen::VectorXd deltaPos = qIter*m_currentDT;
-        m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + 2*m_mesh.getNodesNumber()));
+        m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + dim*m_mesh.getNodesNumber()));
         m_picardCurrentNumIter++;
 
         if(m_picardCurrentNumIter == 1)
@@ -307,11 +317,11 @@ bool SolverIncompressible::solveCurrentTimeStep()
             {
                 if(!m_mesh.isNodeFree(n))
                 {
-                    num += (qIter(n) - qIterPrev(n))*(qIter(n) - qIterPrev(n));
-                    den += qIterPrev(n)*qIterPrev(n);
-
-                    num += (qIter(n + m_mesh.getNodesNumber()) - qIterPrev(n + m_mesh.getNodesNumber()))*(qIter(n + m_mesh.getNodesNumber()) - qIterPrev(n + m_mesh.getNodesNumber()));
-                    den += qIterPrev(n + m_mesh.getNodesNumber())*qIterPrev(n + m_mesh.getNodesNumber());
+                    for(unsigned short d = 0 ; d < dim ; ++d)
+                    {
+                        num += (qIter(n + d*m_mesh.getNodesNumber()) - qIterPrev(n + d*m_mesh.getNodesNumber()))*(qIter(n + d*m_mesh.getNodesNumber()) - qIterPrev(n + d*m_mesh.getNodesNumber()));
+                        den += qIterPrev(n + d*m_mesh.getNodesNumber())*qIterPrev(n + d*m_mesh.getNodesNumber());
+                    }
                 }
             }
 
@@ -323,19 +333,20 @@ bool SolverIncompressible::solveCurrentTimeStep()
             std::cout << " * Relative 2-norm of q: " << res << " vs "
                       << m_picardRelTol << std::endl;
 
-            Eigen::VectorXd mom = m_M*(qIter.head(2*m_mesh.getNodesNumber()) - m_qprev.head(2*m_mesh.getNodesNumber()))
-                                + m_K*qIter.head(2*m_mesh.getNodesNumber())
+            Eigen::VectorXd mom = m_M*(qIter.head(dim*m_mesh.getNodesNumber()) - m_qprev.head(dim*m_mesh.getNodesNumber()))
+                                + m_K*qIter.head(dim*m_mesh.getNodesNumber())
                                 - Eigen::MatrixXd(m_D).transpose()*qIter.tail(m_mesh.getNodesNumber())
                                 - m_F;
 
-            Eigen::VectorXd cont = m_D*qIter.head(2*m_mesh.getNodesNumber());
+            Eigen::VectorXd cont = m_D*qIter.head(dim*m_mesh.getNodesNumber());
 
             for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
             {
                 if(m_mesh.isNodeBound(n) || m_mesh.isNodeFree(n))
                 {
-                    mom(n) = 0;
-                    mom(n + m_mesh.getNodesNumber()) = 0;
+                    for(unsigned short d = 0 ; d < dim ; ++d)
+                        mom(n + d*m_mesh.getNodesNumber()) = 0;
+
                     cont(n) = 0;
                 }
             }
@@ -358,7 +369,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
     m_mesh.remesh();
 
     //We have to compute qPrev here due to new nodes !
-    m_qprev = getQFromNodesStates(0, 2);
+    m_qprev = getQFromNodesStates(0, m_statesNumber - 1);
 
     return true;
 }
@@ -367,237 +378,200 @@ void SolverIncompressible::buildPicardSystem()
 {
     assert(m_tauPSPG.size() == m_mesh.getElementsNumber());
 
+    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short noPerEl = dim + 1;
+
     /*A = [(matrices.M)/p.dt + matrices.K, -transpose(matrices.D);...
-         (matrices.C)/p.dt + matrices.D, matrices.L];
+         (matrices.C)/p.dt - matrices.D, matrices.L];
 
       b = [matrices.F + (matrices.M*qPrev(1:2*Nn))/p.dt;...
            matrices.H + (matrices.C*qPrev(1:2*Nn))/p.dt];
     */
 
-    m_A.resize(3*m_mesh.getNodesNumber(), 3*m_mesh.getNodesNumber());
+    m_A.resize((dim+1)*m_mesh.getNodesNumber(), (dim+1)*m_mesh.getNodesNumber());
     m_A.data().squeeze();
     std::vector<Eigen::Triplet<double>> indexA;
-    indexA.resize(99*m_mesh.getNodesNumber());
+    indexA.reserve((dim*noPerEl*noPerEl + dim*noPerEl*dim*noPerEl + 3*noPerEl*dim*noPerEl + noPerEl*noPerEl)*m_mesh.getElementsNumber());
 
-    m_b.resize(3*m_mesh.getNodesNumber());
+    m_b.resize(m_statesNumber*m_mesh.getNodesNumber());
     m_b.setZero();
 
-    m_M.resize(2*m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
+    m_M.resize(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
     m_M.data().squeeze();
     std::vector<Eigen::Triplet<double>> indexM;
-    indexM.reserve(2*3*3*m_mesh.getElementsNumber());
+    indexM.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
 
     std::vector<Eigen::Triplet<double>> indexK;
     std::vector<Eigen::Triplet<double>> indexD;
     if(m_verboseOutput)
     {
-        m_K.resize(2*m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
+        m_K.resize(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
         m_K.data().squeeze();
-        indexK.reserve(6*6*m_mesh.getElementsNumber());
+        indexK.reserve(dim*noPerEl*dim*noPerEl*m_mesh.getElementsNumber());
 
-        m_D.resize(m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
+        m_D.resize(m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
         m_D.data().squeeze();
-        indexD.reserve(3*6*m_mesh.getElementsNumber());
+        indexD.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
     }
 
-    Eigen::SparseMatrix<double> C(m_mesh.getNodesNumber(), 2*m_mesh.getNodesNumber());
+    Eigen::SparseMatrix<double> C(m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
     std::vector<Eigen::Triplet<double>> indexC;
-    indexC.reserve(3*6*m_mesh.getElementsNumber());
+    indexC.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
 
-    m_F.resize(2*m_mesh.getNodesNumber());
+    m_F.resize(dim*m_mesh.getNodesNumber());
     m_F.setZero();
 
     Eigen::VectorXd H(m_mesh.getNodesNumber());
     H.setZero();
 
-    Eigen::MatrixXd MPrev = m_sumNTN*0.5*(m_rho/m_currentDT);
+    Eigen::MatrixXd MPrev = m_sumNTN*m_mesh.getRefElementSize()*(m_rho/m_currentDT);
+
+    std::vector<Eigen::MatrixXd> Me(m_mesh.getElementsNumber());
+    std::vector<Eigen::MatrixXd> Ke(m_mesh.getElementsNumber());
+    std::vector<Eigen::MatrixXd> De(m_mesh.getElementsNumber());
+    std::vector<Eigen::MatrixXd> Ce(m_mesh.getElementsNumber());
+    std::vector<Eigen::MatrixXd> Le(m_mesh.getElementsNumber());
+    std::vector<Eigen::MatrixXd> Fe(m_mesh.getElementsNumber());
+    std::vector<Eigen::MatrixXd> He(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Eigen::MatrixXd Be = getB(elm);
-        Eigen::MatrixXd Bep(2,3);
-        Bep << Be.topLeftCorner<1,3>(),
-               Be.bottomLeftCorner<1,3>();
+        Eigen::MatrixXd Bep(dim, dim + 1);
+        if(dim == 2)
+            Bep << Be.block(0, 0, 1, 3), Be.block(1, 3, 1, 3);
+        else if(dim == 3)
+            Bep << Be.block(0, 0, 1, 4), Be.block(1, 4, 1, 4), Be.block(2, 8, 1, 4);
 
         //Me = S rho Nv^T Nv dV
-        Eigen::MatrixXd Me = MPrev*m_mesh.getElementDetJ(elm);
+        Me[elm] = MPrev*m_mesh.getElementDetJ(elm);
 
         //Ke = S Bv^T ddev Bv dV
-        Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
+        Ke[elm] = m_mesh.getRefElementSize()*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
 
         //De = S Np^T m Bv dV
-        Eigen::MatrixXd De(3,6); De.setZero();
+        De[elm].resize((dim+1),dim*(dim+1)); De[elm].setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            De += (m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
+            De[elm] += (m_N[k].topLeftCorner(1, dim+1)).transpose()*m_m.transpose()*Be*m_mesh.getGaussWeight(k);
 
-        De *= 0.5*m_mesh.getElementDetJ(elm);
+
+        De[elm] *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
 
         //Ce = tauPSPG S Bp^T Nv dV
-        Eigen::MatrixXd Ce(3,6); Ce.setZero();
+        Ce[elm].resize((dim+1),dim*(dim+1)); Ce[elm].setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Ce += Bep.transpose()*m_N[k]*GP2Dweight<double>[k];
+            Ce[elm] += Bep.transpose()*m_N[k]*m_mesh.getGaussWeight(k);
 
-        Ce *= (0.5*m_tauPSPG[elm]/m_currentDT)*m_mesh.getElementDetJ(elm);
+        Ce[elm] *= (m_mesh.getRefElementSize()*m_tauPSPG[elm]/m_currentDT)*m_mesh.getElementDetJ(elm);
 
         //Le = tauPSPG S Bp^T Bp dV
-        Eigen::MatrixXd Le = 0.5*(m_tauPSPG[elm]/m_rho)
-                             *Bep.transpose()*Bep
-                             *m_mesh.getElementDetJ(elm);
-
-        const Eigen::Vector2d b(0, -m_gravity);
+        Le[elm] = m_mesh.getRefElementSize()*(m_tauPSPG[elm]/m_rho)
+                *Bep.transpose()*Bep
+                *m_mesh.getElementDetJ(elm);
 
         //Fe = S Nv^T bodyforce dV
-        Eigen::MatrixXd Fe(6,1); Fe.setZero();
+        Fe[elm].resize(dim*(dim+1),1); Fe[elm].setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Fe += m_N[k].transpose()*b*GP2Dweight<double>[k];
+            Fe[elm] += m_N[k].transpose()*m_bodyForces*m_mesh.getGaussWeight(k);
 
-        Fe *= 0.5*m_rho*m_mesh.getElementDetJ(elm);
+        Fe[elm] *= m_mesh.getRefElementSize()*m_rho*m_mesh.getElementDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
-        Eigen::VectorXd He = 0.5*m_tauPSPG[elm]*Bep.transpose()
-                             *b*m_mesh.getElementDetJ(elm);
+        He[elm] = m_mesh.getRefElementSize()*m_tauPSPG[elm]*Bep.transpose()
+                *m_bodyForces*m_mesh.getElementDetJ(elm);
+    }
 
-        //Big push_back ^^
-        #pragma omp critical
+    //Big push_back ^^
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    {
+        for(unsigned short i = 0 ; i < (dim+1) ; ++i)
         {
-            for(unsigned short i = 0 ; i < 3 ; ++i)
+            for(unsigned short j = 0 ; j < (dim+1) ; ++j)
             {
-                for(unsigned short j = 0 ; j < 3 ; ++j)
+                for(unsigned short d = 0 ; d < dim ; ++d)
                 {
                     /********************************************************************
                                                  Build M/dt
                     ********************************************************************/
-                    indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j],
-                                                            Me(i,j)));
+                    indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
+                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                            Me[elm](i + d*noPerEl, j + d*noPerEl)));
 
-                    indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Me(i+3,j+3)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j],
-                                                            Me(i,j)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Me(i+3,j+3)));
+                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
+                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                            Me[elm](i + d*noPerEl, j + d*noPerEl)));
 
                     /********************************************************************
-                                                    Build K
+                                                  Build K
                     ********************************************************************/
-                    if(m_verboseOutput)
+                    for(unsigned short d2 = 0 ; d2 < dim ; ++d2)
                     {
-                        indexK.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                                m_mesh.getElement(elm)[j],
-                                                                Ke(i,j)));
+                        if(m_verboseOutput)
+                        {
+                            indexK.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
+                                                                    m_mesh.getElement(elm)[j] + d2*m_mesh.getNodesNumber(),
+                                                                    Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
+                        }
 
-                        indexK.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                                m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                                Ke(i,j+3)));
-
-                        indexK.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[j],
-                                                                Ke(i+3,j)));
-
-                        indexK.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                                Ke(i+3,j+3)));
+                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
+                                                                m_mesh.getElement(elm)[j] + d2*m_mesh.getNodesNumber(),
+                                                                Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
                     }
 
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j],
-                                                            Ke(i,j)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Ke(i,j+3)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j],
-                                                            Ke(i+3,j)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Ke(i+3,j+3)));
-
                     /********************************************************************
-                                                    Build D
+                                                  Build D
                     ********************************************************************/
                     if(m_verboseOutput)
                     {
                         indexD.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                                m_mesh.getElement(elm)[j],
-                                                                De(i,j)));
-
-                        indexD.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                                m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                                De(i,j+3)));
+                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                                De[elm](i, j + d*noPerEl)));
                     }
 
                     //Part D of A
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j],
-                                                            De(i,j)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            De(i,j+3)));
+                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                            De[elm](i, j + d*noPerEl)));
 
                     //Part -D^T of A
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[j],
-                                                            m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            -De(i,j)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            -De(i,j+3)));
+                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                            m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                            -De[elm](i, j + d*noPerEl)));
 
                     /********************************************************************
                                                 Build C/dt
                     ********************************************************************/
                     indexC.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j],
-                                                            Ce(i,j)));
+                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                            Ce[elm](i, j + d*noPerEl)));
 
-                    indexC.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Ce(i,j+3)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j],
-                                                            Ce(i,j)));
-
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + m_mesh.getNodesNumber(),
-                                                            Ce(i,j+3)));
-
-                    /********************************************************************
-                                                Build L
-                    ********************************************************************/
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + 2*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + 2*m_mesh.getNodesNumber(),
-                                                            Le(i,j)));
+                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                            Ce[elm](i, j + d*noPerEl)));
                 }
 
-                /************************************************************************
-                                                Build f
-                ************************************************************************/
-                m_F(m_mesh.getElement(elm)[i]) += Fe(i);
-
-                m_F(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber()) +=
-                Fe(i + 3);
-
-
-                /************************************************************************
-                                                Build h
-                ************************************************************************/
-                H(m_mesh.getElement(elm)[i]) += He(i);
+                /********************************************************************
+                                            Build L
+                ********************************************************************/
+                indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                        m_mesh.getElement(elm)[j] + dim*m_mesh.getNodesNumber(),
+                                                        Le[elm](i,j)));
             }
+
+            /************************************************************************
+                                              Build f
+            ************************************************************************/
+            for(unsigned short d = 0 ; d < dim ; ++d)
+                m_F(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()) += Fe[elm](i + d*noPerEl);
+
+            /************************************************************************
+                                            Build h
+            ************************************************************************/
+            H(m_mesh.getElement(elm)[i]) += He[elm](i);
         }
     }
 
@@ -616,161 +590,32 @@ void SolverIncompressible::buildPicardSystem()
     ********************************************************************************/
     m_A.setFromTriplets(indexA.begin(), indexA.end());
 
-    m_b << m_F + m_M*m_qprev.head(2*m_mesh.getNodesNumber()), H + C*m_qprev.head(2*m_mesh.getNodesNumber());
+    m_b << m_F + m_M*m_qprev.head(dim*m_mesh.getNodesNumber()), H + C*m_qprev.head(dim*m_mesh.getNodesNumber());
 }
 
 void SolverIncompressible::computeTauPSPG()
 {
     m_tauPSPG.resize(m_mesh.getElementsNumber());
 
-    double U = 0;
-    std::size_t trueNnodes = 0;
-    #pragma omp parallel for default(shared) reduction(+: U, trueNnodes)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        if(!m_mesh.isNodeFree(n))
-        {
-            U += std::sqrt(m_mesh.getNodeState(n, 0)*m_mesh.getNodeState(n, 0) +
-                           m_mesh.getNodeState(n, 1)*m_mesh.getNodeState(n, 1));
-
-            trueNnodes++;
-        }
-    }
-    U /= static_cast<double>(trueNnodes);
-
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
-        const double h = std::sqrt(2*m_mesh.getElementDetJ(elm)/M_PI);
+        const double h = std::sqrt(m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)/M_PI);
+
+        double U = 0;
+        for (unsigned short n = 0 ; n < m_mesh.getMeshDim() + 1 ; ++n)
+        {
+            double nodeU = 0;
+            for (unsigned short d = 0 ; d < m_mesh.getMeshDim() ; ++d)
+            {
+                nodeU += m_mesh.getNodeState(m_mesh.getElement(elm)[n], d)*m_mesh.getNodeState(m_mesh.getElement(elm)[n], d);
+            }
+            U += std::sqrt(nodeU);
+        }
+        U /= (m_mesh.getMeshDim() + 1);
 
         m_tauPSPG[elm] = 1/std::sqrt((2/m_currentDT)*(2/m_currentDT)
                                  + (2*U/h)*(2*U/h)
                                  + 9*(4*m_mu/(h*h*m_rho))*(4*m_mu/(h*h*m_rho)));
     }
-}
-
-void SolverIncompressible::writeData() const
-{
-    gmsh::model::add("theModel");
-    gmsh::model::setCurrent("theModel");
-    if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
-        gmsh::model::addDiscreteEntity(0, 1);
-    if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
-        gmsh::model::addDiscreteEntity(2, 2);
-
-    if(m_whatToWrite[0])
-        gmsh::view::add("u", 1);
-
-    if(m_whatToWrite[1])
-        gmsh::view::add("v", 2);
-
-    if(m_whatToWrite[2])
-        gmsh::view::add("p", 3);
-
-    if(m_whatToWrite[3])
-        gmsh::view::add("ke", 4);
-
-    if(m_whatToWrite[4])
-        gmsh::view::add("velocity", 5);
-
-    std::vector<std::size_t> nodesTags(m_mesh.getNodesNumber());
-    std::vector<double> nodesCoord(3*m_mesh.getNodesNumber());
-    #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        nodesTags[n] = n + 1;
-        nodesCoord[3*n] = m_mesh.getNodePosition(n, 0);
-        nodesCoord[3*n + 1] = m_mesh.getNodePosition(n, 1);
-        nodesCoord[3*n + 2] = 0;
-    }
-
-    gmsh::model::mesh::addNodes(0, 1, nodesTags, nodesCoord);
-
-    if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
-    {
-        std::vector<std::size_t> elementTags(m_mesh.getElementsNumber());
-        std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementsNumber());
-        #pragma omp parallel for default(shared)
-        for(std::size_t i = 0 ; i < m_mesh.getElementsNumber() ; ++i)
-        {
-            elementTags[i] = i + 1;
-            nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
-            nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
-            nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
-        }
-
-        gmsh::model::mesh::addElementsByType(2, 2, elementTags, nodesTagsPerElement);
-    }
-
-    if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
-        gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
-
-    std::vector<std::vector<double>> dataU;
-    std::vector<std::vector<double>> dataV;
-    std::vector<std::vector<double>> dataP;
-    std::vector<std::vector<double>> dataKe;
-    std::vector<std::vector<double>> dataVelocity;
-
-    if(m_whatToWrite[0])
-        dataU.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[1])
-        dataV.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[2])
-        dataP.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[3])
-        dataKe.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[4])
-        dataVelocity.resize(m_mesh.getNodesNumber());
-
-    #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        if(m_whatToWrite[0])
-        {
-            const std::vector<double> u{m_mesh.getNodeState(n, 0)};
-            dataU[n] = u;
-        }
-        if(m_whatToWrite[1])
-        {
-            const std::vector<double> v{m_mesh.getNodeState(n, 1)};
-            dataV[n] = v;
-        }
-        if(m_whatToWrite[2])
-        {
-            const std::vector<double> p{m_mesh.getNodeState(n, 2)};
-            dataP[n] = p;
-        }
-        if(m_whatToWrite[3])
-        {
-            const std::vector<double> ke{0.5*(m_mesh.getNodeState(n, 0)*m_mesh.getNodeState(n, 0)
-                                            + m_mesh.getNodeState(n, 1)*m_mesh.getNodeState(n, 1))};
-            dataKe[n] = ke;
-        }
-        if(m_whatToWrite[4])
-        {
-            const std::vector<double> velocity{m_mesh.getNodeState(n, 0), m_mesh.getNodeState(n, 1), 0};
-            dataVelocity[n] = velocity;
-        }
-    }
-
-    if(m_whatToWrite[0])
-        gmsh::view::addModelData(1, m_currentStep, "theModel", "NodeData", nodesTags, dataU, m_currentTime, 1);
-    if(m_whatToWrite[1])
-        gmsh::view::addModelData(2, m_currentStep, "theModel", "NodeData", nodesTags, dataV, m_currentTime, 1);
-    if(m_whatToWrite[2])
-        gmsh::view::addModelData(3, m_currentStep, "theModel", "NodeData", nodesTags, dataP, m_currentTime, 1);
-    if(m_whatToWrite[3])
-        gmsh::view::addModelData(4, m_currentStep, "theModel", "NodeData", nodesTags, dataKe, m_currentTime, 1);
-    if(m_whatToWrite[4])
-        gmsh::view::addModelData(5, m_currentStep, "theModel", "NodeData", nodesTags, dataVelocity, m_currentTime, 3);
-
-    const std::string baseName = m_resultsName.substr(0, m_resultsName.find(".msh"));
-
-    for(unsigned short i = 0; i < m_whatToWrite.size(); ++i)
-    {
-        if(m_whatToWrite[i] == true)
-            gmsh::view::write(i + 1, baseName + "_" + std::to_string(m_currentTime) + ".msh" , true);
-    }
-
-    gmsh::model::remove();
 }

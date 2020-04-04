@@ -1,9 +1,7 @@
 #ifndef NODE_HPP_INCLUDED
 #define NODE_HPP_INCLUDED
 
-#include <cassert>
 #include <vector>
-
 
 /**
  * \struct Node
@@ -36,7 +34,6 @@ struct Node
      */
     Node(unsigned int dim)
     {
-        assert(dim == 2 || dim == 3);
         this->position.resize(dim);
 
         this->isBound = false;

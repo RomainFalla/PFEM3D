@@ -1,0 +1,34 @@
+{
+	"ProblemType": "Incompressible",
+	"Remeshing": {
+		"hchar": 0.0146,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-0.1, -0.1, 0.684, 100]
+	},
+	"Solver": {
+		"gravity": 9.81,
+		"Time": {
+			"adaptDT": true,
+			"coeffDTincrease": 1.5,
+    		"coeffDTdecrease": 2.0,
+    		"maxDT": 0.002,
+			"initialDT": 0.002,
+    		"endTime": 4,
+    		"timeBetweenWriting": 0.05
+		},
+		"Picard": {
+			"relTol": 5e-6,
+    		"maxIter": 10
+		},
+		"Fluid": {
+			"rho": 1000,
+			"mu": 1e-3	
+		},
+		"whatToWrite": ["p", "ke"],
+		"writeAs": "NodesElements",
+		"initialCondition" : [0, 0, 0]
+	},
+	"verboseOutput": false
+}

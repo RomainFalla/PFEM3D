@@ -1,25 +1,20 @@
-#include <cassert>
-#include <chrono>
-#include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <limits>
-
-#if defined(_OPENMP)
-    #include <cstdlib>
-    #include <omp.h>
-#endif
 
 #include <gmsh.h>
-#include <nlohmann/json.hpp>
 
 #include "SolverCompressible.hpp"
-#include "../quadrature/gausslegendre.hpp"
 
 
 SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName) :
 Solver(j, mshName, resultsName)
 {
+    unsigned short dim = m_mesh.getMeshDim();
+
+    m_statesNumber = 2*dim + 2;
+
+    m_mesh.setStatesNumber(m_statesNumber);
+
     m_strongContinuity        = j["Solver"]["strongContinuity"].get<bool>();
 
     m_rho0              = j["Solver"]["Fluid"]["rho0"].get<double>();
@@ -30,22 +25,27 @@ Solver(j, mshName, resultsName)
 
     m_securityCoeff      = j["Solver"]["Time"]["securityCoeff"].get<double>();
 
+    if(dim == 2)
+        m_whatCanBeWriten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
+    else if(dim == 3)
+        m_whatCanBeWriten = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "velocity"};
+
     std::vector<std::string> whatToWrite = j["Solver"]["whatToWrite"];
-    for(auto what : whatToWrite)
+    m_whatToWrite.resize(2*dim + 4, false);
+
+    for(unsigned short i = 0 ; i < whatToWrite.size() ; ++i)
     {
-        if(what == "u")
-            m_whatToWrite[0] = true;
-        else if(what == "v")
-            m_whatToWrite[1] = true;
-        else if(what == "p")
-            m_whatToWrite[2] = true;
-        else if(what == "ke")
-            m_whatToWrite[3] = true;
-        else if(what == "velocity")
-            m_whatToWrite[4] = true;
-        else if(what == "rho")
-            m_whatToWrite[5] = true;
-        else
+        bool found = false;
+        for(unsigned short j = 0 ; j < m_whatCanBeWriten.size() ; ++j)
+        {
+            if(whatToWrite[i] == m_whatCanBeWriten[j])
+            {
+                m_whatToWrite[j] = true;
+                found = true;
+                break;
+            }
+        }
+        if(!found)
             throw std::runtime_error("Unknown quantity to write!");
     }
 
@@ -59,19 +59,30 @@ Solver(j, mshName, resultsName)
 
     gmsh::option::setNumber("General.NumThreads", m_numOMPThreads);
 
-    m_N = getN();
-
-    m_sumNTN.resize(3,3); m_sumNTN.setZero();
+    m_sumNTN.resize(dim + 1, dim + 1); m_sumNTN.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
-        m_sumNTN += (m_N[k].topLeftCorner(1,3)).transpose()*m_N[k].topLeftCorner(1,3)*GP2Dweight<double>[k];
+    {
+        for(unsigned short k = 0 ; k < m_N.size() ; ++k)
+            m_sumNTN += (m_N[k].topLeftCorner(1, dim + 1)).transpose()*m_N[k].topLeftCorner(1,  dim + 1)*m_mesh.getGaussWeight(k);
+    }
 
-    m_m.resize(3);
-    m_m << 1, 1, 0;
-
-    m_ddev.resize(3, 3);
-    m_ddev << 4.0/3, -2.0/3, 0,
-             -2.0/3,  4.0/3, 0,
-                  0,      0, 1;
+    if(dim == 2)
+    {
+        m_ddev.resize(3, 3);
+        m_ddev <<  4.0/3, -2.0/3, 0,
+                  -2.0/3,  4.0/3, 0,
+                       0,      0, 1;
+    }
+    else if(dim == 3)
+    {
+        m_ddev.resize(6, 6);
+        m_ddev <<  4.0/3, -2.0/3, -2.0/3, 0, 0, 0,
+                  -2.0/3,  4.0/3, -2.0/3, 0, 0, 0,
+                  -2.0/3, -2.0/3,  4.0/3, 0, 0, 0,
+                       0,      0,      0, 1, 0, 0,
+                       0,      0,      0, 0, 1, 0,
+                       0,      0,      0, 0, 0, 1;
+    }
 
     m_ddev *= m_mu;
 }
@@ -85,16 +96,29 @@ void SolverCompressible::applyBoundaryConditionsMom()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
+    const unsigned short dim = m_mesh.getMeshDim();
+
     //Do not parallelize this
     for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
-        if(m_mesh.isNodeBound(n) || m_mesh.isNodeFree(n))
+        if(m_mesh.isNodeFree(n) && !m_mesh.isNodeBound(n))
         {
-            m_F(n) = 0;
-            m_invM.diagonal()[n] = 1;
+            for(unsigned short d = 0 ; d < dim - 1 ; ++d)
+            {
+                m_F(n + d*m_mesh.getNodesNumber()) = 0;
+                m_invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
+            }
 
-            m_F(n + m_mesh.getNodesNumber()) = 0;
-            m_invM.diagonal()[n+m_mesh.getNodesNumber()] = 1;
+             m_F(n + (dim - 1)*m_mesh.getNodesNumber()) = - m_gravity;
+             m_invM.diagonal()[n + (dim - 1)*m_mesh.getNodesNumber()] = 1;
+        }
+        else if(m_mesh.isNodeBound(n))
+        {
+            for(unsigned short d = 0 ; d < dim ; ++d)
+            {
+                m_F(n + d*m_mesh.getNodesNumber()) = 0;
+                m_invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
+            }
         }
     }
 }
@@ -108,7 +132,7 @@ void SolverCompressible::applyBoundaryConditionsCont()
     {
         if(m_mesh.isNodeFree(n))
         {
-           m_Frho(n) = m_mesh.getNodeState(n, 3);
+           m_Frho(n) = m_mesh.getNodeState(n, m_mesh.getMeshDim() + 1);
 
            m_invMrho.diagonal()[n] = 1;
         }
@@ -119,6 +143,7 @@ void SolverCompressible::displaySolverParams() const
 {
     std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
     std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;
+    std::cout << "Mesh dimension: " << m_mesh.getMeshDim() << "D" << std::endl;
     std::cout << "alpha: " << m_mesh.getAlpha() << std::endl;
     std::cout << "hchar: " << m_mesh.getHchar() << std::endl;
     std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
@@ -149,35 +174,28 @@ void SolverCompressible::setInitialCondition()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    m_mesh.setStatesNumber(6);
+    const unsigned short dim = m_mesh.getMeshDim();
 
     #pragma omp parallel for default(shared)
     for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
-        if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
+        for(unsigned short d = 0 ; d < dim + 1 ; ++d)
         {
-            m_mesh.setNodeState(n, 0, m_initialCondition[0]);
-            m_mesh.setNodeState(n, 1, m_initialCondition[1]);
-            m_mesh.setNodeState(n, 2, m_initialCondition[2]);
-        }
-        else
-        {
-            m_mesh.setNodeState(n, 0, 0);
-            m_mesh.setNodeState(n, 1, 0);
-            m_mesh.setNodeState(n, 2, 0);
+            if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
+                m_mesh.setNodeState(n, d, m_initialCondition[d]);
+            else
+                m_mesh.setNodeState(n, d, 0);
         }
 
-        if(m_mesh.isNodeFree(n))
-            m_mesh.setNodeState(n, 3, 0);
-        else
-            m_mesh.setNodeState(n, 3, m_initialCondition[3]);
-
-        m_mesh.setNodeState(n, 4, 0);
-        m_mesh.setNodeState(n, 5, 0);
+        m_mesh.setNodeState(n, dim + 1, m_initialCondition[dim + 1]);
+        for(unsigned short d = 0 ; d < dim ; ++d)
+        {
+            m_mesh.setNodeState(n, dim + 2 + d, 0);
+        }
     }
 
-    m_qVPrev = getQFromNodesStates(0, 1);
-    m_qAccPrev = getQFromNodesStates(4, 5);
+    m_qVPrev = getQFromNodesStates(0, dim - 1);
+    m_qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);
 }
 
 void SolverCompressible::solveProblem()
@@ -232,14 +250,14 @@ void SolverCompressible::solveProblem()
                 if(m_mesh.isNodeBound(n) && m_mesh.isNodeFree(n))
                     continue;
 
-                U = std::max(m_mesh.getNodeState(n, 0)*
-                   m_mesh.getNodeState(n, 0) +
-                   m_mesh.getNodeState(n, 1)*
-                   m_mesh.getNodeState(n, 1), U);
+                double localU = 0;
+                for(unsigned short d = 0 ; d < m_mesh.getMeshDim() ; ++d)
+                    localU += m_mesh.getNodeState(n, d)*m_mesh.getNodeState(n, d);
 
-                c = std::max((m_K0 + m_K0prime *m_mesh.getNodeState(n, 2))/m_mesh.getNodeState(n, 3), c);
+                U = std::max(localU, U);
+
+                c = std::max((m_K0 + m_K0prime *m_mesh.getNodeState(n, m_mesh.getMeshDim()))/m_mesh.getNodeState(n, m_mesh.getMeshDim() + 1), c);
             }
-
             U = std::sqrt(U);
             c = std::sqrt(c);
 
@@ -252,30 +270,29 @@ void SolverCompressible::solveProblem()
 
 bool SolverCompressible::solveCurrentTimeStep()
 {
+    assert(m_qVPrev.size() == m_qAccPrev.size());
+    assert(m_qVPrev.size() == m_mesh.getMeshDim()*m_mesh.getNodesNumber());
+
+    const unsigned short dim = m_mesh.getMeshDim();
+
     if(m_strongContinuity)
         buildFrho();
 
     Eigen::VectorXd qV1half = m_qVPrev + 0.5*m_currentDT*m_qAccPrev;
 
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        if(m_mesh.isNodeFree(n) && !m_mesh.isNodeBound(n))
-            qV1half[n + m_mesh.getNodesNumber()] -= m_currentDT*m_gravity*m_mesh.getNodeState(n, 3)*
-                                                    m_mesh.getHchar()*m_mesh.getHchar()*0.5;
-    }
-
-    setNodesStatesfromQ(qV1half, 0, 1);
+    setNodesStatesfromQ(qV1half, 0, dim - 1);
     Eigen::VectorXd deltaPos = qV1half*m_currentDT;
-    m_mesh.updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + 2*m_mesh.getNodesNumber()));
+    m_mesh.updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
 
     buildMatricesCont();
     applyBoundaryConditionsCont();
 
     Eigen::VectorXd qRho(m_mesh.getNodesNumber());
     qRho = m_invMrho*m_Frho;
-    setNodesStatesfromQ(qRho, 3, 3);
+    setNodesStatesfromQ(qRho, dim + 1, dim + 1);
     Eigen::VectorXd qP = getPFromRhoTaitMurnagham(qRho);
-    setNodesStatesfromQ(qP, 2, 2);
+
+    setNodesStatesfromQ(qP, dim, dim);
 
     buildMatricesMom();
     applyBoundaryConditionsMom();
@@ -284,8 +301,8 @@ bool SolverCompressible::solveCurrentTimeStep()
 
     m_qVPrev = qV1half + 0.5*m_currentDT*m_qAccPrev;
 
-    setNodesStatesfromQ(m_qVPrev, 0, 1);
-    setNodesStatesfromQ(m_qAccPrev, 4, 5);
+    setNodesStatesfromQ(m_qVPrev, 0, dim - 1);
+    setNodesStatesfromQ(m_qAccPrev, dim + 2, 2*dim + 1);
 
     m_currentTime += m_currentDT;
     m_currentStep++;
@@ -294,110 +311,112 @@ bool SolverCompressible::solveCurrentTimeStep()
     m_mesh.remesh();
 
     //We have to compute qPrev here due to new nodes !
-    m_qVPrev = getQFromNodesStates(0, 1);
-    m_qAccPrev = getQFromNodesStates(4, 5);
+    m_qVPrev = getQFromNodesStates(0, dim - 1);
+    m_qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);
 
     return true;
 }
 
 void SolverCompressible::buildFrho()
 {
+    const unsigned short dim = m_mesh.getMeshDim();
+
     m_Frho.resize(m_mesh.getNodesNumber()); m_Frho.setZero();
+
+    std::vector<Eigen::VectorXd> Frhoe(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
-        Eigen::Vector3d Rho(m_mesh.getNodeState(m_mesh.getElement(elm)[0], 3),
-                            m_mesh.getNodeState(m_mesh.getElement(elm)[1], 3),
-                            m_mesh.getNodeState(m_mesh.getElement(elm)[2], 3));
+        Eigen::VectorXd Rho = getElementState(elm, dim + 1);
 
-        Eigen::MatrixXd Mrhoe = 0.5*m_mesh.getElementDetJ(elm)*m_sumNTN;
+        Eigen::MatrixXd Mrhoe = m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)*m_sumNTN;
 
-        Eigen::VectorXd Frhoe = Mrhoe*Rho;
+        Frhoe[elm] = Mrhoe*Rho;
+    }
 
-        //Big push_back ^^
-        #pragma omp critical
-        {
-            for(unsigned short i = 0 ; i < 3 ; ++i)
-            {
-                /********************************************************************
-                                                 Build M
-                ********************************************************************/
-                m_Frho(m_mesh.getElement(elm)[i]) += Frhoe(i);
-            }
-        }
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    {
+        for(unsigned short i = 0 ; i < dim + 1 ; ++i)
+            m_Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
     }
 }
 
 void SolverCompressible::buildMatricesCont()
 {
+    const unsigned short dim = m_mesh.getMeshDim();
+
     m_invMrho.resize(m_mesh.getNodesNumber()); m_invMrho.setZero();
+
+    std::vector<Eigen::MatrixXd> Mrhoe(m_mesh.getElementsNumber());
+    std::vector<Eigen::VectorXd> Frhoe;
 
     if(!m_strongContinuity)
     {
         m_Frho.resize(m_mesh.getNodesNumber()); m_Frho.setZero();
+        Frhoe.resize((m_mesh.getElementsNumber()));
     }
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
-        Eigen::MatrixXd Mrhoe = 0.5*m_mesh.getElementDetJ(elm)*m_sumNTN;
-
-        Eigen::MatrixXd FeRhoTot(3,1); FeRhoTot.setZero();
+        Mrhoe[elm] = m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)*m_sumNTN;
 
         if(!m_strongContinuity)
         {
-            Eigen::Vector3d Rho(m_mesh.getNodeState(m_mesh.getElement(elm)[0], 3),
-                            m_mesh.getNodeState(m_mesh.getElement(elm)[1], 3),
-                            m_mesh.getNodeState(m_mesh.getElement(elm)[2], 3));
+            Eigen::VectorXd Rho = getElementState(elm, dim + 1);
 
-            Eigen::VectorXd V(6);
-            V << m_mesh.getNodeState(m_mesh.getElement(elm)[0], 0),
-                 m_mesh.getNodeState(m_mesh.getElement(elm)[1], 0),
-                 m_mesh.getNodeState(m_mesh.getElement(elm)[2], 0),
-                 m_mesh.getNodeState(m_mesh.getElement(elm)[0], 1),
-                 m_mesh.getNodeState(m_mesh.getElement(elm)[1], 1),
-                 m_mesh.getNodeState(m_mesh.getElement(elm)[2], 1);
+            Eigen::VectorXd V((dim + 1)*dim);
+            if(dim == 2)
+            {
+                V << getElementState(elm, 0),
+                     getElementState(elm, 1);
+            }
+            else if(dim == 3)
+            {
+                 V << getElementState(elm, 0),
+                      getElementState(elm, 1),
+                      getElementState(elm, 2);
+            }
 
             Eigen::MatrixXd Be = getB(elm);
 
             //De = S rho Np^T m Bv dV
-            Eigen::MatrixXd Drhoe(3,6); Drhoe.setZero();
+            Eigen::MatrixXd Drhoe(dim + 1, dim*(dim + 1)); Drhoe.setZero();
 
             for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-                Drhoe += (m_N[k].topLeftCorner<1,3>()*Rho)*(m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
+            {
+                double rho = (m_N[k].topLeftCorner(1, dim + 1)*Rho).value();
+                Drhoe += rho*m_N[k].topLeftCorner(1, dim + 1).transpose()*m_m.transpose()*Be*m_mesh.getGaussWeight(k);
+            }
 
-            Drhoe *= 0.5*m_mesh.getElementDetJ(elm);
+            Drhoe *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
 
-            FeRhoTot = Mrhoe*Rho - m_currentDT*Drhoe*V;
+            Frhoe[elm] = Mrhoe[elm]*Rho - m_currentDT*Drhoe*V;
         }
 
-        for(std::size_t i = 0 ; i < Mrhoe.rows() ; ++i)
+        for(unsigned short i = 0 ; i < Mrhoe[elm].rows() ; ++i)
         {
-            for(std::size_t j = 0 ; j < Mrhoe.cols() ; ++j)
+            for(unsigned short j = 0 ; j < Mrhoe[elm].cols() ; ++j)
             {
                 if(i != j)
                 {
-                    Mrhoe(i, i) += Mrhoe(i, j);
-                    Mrhoe(i, j) = 0;
+                    Mrhoe[elm](i, i) += Mrhoe[elm](i, j);
+                    Mrhoe[elm](i, j) = 0;
                 }
             }
         }
+    }
 
-        //Big push_back ^^
-        #pragma omp critical
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    {
+        for(unsigned short i = 0 ; i < dim + 1 ; ++i)
         {
-            for(unsigned short i = 0 ; i < 3 ; ++i)
-            {
-                /********************************************************************
-                                                 Build M
-                ********************************************************************/
-                m_invMrho.diagonal()[m_mesh.getElement(elm)[i]] += Mrhoe(i,i);
+            m_invMrho.diagonal()[m_mesh.getElement(elm)[i]] += Mrhoe[elm](i,i);
 
-                if(!m_strongContinuity)
-                {
-                    m_Frho(m_mesh.getElement(elm)[i]) += FeRhoTot(i);
-                }
+            if(!m_strongContinuity)
+            {
+                m_Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
             }
         }
     }
@@ -409,234 +428,105 @@ void SolverCompressible::buildMatricesCont()
 
 void SolverCompressible::buildMatricesMom()
 {
-    m_invM.resize(2*m_mesh.getNodesNumber()); m_invM.setZero();
+    const unsigned short dim = m_mesh.getMeshDim();
 
-    m_F.resize(2*m_mesh.getNodesNumber()); m_F.setZero();
+    m_invM.resize(dim*m_mesh.getNodesNumber()); m_invM.setZero();
+    std::vector<Eigen::MatrixXd> Me(m_mesh.getElementsNumber());
+
+    m_F.resize(dim*m_mesh.getNodesNumber()); m_F.setZero();
+    std::vector<Eigen::VectorXd> FTote(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
-        Eigen::Vector3d Rho(m_mesh.getNodeState(m_mesh.getElement(elm)[0], 3),
-                            m_mesh.getNodeState(m_mesh.getElement(elm)[1], 3),
-                            m_mesh.getNodeState(m_mesh.getElement(elm)[2], 3));
+        Eigen::VectorXd Rho = getElementState(elm, dim + 1);
 
-        Eigen::VectorXd V(6);
-        V << m_mesh.getNodeState(m_mesh.getElement(elm)[0], 0),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[1], 0),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[2], 0),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[0], 1),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[1], 1),
-             m_mesh.getNodeState(m_mesh.getElement(elm)[2], 1);
+        Eigen::VectorXd V((dim + 1)*dim);
+        if(dim == 2)
+        {
+            V << getElementState(elm, 0),
+                 getElementState(elm, 1);
+        }
+        else if(dim == 3)
+        {
+             V << getElementState(elm, 0),
+                  getElementState(elm, 1),
+                  getElementState(elm, 2);
+        }
 
-        Eigen::Vector3d P(m_mesh.getNodeState(m_mesh.getElement(elm)[0], 2),
-                          m_mesh.getNodeState(m_mesh.getElement(elm)[1], 2),
-                          m_mesh.getNodeState(m_mesh.getElement(elm)[2], 2));
+        Eigen::VectorXd P = getElementState(elm, dim);
 
         Eigen::MatrixXd Be = getB(elm);
 
-        Eigen::MatrixXd Me(6, 6); Me.setZero();
+        Me[elm].resize(dim*(dim + 1), dim*(dim + 1)); Me[elm].setZero();
+
         for(unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Me += (m_N[k].topLeftCorner<1,3>()*Rho)*m_N[k].transpose()*m_N[k]*GP2Dweight<double>[k];
-
-        Me *= 0.5*m_mesh.getElementDetJ(elm);
-
-        for(std::size_t i = 0 ; i < Me.rows() ; ++i)
         {
-            for(std::size_t j = 0 ; j < Me.cols() ; ++j)
+            double rho = (m_N[k].topLeftCorner(1, dim + 1)*Rho).value();
+            Me[elm] += rho*m_N[k].transpose()*m_N[k]*m_mesh.getGaussWeight(k);
+        }
+
+        Me[elm] *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
+
+        for(unsigned short i = 0 ; i < Me[elm].rows() ; ++i)
+        {
+            for(unsigned short j = 0 ; j < Me[elm].cols() ; ++j)
             {
                 if(i != j)
                 {
-                    Me(i, i) += Me(i, j);
-                    Me(i, j) = 0;
+                    Me[elm](i, i) += Me[elm](i, j);
+                    Me[elm](i, j) = 0;
                 }
             }
         }
 
         //Ke = S Bv^T ddev Bv dV
-        Eigen::MatrixXd Ke = 0.5*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
+        Eigen::MatrixXd Ke = m_mesh.getRefElementSize()*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
 
         //De = S Np^T m Bv dV
-        Eigen::MatrixXd De(3,6); De.setZero();
+        Eigen::MatrixXd De(dim + 1, dim*(dim + 1)); De.setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            De += (m_N[k].topLeftCorner<1,3>()).transpose()*m_m.transpose()*Be*GP2Dweight<double>[k];
+            De += (m_N[k].topLeftCorner(1, dim + 1)).transpose()*m_m.transpose()*Be*m_mesh.getGaussWeight(k);
 
-        De *= 0.5*m_mesh.getElementDetJ(elm);
-
-        const Eigen::Vector2d b(0, -m_gravity);
+        De *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
 
         //Fe = S Nv^T bodyforce dV
-        Eigen::MatrixXd Fe(6,1); Fe.setZero();
+        Eigen::MatrixXd Fe(dim*(dim + 1), 1); Fe.setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Fe += (m_N[k].topLeftCorner<1,3>()*Rho)*m_N[k].transpose()*b*GP2Dweight<double>[k];
-
-        Fe *= 0.5*m_mesh.getElementDetJ(elm);
-
-        Eigen::MatrixXd FeTot(6,1); FeTot.setZero();
-        FeTot = -Ke*V + De.transpose()*P + Fe;
-
-        //Big push_back ^^
-        #pragma omp critical
         {
-            for(unsigned short i = 0 ; i < 3 ; ++i)
+            double rho = (m_N[k].topLeftCorner(1, dim + 1)*Rho).value();
+            Fe += rho*m_N[k].transpose()*m_bodyForces*m_mesh.getGaussWeight(k);
+        }
+
+        Fe *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
+
+        Eigen::MatrixXd FeTot(dim*(dim + 1), 1); FeTot.setZero();
+        FTote[elm] = -Ke*V + De.transpose()*P + Fe;
+    }
+
+    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    {
+        for(unsigned short i = 0 ; i < dim + 1 ; ++i)
+        {
+            for(unsigned short d = 0 ; d < dim ; ++d)
             {
                 /********************************************************************
                                              Build M
                 ********************************************************************/
-                m_invM.diagonal()[m_mesh.getElement(elm)[i]] += Me(i,i);
-                m_invM.diagonal()[m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber()] += Me(i + 3, i + 3);
+                m_invM.diagonal()[m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()] += Me[elm](i + d*(dim + 1), i + d*(dim + 1));
 
                 /************************************************************************
                                                 Build f
                 ************************************************************************/
-                m_F(m_mesh.getElement(elm)[i]) += FeTot(i);
-                m_F(m_mesh.getElement(elm)[i] + m_mesh.getNodesNumber()) += FeTot(i + 3);
+                m_F(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()) += FTote[elm](i + d*(dim + 1));
+
             }
         }
     }
 
     #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < 2*m_mesh.getNodesNumber() ; ++i)
+    for(std::size_t i = 0 ; i < dim*m_mesh.getNodesNumber() ; ++i)
         m_invM.diagonal()[i] = 1/m_invM.diagonal()[i];
-}
-
-void SolverCompressible::writeData() const
-{
-    gmsh::model::add("theModel");
-    gmsh::model::setCurrent("theModel");
-    if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
-        gmsh::model::addDiscreteEntity(0, 1);
-    if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
-        gmsh::model::addDiscreteEntity(2, 2);
-
-    if(m_whatToWrite[0])
-        gmsh::view::add("u", 1);
-
-    if(m_whatToWrite[1])
-        gmsh::view::add("v", 2);
-
-    if(m_whatToWrite[2])
-        gmsh::view::add("p", 3);
-
-    if(m_whatToWrite[3])
-        gmsh::view::add("ke", 4);
-
-    if(m_whatToWrite[4])
-        gmsh::view::add("velocity", 5);
-
-    if(m_whatToWrite[5])
-        gmsh::view::add("rho", 6);
-
-    std::vector<std::size_t> nodesTags(m_mesh.getNodesNumber());
-    std::vector<double> nodesCoord(3*m_mesh.getNodesNumber());
-    #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        nodesTags[n] = n + 1;
-        nodesCoord[3*n] = m_mesh.getNodePosition(n, 0);
-        nodesCoord[3*n + 1] = m_mesh.getNodePosition(n, 1);
-        nodesCoord[3*n + 2] = 0;
-    }
-
-    gmsh::model::mesh::addNodes(0, 1, nodesTags, nodesCoord);
-
-    if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
-    {
-        std::vector<std::size_t> elementTags(m_mesh.getElementsNumber());
-        std::vector<std::size_t> nodesTagsPerElement(3*m_mesh.getElementsNumber());
-        #pragma omp parallel for default(shared)
-        for(std::size_t i = 0 ; i < m_mesh.getElementsNumber() ; ++i)
-        {
-            elementTags[i] = i + 1;
-            nodesTagsPerElement[3*i] = m_mesh.getElement(i)[0] + 1;
-            nodesTagsPerElement[3*i + 1] = m_mesh.getElement(i)[1] + 1;
-            nodesTagsPerElement[3*i + 2] = m_mesh.getElement(i)[2] + 1;
-        }
-
-        gmsh::model::mesh::addElementsByType(2, 2, elementTags, nodesTagsPerElement);
-    }
-
-    if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
-        gmsh::model::mesh::addElementsByType(1, 15, nodesTags, nodesTags);
-
-    std::vector<std::vector<double>> dataU;
-    std::vector<std::vector<double>> dataV;
-    std::vector<std::vector<double>> dataP;
-    std::vector<std::vector<double>> dataKe;
-    std::vector<std::vector<double>> dataVelocity;
-    std::vector<std::vector<double>> dataRho;
-
-    if(m_whatToWrite[0])
-        dataU.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[1])
-        dataV.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[2])
-        dataP.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[3])
-        dataKe.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[4])
-        dataVelocity.resize(m_mesh.getNodesNumber());
-    if(m_whatToWrite[5])
-        dataRho.resize(m_mesh.getNodesNumber());
-
-    #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        if(m_whatToWrite[0])
-        {
-            const std::vector<double> u{m_mesh.getNodeState(n, 0)};
-            dataU[n] = u;
-        }
-        if(m_whatToWrite[1])
-        {
-            const std::vector<double> v{m_mesh.getNodeState(n, 1)};
-            dataV[n] = v;
-        }
-        if(m_whatToWrite[2])
-        {
-            const std::vector<double> p{m_mesh.getNodeState(n, 2)};
-            dataP[n] = p;
-        }
-        if(m_whatToWrite[3])
-        {
-            const std::vector<double> ke{0.5*(m_mesh.getNodeState(n, 0)*m_mesh.getNodeState(n, 0)
-                                            + m_mesh.getNodeState(n, 1)*m_mesh.getNodeState(n, 1))};
-            dataKe[n] = ke;
-        }
-        if(m_whatToWrite[4])
-        {
-            const std::vector<double> velocity{m_mesh.getNodeState(n, 0), m_mesh.getNodeState(n, 1), 0};
-            dataVelocity[n] = velocity;
-        }
-
-        if(m_whatToWrite[5])
-        {
-            const std::vector<double> rho{m_mesh.getNodeState(n, 3)};
-            dataRho[n] = rho;
-        }
-    }
-
-    if(m_whatToWrite[0])
-        gmsh::view::addModelData(1, m_currentStep, "theModel", "NodeData", nodesTags, dataU, m_currentTime, 1);
-    if(m_whatToWrite[1])
-        gmsh::view::addModelData(2, m_currentStep, "theModel", "NodeData", nodesTags, dataV, m_currentTime, 1);
-    if(m_whatToWrite[2])
-        gmsh::view::addModelData(3, m_currentStep, "theModel", "NodeData", nodesTags, dataP, m_currentTime, 1);
-    if(m_whatToWrite[3])
-        gmsh::view::addModelData(4, m_currentStep, "theModel", "NodeData", nodesTags, dataKe, m_currentTime, 1);
-    if(m_whatToWrite[4])
-        gmsh::view::addModelData(5, m_currentStep, "theModel", "NodeData", nodesTags, dataVelocity, m_currentTime, 3);
-    if(m_whatToWrite[5])
-        gmsh::view::addModelData(6, m_currentStep, "theModel", "NodeData", nodesTags, dataRho, m_currentTime, 1);
-
-    const std::string baseName = m_resultsName.substr(0, m_resultsName.find(".msh"));
-
-    for(unsigned short i = 0; i < m_whatToWrite.size(); ++i)
-    {
-        if(m_whatToWrite[i] == true)
-            gmsh::view::write(i + 1, baseName + "_" + std::to_string(m_currentTime) + ".msh" , true);
-    }
-
-    gmsh::model::remove();
 }
