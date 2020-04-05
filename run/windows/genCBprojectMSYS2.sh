@@ -35,16 +35,4 @@ cp -r /c/tools/msys64/mingw64/bin/libstdc++-6.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libwinpthread-1.dll bin
 cp -r /c/tools/CGAL-5.0.2/bin/libCGAL.dll bin
 
-sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/pfem.dir/build.make
-sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/pfem.dir/build.make
-sed -i 's? C:/building/msys64/mingw64/lib/libmpfr.a C:/building/msys64/mingw64/lib/libgmp.dll.a?  C:/tools/msys64/mingw64/lib/libmpfr.a C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/pfem.dir/linklibs.rsp
-
-sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/Mesh.dir/build.make
-sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/Mesh.dir/build.make
-sed -i 's? C:/building/msys64/mingw64/lib/libmpfr.a C:/building/msys64/mingw64/lib/libgmp.dll.a?  C:/tools/msys64/mingw64/lib/libmpfr.a C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/Mesh.dir/linklibs.rsp
-
-sed -i 's?C:/building/msys64/mingw64/lib/libmpfr.a?C:/tools/msys64/mingw64/lib/libmpfr.a?g' srcs/CMakeFiles/Solver.dir/build.make
-sed -i 's?C:/building/msys64/mingw64/lib/libgmp.dll.a?C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/Solver.dir/build.make
-sed -i 's? C:/building/msys64/mingw64/lib/libmpfr.a C:/building/msys64/mingw64/lib/libgmp.dll.a?  C:/tools/msys64/mingw64/lib/libmpfr.a C:/tools/msys64/mingw64/lib/libgmp.dll.a?g' srcs/CMakeFiles/Solver.dir/linklibs.rsp
-
 cd ../
