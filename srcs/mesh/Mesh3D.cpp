@@ -73,43 +73,31 @@ void Mesh::triangulateAlphaShape3D()
                 m_nodesList[element[3]].isFree = false;
 
                 // We compute the neighbour nodes of each nodes
-                std::vector<std::size_t> temp;
+                m_nodesList[element[0]].neighbourNodes.push_back(element[1]);
+                m_nodesList[element[0]].neighbourNodes.push_back(element[2]);
+                m_nodesList[element[0]].neighbourNodes.push_back(element[3]);
 
-                temp = m_nodesList[element[0]].neighbourNodes;
-                if(std::find(temp.begin(), temp.end(), element[1]) == temp.end())
-                    m_nodesList[element[0]].neighbourNodes.push_back(element[1]);
-                if(std::find(temp.begin(), temp.end(), element[2]) == temp.end())
-                    m_nodesList[element[0]].neighbourNodes.push_back(element[2]);
-                if(std::find(temp.begin(), temp.end(), element[3]) == temp.end())
-                    m_nodesList[element[0]].neighbourNodes.push_back(element[3]);
+                m_nodesList[element[1]].neighbourNodes.push_back(element[0]);
+                m_nodesList[element[1]].neighbourNodes.push_back(element[2]);
+                m_nodesList[element[1]].neighbourNodes.push_back(element[3]);
 
-                temp = m_nodesList[element[1]].neighbourNodes;
-                if(std::find(temp.begin(), temp.end(), element[0]) == temp.end())
-                    m_nodesList[element[1]].neighbourNodes.push_back(element[0]);
-                if(std::find(temp.begin(), temp.end(), element[2]) == temp.end())
-                    m_nodesList[element[1]].neighbourNodes.push_back(element[2]);
-                if(std::find(temp.begin(), temp.end(), element[3]) == temp.end())
-                    m_nodesList[element[1]].neighbourNodes.push_back(element[3]);
+                m_nodesList[element[2]].neighbourNodes.push_back(element[0]);
+                m_nodesList[element[2]].neighbourNodes.push_back(element[1]);
+                m_nodesList[element[2]].neighbourNodes.push_back(element[3]);
 
-                temp = m_nodesList[element[2]].neighbourNodes;
-                if(std::find(temp.begin(), temp.end(), element[0]) == temp.end())
-                    m_nodesList[element[2]].neighbourNodes.push_back(element[0]);
-                if(std::find(temp.begin(), temp.end(), element[1]) == temp.end())
-                    m_nodesList[element[2]].neighbourNodes.push_back(element[1]);
-                if(std::find(temp.begin(), temp.end(), element[3]) == temp.end())
-                    m_nodesList[element[2]].neighbourNodes.push_back(element[3]);
-
-                temp = m_nodesList[element[3]].neighbourNodes;
-                if(std::find(temp.begin(), temp.end(), element[0]) == temp.end())
-                    m_nodesList[element[3]].neighbourNodes.push_back(element[0]);
-                if(std::find(temp.begin(), temp.end(), element[1]) == temp.end())
-                    m_nodesList[element[3]].neighbourNodes.push_back(element[1]);
-                if(std::find(temp.begin(), temp.end(), element[2]) == temp.end())
-                    m_nodesList[element[3]].neighbourNodes.push_back(element[2]);
+                m_nodesList[element[3]].neighbourNodes.push_back(element[0]);
+                m_nodesList[element[3]].neighbourNodes.push_back(element[1]);
+                m_nodesList[element[3]].neighbourNodes.push_back(element[2]);
 
                 m_elementsList.push_back(element);
             }
         }
+    }
+
+    for(auto& node : m_nodesList)
+    {
+        std::sort(node.neighbourNodes.begin(), node.neighbourNodes.begin());
+        node.neighbourNodes.erase(std::unique(node.neighbourNodes.begin(), node.neighbourNodes.end()), node.neighbourNodes.end());
     }
 
     for(Alpha_shape_3::Alpha_shape_vertices_iterator it = as.alpha_shape_vertices_begin() ;
