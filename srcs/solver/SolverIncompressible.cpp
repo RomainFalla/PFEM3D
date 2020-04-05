@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 
@@ -267,6 +268,8 @@ bool SolverIncompressible::solveCurrentTimeStep()
 {
     assert(m_qprev.size() == m_statesNumber*m_mesh.getNodesNumber());
 
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     const unsigned short dim = m_mesh.getMeshDim();
 
     m_mesh.saveNodesList();
@@ -365,11 +368,23 @@ bool SolverIncompressible::solveCurrentTimeStep()
     m_currentTime += m_currentDT;
     m_currentStep++;
 
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    if(m_verboseOutput)
+        std::cout << "Picard algorithm solved in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
+
+    startTime = std::chrono::high_resolution_clock::now();
     //Remeshing step
     m_mesh.remesh();
 
     //We have to compute qPrev here due to new nodes !
     m_qprev = getQFromNodesStates(0, m_statesNumber - 1);
+    endTime = std::chrono::high_resolution_clock::now();
+
+    endTime = std::chrono::high_resolution_clock::now();
+    ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    if(m_verboseOutput)
+        std::cout << "Remeshing done in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
 
     return true;
 }

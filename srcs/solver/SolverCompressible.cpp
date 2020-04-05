@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 
@@ -273,6 +274,8 @@ bool SolverCompressible::solveCurrentTimeStep()
     assert(m_qVPrev.size() == m_qAccPrev.size());
     assert(m_qVPrev.size() == m_mesh.getMeshDim()*m_mesh.getNodesNumber());
 
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     const unsigned short dim = m_mesh.getMeshDim();
 
     if(m_strongContinuity)
@@ -307,12 +310,23 @@ bool SolverCompressible::solveCurrentTimeStep()
     m_currentTime += m_currentDT;
     m_currentStep++;
 
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    if(m_verboseOutput)
+        std::cout << "Problem solved in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
+
+    startTime = std::chrono::high_resolution_clock::now();
     //Remeshing step
     m_mesh.remesh();
 
     //We have to compute qPrev here due to new nodes !
     m_qVPrev = getQFromNodesStates(0, dim - 1);
     m_qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);
+
+    endTime = std::chrono::high_resolution_clock::now();
+    ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    if(m_verboseOutput)
+        std::cout << "Remeshing done in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
 
     return true;
 }
