@@ -21,9 +21,9 @@
 		"Fluid": {
 			"rho0": 1000,
 			"mu": 1e-3,	
-			"K0": 2e7,
-			"K0prime": 7,
-			"pInfty": 0
+			"K0": 2200000,
+            "K0prime": 7.6,
+            "pInfty": 101325
 		},
 		"whatToWrite": ["p", "ke"],
 		"writeAs": "NodesElements",

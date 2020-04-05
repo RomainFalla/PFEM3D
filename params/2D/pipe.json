@@ -24,7 +24,7 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 200
+			"mu": 1e-3
 		},
 		"whatToWrite": ["p", "ke"],
 		"writeAs": "NodesElements",
