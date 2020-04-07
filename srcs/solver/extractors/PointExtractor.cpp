@@ -39,14 +39,14 @@ void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int c
                valueToWrite = 0;
             else
             {
-                Eigen::MatrixXd A(mesh.getMeshDim() + 1, mesh.getMeshDim() + 1);
-                if(mesh.getMeshDim() == 2)
+                Eigen::MatrixXd A(mesh.getDim() + 1, mesh.getDim() + 1);
+                if(mesh.getDim() == 2)
                 {
                     A << mesh.getNodePosition(mesh.getElement(elm)[0], 0), mesh.getNodePosition(mesh.getElement(elm)[0], 1), 1,
                          mesh.getNodePosition(mesh.getElement(elm)[1], 0), mesh.getNodePosition(mesh.getElement(elm)[1], 1), 1,
                          mesh.getNodePosition(mesh.getElement(elm)[2], 0), mesh.getNodePosition(mesh.getElement(elm)[2], 1), 1;
                 }
-                else if(mesh.getMeshDim() == 3)
+                else
                 {
                     A << mesh.getNodePosition(mesh.getElement(elm)[0], 0), mesh.getNodePosition(mesh.getElement(elm)[0], 1), mesh.getNodePosition(mesh.getElement(elm)[0], 2), 1,
                          mesh.getNodePosition(mesh.getElement(elm)[1], 0), mesh.getNodePosition(mesh.getElement(elm)[1], 1), mesh.getNodePosition(mesh.getElement(elm)[1], 2), 1,
@@ -54,16 +54,16 @@ void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int c
                          mesh.getNodePosition(mesh.getElement(elm)[3], 0), mesh.getNodePosition(mesh.getElement(elm)[3], 1), mesh.getNodePosition(mesh.getElement(elm)[3], 2), 1;
                 }
 
-                Eigen::VectorXd b(mesh.getMeshDim() + 1);
+                Eigen::VectorXd b(mesh.getDim() + 1);
                 if(m_stateToWrite < m_statesNumber)
                 {
-                    if(mesh.getMeshDim() == 2)
+                    if(mesh.getDim() == 2)
                     {
                         b << mesh.getNodeState(mesh.getElement(elm)[0], m_stateToWrite),
                              mesh.getNodeState(mesh.getElement(elm)[1], m_stateToWrite),
                              mesh.getNodeState(mesh.getElement(elm)[2], m_stateToWrite);
                     }
-                    else if(mesh.getMeshDim() == 3)
+                    else
                     {
                         b << mesh.getNodeState(mesh.getElement(elm)[0], m_stateToWrite),
                              mesh.getNodeState(mesh.getElement(elm)[1], m_stateToWrite),
@@ -73,11 +73,11 @@ void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int c
                 }
                 else
                 {
-                    std::vector<double> ke(mesh.getMeshDim() + 1);
+                    std::vector<double> ke(mesh.getDim() + 1);
                     for(unsigned short i = 0 ; i < ke.size() ; ++i)
                     {
                         ke[i] = 0;
-                        for(unsigned short d = 0 ; d < mesh.getMeshDim() ; ++d)
+                        for(unsigned short d = 0 ; d < mesh.getDim() ; ++d)
                         {
                             ke[i]+= mesh.getNodeState(mesh.getElement(elm)[i], d)*
                                     mesh.getNodeState(mesh.getElement(elm)[i], d);
@@ -85,13 +85,13 @@ void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int c
                         ke[i] = 0.5*std::sqrt(ke[i]);
                     }
 
-                    if(mesh.getMeshDim() == 2)
+                    if(mesh.getDim() == 2)
                     {
                         b << ke[0],
                              ke[1],
                              ke[2];
                     }
-                    else if(mesh.getMeshDim() == 3)
+                    else
                     {
                          b << ke[0],
                               ke[1],
@@ -103,10 +103,10 @@ void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int c
                 Eigen::VectorXd sol = A.completeOrthogonalDecomposition().solve(b);
 
                 valueToWrite = 0;
-                for(unsigned short d = 0 ; d < mesh.getMeshDim() ; ++d)
+                for(unsigned short d = 0 ; d < mesh.getDim() ; ++d)
                     valueToWrite += sol(d)*point[d];
 
-                valueToWrite += sol(mesh.getMeshDim());
+                valueToWrite += sol(mesh.getDim());
             }
 
             m_outFile << "," << std::to_string(point[0]) << "," << std::to_string(point[1]) << "," << std::to_string(valueToWrite);
@@ -122,30 +122,30 @@ bool PointExtractor::findElementIndex(const Mesh& mesh, IndexType& elementIndex,
 {
     for(IndexType elm = 0 ; elm < mesh.getElementsNumber() ; ++elm)
     {
-        std::vector<double> baryCenter(mesh.getMeshDim());
-        for(unsigned short d = 0 ; d < mesh.getMeshDim() ; ++d)
+        std::vector<double> baryCenter(mesh.getDim());
+        for(unsigned short d = 0 ; d < mesh.getDim() ; ++d)
         {
             baryCenter[d] = 0;
-            for(unsigned short n = 0 ; n < mesh.getMeshDim() + 1 ; ++n)
+            for(unsigned short n = 0 ; n < mesh.getDim() + 1 ; ++n)
             {
                 baryCenter[d] += mesh.getNodePosition(mesh.getElement(elm)[n], d);
             }
-            baryCenter[d] /= static_cast<double>(mesh.getMeshDim() + 1);
+            baryCenter[d] /= static_cast<double>(mesh.getDim() + 1);
         }
 
         unsigned short ok = 0;
 
-        if(mesh.getMeshDim() == 2)
+        if(mesh.getDim() == 2)
         {
-            std::vector<double> normal(mesh.getMeshDim());
-            std::vector<double> vMiddleToBary(mesh.getMeshDim());
-            std::vector<double> vPointToVertex(mesh.getMeshDim());
+            std::vector<double> normal(mesh.getDim());
+            std::vector<double> vMiddleToBary(mesh.getDim());
+            std::vector<double> vPointToVertex(mesh.getDim());
 
-            for(unsigned short i = 0 ; i < mesh.getMeshDim() + 1 ; ++i)
+            for(unsigned short i = 0 ; i < mesh.getDim() + 1 ; ++i)
             {
                 //Segment 1-0
                 unsigned short j = i + 1;
-                if(i == mesh.getMeshDim())
+                if(i == mesh.getDim())
                     j = 0;
 
                 normal[0] = mesh.getNodePosition(mesh.getElement(elm)[j], 1) - mesh.getNodePosition(mesh.getElement(elm)[i], 1);
@@ -175,7 +175,7 @@ bool PointExtractor::findElementIndex(const Mesh& mesh, IndexType& elementIndex,
                 return true;
             }
         }
-        else if(mesh.getMeshDim() == 3)
+        else
             throw std::runtime_error("3D meshes currently unsupported for Point Extractor");
 
     }

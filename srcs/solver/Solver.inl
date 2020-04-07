@@ -5,7 +5,7 @@ inline Eigen::MatrixXd Solver::getB(IndexType elementIndex) const
     assert(elementIndex < m_mesh.getElementsNumber() && "elementIndex should be between 0 and size - 1 !");
 
     Eigen::MatrixXd B;
-    if(m_mesh.getMeshDim() == 2)
+    if(m_mesh.getDim() == 2)
     {
         B.resize(3, 6); B.setZero();
         B(0,0) = B(2,3) = - m_mesh.getElementInvJ(elementIndex, 0, 0) - m_mesh.getElementInvJ(elementIndex, 1, 0);
@@ -16,7 +16,7 @@ inline Eigen::MatrixXd Solver::getB(IndexType elementIndex) const
         B(1,4) = B(2,1) = m_mesh.getElementInvJ(elementIndex, 0, 1);
         B(1,5) = B(2,2) = m_mesh.getElementInvJ(elementIndex, 1, 1);
     }
-    else if(m_mesh.getMeshDim() == 3)
+    else
     {
         B.resize(6, 12); B.setZero();
         B(0,0) = B(3,4) = B(4,8) = - m_mesh.getElementInvJ(elementIndex, 0, 0) - m_mesh.getElementInvJ(elementIndex, 1, 0) - m_mesh.getElementInvJ(elementIndex, 2, 0);
@@ -57,13 +57,13 @@ inline Eigen::VectorXd Solver::getElementState(IndexType elm, unsigned short sta
 {
     Eigen::VectorXd stateVec(m_mesh.getElement(elm).size());
 
-    if(m_mesh.getMeshDim() == 2)
+    if(m_mesh.getDim() == 2)
     {
         stateVec << m_mesh.getNodeState(m_mesh.getElement(elm)[0], state),
                     m_mesh.getNodeState(m_mesh.getElement(elm)[1], state),
                     m_mesh.getNodeState(m_mesh.getElement(elm)[2], state);
     }
-    else if(m_mesh.getMeshDim() == 3)
+    else
     {
         stateVec << m_mesh.getNodeState(m_mesh.getElement(elm)[0], state),
                     m_mesh.getNodeState(m_mesh.getElement(elm)[1], state),
@@ -95,7 +95,7 @@ inline std::vector<Eigen::MatrixXd> Solver::getN() const
 
     for(unsigned short p = 0 ; p < m_mesh.getGaussPointsNumber() ; ++p)
     {
-        if(m_mesh.getMeshDim() == 2)
+        if(m_mesh.getDim() == 2)
         {
             Eigen::MatrixXd N(2, 6); N.setZero();
 
@@ -105,7 +105,7 @@ inline std::vector<Eigen::MatrixXd> Solver::getN() const
 
             Ns.push_back(N);
         }
-        else if(m_mesh.getMeshDim() == 3)
+        else
         {
             Eigen::MatrixXd N(3, 12); N.setZero();
 

@@ -12,7 +12,7 @@
 SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
 {
-    unsigned short dim = m_mesh.getMeshDim();
+    unsigned short dim = m_mesh.getDim();
 
     m_statesNumber = dim + 1;
 
@@ -38,7 +38,7 @@ Solver(j, mshName)
     std::vector<std::string> whatCanBeWritten;
     if(dim == 2)
         whatCanBeWritten = {"u", "v", "p", "ke", "velocity"};
-    else if(dim == 3)
+    else
         whatCanBeWritten = {"u", "v", "w", "p", "ke", "velocity"};
 
     auto extractors = j["Solver"]["Extractors"];
@@ -98,7 +98,7 @@ Solver(j, mshName)
                   0, 2, 0,
                   0, 0, 1;
     }
-    else if(dim == 3)
+    else
     {
         m_ddev.resize(6, 6);
         m_ddev << 2, 0, 0, 0, 0, 0,
@@ -122,7 +122,7 @@ void SolverIncompressible::applyBoundaryConditions()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     //Do not parallelize this
     for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
@@ -166,7 +166,7 @@ void SolverIncompressible::displaySolverParams() const
 {
     std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
     std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;
-    std::cout << "Mesh dimension: " << m_mesh.getMeshDim() << "D" << std::endl;
+    std::cout << "Mesh dimension: " << m_mesh.getDim() << "D" << std::endl;
     std::cout << "alpha: " << m_mesh.getAlpha() << std::endl;
     std::cout << "hchar: " << m_mesh.getHchar() << std::endl;
     std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
@@ -199,7 +199,7 @@ void SolverIncompressible::setInitialCondition()
     #pragma omp parallel for default(shared)
     for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
-        for(unsigned short s = 0 ; s < m_mesh.getMeshDim() + 1 ; ++s)
+        for(unsigned short s = 0 ; s < m_mesh.getDim() + 1 ; ++s)
         {
             if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
             {
@@ -293,7 +293,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     m_mesh.saveNodesList();
 
@@ -416,7 +416,7 @@ void SolverIncompressible::buildPicardSystem()
 {
     assert(m_tauPSPG.size() == m_mesh.getElementsNumber());
 
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
     const unsigned short noPerEl = dim + 1;
 
     /*A = [(matrices.M)/p.dt + matrices.K, -transpose(matrices.D);...
@@ -479,7 +479,7 @@ void SolverIncompressible::buildPicardSystem()
         Eigen::MatrixXd Bep(dim, dim + 1);
         if(dim == 2)
             Bep << Be.block(0, 0, 1, 3), Be.block(1, 3, 1, 3);
-        else if(dim == 3)
+        else
             Bep << Be.block(0, 0, 1, 4), Be.block(1, 4, 1, 4), Be.block(2, 8, 1, 4);
 
         //Me = S rho Nv^T Nv dV
@@ -641,16 +641,16 @@ void SolverIncompressible::computeTauPSPG()
         const double h = std::sqrt(m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)/M_PI);
 
         double U = 0;
-        for (unsigned short n = 0 ; n < m_mesh.getMeshDim() + 1 ; ++n)
+        for (unsigned short n = 0 ; n < m_mesh.getDim() + 1 ; ++n)
         {
             double nodeU = 0;
-            for (unsigned short d = 0 ; d < m_mesh.getMeshDim() ; ++d)
+            for (unsigned short d = 0 ; d < m_mesh.getDim() ; ++d)
             {
                 nodeU += m_mesh.getNodeState(m_mesh.getElement(elm)[n], d)*m_mesh.getNodeState(m_mesh.getElement(elm)[n], d);
             }
             U += std::sqrt(nodeU);
         }
-        U /= (m_mesh.getMeshDim() + 1);
+        U /= (m_mesh.getDim() + 1);
 
         m_tauPSPG[elm] = 1/std::sqrt((2/m_currentDT)*(2/m_currentDT)
                                  + (2*U/h)*(2*U/h)

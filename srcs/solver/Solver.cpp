@@ -51,7 +51,7 @@ m_mesh(j)
 
     m_N = getN();
 
-    if(m_mesh.getMeshDim() == 2)
+    if(m_mesh.getDim() == 2)
     {
         m_m.resize(3);
         m_m << 1, 1, 0;
@@ -59,7 +59,7 @@ m_mesh(j)
         m_bodyForces.resize(2);
         m_bodyForces << 0 , -m_gravity;
     }
-    else if(m_mesh.getMeshDim() == 3)
+    else
     {
         m_m.resize(6);
         m_m << 1, 1, 1, 0, 0, 0;

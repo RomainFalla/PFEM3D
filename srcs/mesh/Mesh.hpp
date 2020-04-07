@@ -31,6 +31,12 @@ class MESH_API Mesh
         inline double getAlpha() const;
 
         /**
+         * \return The mesh dimension.
+         */
+        inline unsigned short getDim() const;
+
+
+        /**
          * \param elm The index of the element.
          * \return The vector containing the index of the nodes in nodesList
          *         making a certain element.
@@ -102,11 +108,6 @@ class MESH_API Mesh
          * \return The characteristic size of the mesh.
          */
         inline double getHchar() const;
-
-        /**
-         * \return The mesh dimension.
-         */
-        inline unsigned short getMeshDim() const;
 
         /**
          * \return The number of nodes in the mesh.
@@ -266,7 +267,7 @@ class MESH_API Mesh
          * \brief Compute the mesh dimension from the .msh file.
          * \return The mesh dimension (2 or 3).
          */
-        unsigned short computeMeshDim() const;
+        void computeMeshDim();
 
         /**
          * \brief Remesh the nodes in nodesList using CGAL (Delaunay triangulation

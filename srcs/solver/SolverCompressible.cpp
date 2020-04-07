@@ -12,7 +12,7 @@
 SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
 {
-    unsigned short dim = m_mesh.getMeshDim();
+    unsigned short dim = m_mesh.getDim();
 
     m_statesNumber = 2*dim + 2;
 
@@ -31,7 +31,7 @@ Solver(j, mshName)
     std::vector<std::string> whatCanBeWritten;
     if(dim == 2)
         whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
-    else if(dim == 3)
+    else
         whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
 
     auto extractors = j["Solver"]["Extractors"];
@@ -92,7 +92,7 @@ Solver(j, mshName)
                   -2.0/3,  4.0/3, 0,
                        0,      0, 1;
     }
-    else if(dim == 3)
+    else
     {
         m_ddev.resize(6, 6);
         m_ddev <<  4.0/3, -2.0/3, -2.0/3, 0, 0, 0,
@@ -117,7 +117,7 @@ void SolverCompressible::applyBoundaryConditionsMom()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     //Do not parallelize this
     for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
@@ -153,7 +153,7 @@ void SolverCompressible::applyBoundaryConditionsCont()
     {
         if(m_mesh.isNodeFree(n))
         {
-           m_Frho(n) = m_mesh.getNodeState(n, m_mesh.getMeshDim() + 1);
+           m_Frho(n) = m_mesh.getNodeState(n, m_mesh.getDim() + 1);
 
            m_invMrho.diagonal()[n] = 1;
         }
@@ -164,7 +164,7 @@ void SolverCompressible::displaySolverParams() const
 {
     std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
     std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;
-    std::cout << "Mesh dimension: " << m_mesh.getMeshDim() << "D" << std::endl;
+    std::cout << "Mesh dimension: " << m_mesh.getDim() << "D" << std::endl;
     std::cout << "alpha: " << m_mesh.getAlpha() << std::endl;
     std::cout << "hchar: " << m_mesh.getHchar() << std::endl;
     std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
@@ -193,7 +193,7 @@ void SolverCompressible::setInitialCondition()
 {
     assert(m_mesh.getNodesNumber() != 0);
 
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     #pragma omp parallel for default(shared)
     for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
@@ -271,12 +271,12 @@ void SolverCompressible::solveProblem()
                     continue;
 
                 double localU = 0;
-                for(unsigned short d = 0 ; d < m_mesh.getMeshDim() ; ++d)
+                for(unsigned short d = 0 ; d < m_mesh.getDim() ; ++d)
                     localU += m_mesh.getNodeState(n, d)*m_mesh.getNodeState(n, d);
 
                 U = std::max(localU, U);
 
-                c = std::max((m_K0 + m_K0prime *m_mesh.getNodeState(n, m_mesh.getMeshDim()))/m_mesh.getNodeState(n, m_mesh.getMeshDim() + 1), c);
+                c = std::max((m_K0 + m_K0prime *m_mesh.getNodeState(n, m_mesh.getDim()))/m_mesh.getNodeState(n, m_mesh.getDim() + 1), c);
             }
             U = std::sqrt(U);
             c = std::sqrt(c);
@@ -291,11 +291,11 @@ void SolverCompressible::solveProblem()
 bool SolverCompressible::solveCurrentTimeStep()
 {
     assert(m_qVPrev.size() == m_qAccPrev.size());
-    assert(m_qVPrev.size() == m_mesh.getMeshDim()*m_mesh.getNodesNumber());
+    assert(m_qVPrev.size() == m_mesh.getDim()*m_mesh.getNodesNumber());
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     if(m_strongContinuity)
         buildFrho();
@@ -352,7 +352,7 @@ bool SolverCompressible::solveCurrentTimeStep()
 
 void SolverCompressible::buildFrho()
 {
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     m_Frho.resize(m_mesh.getNodesNumber()); m_Frho.setZero();
 
@@ -377,7 +377,7 @@ void SolverCompressible::buildFrho()
 
 void SolverCompressible::buildMatricesCont()
 {
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     m_invMrho.resize(m_mesh.getNodesNumber()); m_invMrho.setZero();
 
@@ -405,7 +405,7 @@ void SolverCompressible::buildMatricesCont()
                 V << getElementState(elm, 0),
                      getElementState(elm, 1);
             }
-            else if(dim == 3)
+            else
             {
                  V << getElementState(elm, 0),
                       getElementState(elm, 1),
@@ -461,7 +461,7 @@ void SolverCompressible::buildMatricesCont()
 
 void SolverCompressible::buildMatricesMom()
 {
-    const unsigned short dim = m_mesh.getMeshDim();
+    const unsigned short dim = m_mesh.getDim();
 
     m_invM.resize(dim*m_mesh.getNodesNumber()); m_invM.setZero();
     std::vector<Eigen::MatrixXd> Me(m_mesh.getElementsNumber());
@@ -480,7 +480,7 @@ void SolverCompressible::buildMatricesMom()
             V << getElementState(elm, 0),
                  getElementState(elm, 1);
         }
-        else if(dim == 3)
+        else
         {
              V << getElementState(elm, 0),
                   getElementState(elm, 1),

@@ -61,7 +61,7 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
     if(m_writeAs == "Nodes" || m_writeAs == "NodesElements")
         gmsh::model::addDiscreteEntity(0, 1);
     if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
-        gmsh::model::addDiscreteEntity(mesh.getMeshDim(), 2);
+        gmsh::model::addDiscreteEntity(mesh.getDim(), 2);
 
     for(unsigned short i = 0 ; i < m_whatToWrite.size() ; ++i)
     {
@@ -77,9 +77,9 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
         nodesTags[n] = n + 1;
         nodesCoord[3*n] = mesh.getNodePosition(n, 0);
         nodesCoord[3*n + 1] = mesh.getNodePosition(n, 1);
-        if(mesh.getMeshDim() == 2)
+        if(mesh.getDim() == 2)
             nodesCoord[3*n + 2] = 0;
-        else if(mesh.getMeshDim() == 3)
+        else
             nodesCoord[3*n + 2] = mesh.getNodePosition(n, 2);
     }
 
@@ -88,18 +88,18 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
     if(m_writeAs == "Elements" || m_writeAs == "NodesElements")
     {
         std::vector<std::size_t> elementTags(mesh.getElementsNumber());
-        std::vector<std::size_t> nodesTagsPerElement((mesh.getMeshDim()+1)*mesh.getElementsNumber());
+        std::vector<std::size_t> nodesTagsPerElement((mesh.getDim()+1)*mesh.getElementsNumber());
         #pragma omp parallel for default(shared)
         for(std::size_t elm = 0 ; elm < mesh.getElementsNumber() ; ++elm)
         {
             elementTags[elm] = elm + 1;
             for(std::size_t n = 0 ; n < mesh.getElement(elm).size() ; ++n)
-                nodesTagsPerElement[(mesh.getMeshDim() + 1)*elm + n] = mesh.getElement(elm)[n] + 1;
+                nodesTagsPerElement[(mesh.getDim() + 1)*elm + n] = mesh.getElement(elm)[n] + 1;
         }
 
-        if(mesh.getMeshDim() == 2)
+        if(mesh.getDim() == 2)
             gmsh::model::mesh::addElementsByType(2, 2, elementTags, nodesTagsPerElement); //Triangle 2
-        else if(mesh.getMeshDim() == 3)
+        else
             gmsh::model::mesh::addElementsByType(2, 4, elementTags, nodesTagsPerElement); //Tetrahedron 4
     }
 
@@ -137,7 +137,7 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
         if(m_whatToWrite[m_statesNumber])
         {
             double ke = 0;
-            for(unsigned short d = 0 ; d < mesh.getMeshDim() ; ++d)
+            for(unsigned short d = 0 ; d < mesh.getDim() ; ++d)
                 ke += mesh.getNodeState(n, d)*mesh.getNodeState(n, d);
 
             ke = 0.5*std::sqrt(ke);
@@ -147,12 +147,12 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
         }
         if(m_whatToWrite[m_statesNumber + 1])
         {
-            if(mesh.getMeshDim() == 2)
+            if(mesh.getDim() == 2)
             {
                 const std::vector<double> velocity{mesh.getNodeState(n, 0), mesh.getNodeState(n, 1), 0};
                 dataVelocity[n] = velocity;
             }
-            else if(mesh.getMeshDim() == 3)
+            else
             {
                 const std::vector<double> velocity{mesh.getNodeState(n, 0), mesh.getNodeState(n, 1), mesh.getNodeState(n, 2)};
                 dataVelocity[n] = velocity;

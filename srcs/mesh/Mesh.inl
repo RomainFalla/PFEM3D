@@ -5,6 +5,11 @@ inline double Mesh::getAlpha() const
     return m_alpha;
 }
 
+inline unsigned short Mesh::getDim() const
+{
+    return m_dim;
+}
+
 inline std::vector<IndexType> Mesh::getElement(IndexType elm) const
 {
     assert(elm < m_elementsList.size() && "elm should be between 0 and size - 1 !");
@@ -113,11 +118,6 @@ inline double Mesh::getGaussWeight(unsigned short point) const
 inline double Mesh::getHchar() const
 {
     return m_hchar;
-}
-
-inline unsigned short Mesh::getMeshDim() const
-{
-    return m_dim;
 }
 
 inline IndexType Mesh::getNodesNumber() const

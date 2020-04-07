@@ -297,12 +297,12 @@ void Mesh::computeElementsJ()
 //    }
 //}
 
-unsigned short Mesh::computeMeshDim() const
+void Mesh::computeMeshDim()
 {
     int elementDim = -1;
 
     // loop over the dimension i to get the maximum element dimension in the mesh
-    for(unsigned short i = 0 ; i <= 3 ; ++i)
+    for(unsigned short i = 2 ; i <= 3 ; ++i)
     {
         std::vector<int> eleTypes;
         gmsh::model::mesh::getElementTypes(eleTypes, i);
@@ -315,13 +315,14 @@ unsigned short Mesh::computeMeshDim() const
                 elementDim = i;
                 break;
             default:
-                elementDim = i;
-                std::cerr   << "Hybrid meshes not handled in this example!"
-                            << std::endl;
+                throw std::runtime_error("do not use hybrid meshes for PFEM simulations!");
         }
     }
 
-    return static_cast<unsigned short>(elementDim);
+    if(elementDim == -1)
+        throw std::runtime_error("there is no suitable elements in the .msh file!");
+    else
+        m_dim = static_cast<unsigned short>(elementDim);
 }
 
 void Mesh::loadFromFile(const std::string& fileName)
@@ -340,7 +341,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     gmsh::open(fileName);
 
     // Check that the mesh is not 3D
-    m_dim = computeMeshDim();
+    computeMeshDim();
 
     if(m_boundingBox.size() != 2*m_dim)
         throw std::runtime_error("bad bounding box format! Format: [xmin, ymin, xmax, ymax]");
