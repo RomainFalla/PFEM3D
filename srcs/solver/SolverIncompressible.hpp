@@ -11,18 +11,13 @@
 class SOLVER_API SolverIncompressible : public Solver
 {
     public:
-        SolverIncompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName);
+        SolverIncompressible(const nlohmann::json& j, const std::string& mshName);
         ~SolverIncompressible();
 
         /**
          * \brief Display the parameters in SolverIncompressibleParams structure.
          */
         void displaySolverParams() const;
-
-        /**
-         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
-         */
-        void setInitialCondition();
 
         /**
          * \brief Solve the Picard algorithm for one time step.
@@ -56,6 +51,8 @@ class SOLVER_API SolverIncompressible : public Solver
         Eigen::VectorXd m_F;                /**< The volume force vector. */
         std::vector<double> m_tauPSPG;      /**< tau_PSPG parameters for each element. */
 
+        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
+
         /**
          * \brief Apply boundary conditions to the matrix A
          */
@@ -70,6 +67,11 @@ class SOLVER_API SolverIncompressible : public Solver
          * \brief Build the matrix A and the vector b of the Picard Algorithm.
          */
         void computeTauPSPG();
+
+        /**
+         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
+         */
+        void setInitialCondition();
 };
 
 #endif // SOLVERINCOMPRESSIBLE_HPP_INCLUDED

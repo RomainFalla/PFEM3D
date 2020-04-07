@@ -16,7 +16,6 @@
     		"maxDT": 0.01,
 			"initialDT": 0.01,
     		"endTime": 4,
-    		"timeBetweenWriting": 0.025
 		},
 		"Picard": {
 			"relTol": 5e-6,
@@ -26,9 +25,16 @@
 			"rho": 1000,
 			"mu": 1e-3	
 		},
-		"whatToWrite": ["p", "ke"],
-		"writeAs": "NodesElements",
-		"initialCondition" : [0, 0, 0]
+		"initialCondition" : [0, 0, 0],
+		"Extractors" : [
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 0.2,
+                "whatToWrite": ["p", "ke"],
+				"writeAs": "NodesElements"
+			}
+		]
 	},
 	"verboseOutput": false
 }

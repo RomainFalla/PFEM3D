@@ -5,20 +5,20 @@ inline double Mesh::getAlpha() const
     return m_alpha;
 }
 
-inline std::vector<std::size_t> Mesh::getElement(std::size_t elm) const
+inline std::vector<IndexType> Mesh::getElement(IndexType elm) const
 {
     assert(elm < m_elementsList.size() && "elm should be between 0 and size - 1 !");
     return m_elementsList[elm];
 }
 
-inline double Mesh::getElementDetJ(std::size_t elm) const
+inline double Mesh::getElementDetJ(IndexType elm) const
 {
     assert(elm < m_elementsList.size() && "elm should be between 0 and size - 1 !");
     assert(!m_elementsDetJ.empty());
     return m_elementsDetJ[elm];
 }
 
-inline double Mesh::getElementInvJ(std::size_t elm, unsigned short i, unsigned short j) const
+inline double Mesh::getElementInvJ(IndexType elm, unsigned short i, unsigned short j) const
 {
     assert(elm < m_elementsList.size() && "elm should be between 0 and size - 1 !");
     assert(!m_elementsInvJ.empty());
@@ -26,23 +26,23 @@ inline double Mesh::getElementInvJ(std::size_t elm, unsigned short i, unsigned s
     return m_elementsInvJ[elm][i][j];
 }
 
-inline std::size_t Mesh::getElementsNumber() const
+inline IndexType Mesh::getElementsNumber() const
 {
     return m_elementsList.size();
 }
 
-//inline double Mesh::getFreeSurfaceDetJ(std::size_t edge) const
+//inline double Mesh::getFreeSurfaceDetJ(IndexType edge) const
 //{
 //    assert(edge < m_freeSurfaceEdgesList.size() && "edge should be between 0 and size - 1 !");
 //    return m_freeSurfaceEdgeDetJ[edge];
 //}
 //
-//inline std::vector<std::size_t>  Mesh::getFreeSurfaceEdge(std::size_t edge) const
+//inline std::vector<IndexType>  Mesh::getFreeSurfaceEdge(IndexType edge) const
 //{
 //    return m_freeSurfaceEdgesList[edge];
 //}
 //
-//inline std::size_t  Mesh::getFreeSurfaceEdgesNumber() const
+//inline IndexType  Mesh::getFreeSurfaceEdgesNumber() const
 //{
 //    return m_freeSurfaceEdgesList.size();
 //}
@@ -120,17 +120,17 @@ inline unsigned short Mesh::getMeshDim() const
     return m_dim;
 }
 
-inline std::size_t Mesh::getNodesNumber() const
+inline IndexType Mesh::getNodesNumber() const
 {
     return m_nodesList.size();
 }
 
-inline double Mesh::getNodePosition(std::size_t nodeIndex, unsigned short coordinate) const
+inline double Mesh::getNodePosition(IndexType nodeIndex, unsigned short coordinate) const
 {
     return m_nodesList[nodeIndex].position[coordinate];
 }
 
-inline double Mesh::getNodeState(std::size_t nodeIndex, unsigned short state) const
+inline double Mesh::getNodeState(IndexType nodeIndex, unsigned short state) const
 {
     return m_nodesList[nodeIndex].states[state];
 }
@@ -153,22 +153,22 @@ inline double Mesh::getRefElementSize() const
     }
 }
 
-inline bool Mesh::isNodeFree(std::size_t nodeIndex) const
+inline bool Mesh::isNodeFree(IndexType nodeIndex) const
 {
     return m_nodesList[nodeIndex].isFree;
 }
 
-inline bool Mesh::isNodeBound(std::size_t nodeIndex) const
+inline bool Mesh::isNodeBound(IndexType nodeIndex) const
 {
     return m_nodesList[nodeIndex].isBound;
 }
 
-inline bool Mesh::isNodeFluidInput(std::size_t nodeIndex) const
+inline bool Mesh::isNodeFluidInput(IndexType nodeIndex) const
 {
     return m_nodesList[nodeIndex].isFluidInput;
 }
 
-inline void Mesh::setNodeState(std::size_t nodeIndex, unsigned short stateIndex, double state)
+inline void Mesh::setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state)
 {
     m_nodesList[nodeIndex].states[stateIndex] = state;
 }
@@ -176,7 +176,7 @@ inline void Mesh::setNodeState(std::size_t nodeIndex, unsigned short stateIndex,
 void Mesh::setStatesNumber(unsigned short statesNumber)
 {
     #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         m_nodesList[n].states.resize(statesNumber);
     }

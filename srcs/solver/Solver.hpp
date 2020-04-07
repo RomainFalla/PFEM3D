@@ -10,6 +10,8 @@
 
 #include "Solver_export.h"
 
+class Extractor;
+
 /**
  * \class Solver
  * \brief Represents a solver.
@@ -17,7 +19,7 @@
 class SOLVER_API Solver
 {
     public:
-        Solver(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName);
+        Solver(const nlohmann::json& j, const std::string& mshName);
         ~Solver();
 
         /**
@@ -28,7 +30,7 @@ class SOLVER_API Solver
         /**
          * \return Return the current step of the simulation.
          */
-        inline double getCurrentStep() const;
+        inline unsigned int getCurrentStep() const;
 
         /**
          * \return Return the current physical time of the simulation in seconds.
@@ -40,7 +42,7 @@ class SOLVER_API Solver
          * \param state The considered state.
          * \return Return a vector containing the state of a whole element.
          */
-        inline Eigen::VectorXd getElementState(std::size_t elm, unsigned short state) const;
+        inline Eigen::VectorXd getElementState(IndexType elm, unsigned short state) const;
 
         /**
          * \return Return the maximum physical time at which the simulation will stop in seconds.
@@ -53,11 +55,21 @@ class SOLVER_API Solver
         inline double getMaxDT() const;
 
         /**
+         * \return Return a constant reference to the mesh used by the solver.
+         */
+        inline const Mesh& getMesh() const;
+
+        /**
          * \return A Eigen vector containing the states of the node.
          * \param beginState The first state which will be contained in q.
          * \param endState The last state which will be contained in q.
          */
         inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;
+
+         /**
+         * \return Return the number of state the solver is using.
+         */
+        inline unsigned short getStatesNumber() const;
 
         /**
          * \return Return if the current time step can be modified or not.
@@ -78,11 +90,6 @@ class SOLVER_API Solver
          */
         inline void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState);
 
-        /**
-         * \brief Write solutions to a file.
-         */
-        void writeData() const;
-
     protected:
         bool m_verboseOutput;           /**< Should the output be verbose? */
         unsigned int m_numOMPThreads;   /**< Number of OpenMP threads used. */
@@ -91,22 +98,15 @@ class SOLVER_API Solver
 
         double m_gravity;               /**< Acceleration of the gravity (g > 0). */
 
-        std::string m_resultsName;      /**< File name in which the results will be written. */
-        std::string m_writeAs;
-        std::vector<std::string> m_whatCanBeWriten;
-        std::vector<bool> m_whatToWrite; /**< Which data will be written (u, v, p, ke, velocity). */
-
         std::vector<double> m_initialCondition; /**< Initial condition on the states **/
 
         //Time Parameters
         bool m_adaptDT;                 /**< Should the time step be changed during the computation? */
         double m_currentDT;             /**< Current time step. */
-        double m_currentStep;
+        unsigned int m_currentStep;
         double m_currentTime;
         double m_endTime;                /**< How many real seconds do we compute ? */
         double m_maxDT;                 /**< Maximum allowed time step. */
-        double m_timeBetweenWriting;
-        double m_nextWriteTrigger;
 
         Mesh m_mesh;                       /**< The mesh the solver is using. */
 
@@ -114,14 +114,14 @@ class SOLVER_API Solver
         Eigen::VectorXd m_m;
         Eigen::VectorXd m_bodyForces;
 
-        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
+        std::vector<std::unique_ptr<Extractor>> m_pExtractor;
 
         /**
          * \param elementIndex The index of the element in the element list.
          * \return The gradient shape function matrix for the element in the format:
          *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
          */
-        inline Eigen::MatrixXd getB(std::size_t elementIndex) const;
+        inline Eigen::MatrixXd getB(IndexType elementIndex) const;
 
         /**
          * \return The gradient shape function matrix for each gauss point in the format:

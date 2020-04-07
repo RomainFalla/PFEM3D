@@ -6,9 +6,11 @@
 
 #include "SolverIncompressible.hpp"
 
+#include "extractors/Extractors.hpp"
 
-SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName) :
-Solver(j, mshName, resultsName)
+
+SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName) :
+Solver(j, mshName)
 {
     unsigned short dim = m_mesh.getMeshDim();
 
@@ -17,7 +19,12 @@ Solver(j, mshName, resultsName)
     m_mesh.setStatesNumber(m_statesNumber);
 
     if(m_initialCondition.size() != m_statesNumber)
-        throw std::runtime_error("Invalid number of initial condition!");
+    {
+        std::string errorText = std::string("invalid number of initial condition ") + std::to_string(m_initialCondition.size())
+                              + std::string(", should be ") + std::to_string(m_statesNumber);
+
+        throw std::runtime_error(errorText);
+    }
 
     m_rho               = j["Solver"]["Fluid"]["rho"].get<double>();
     m_mu                = j["Solver"]["Fluid"]["mu"].get<double>();
@@ -28,39 +35,55 @@ Solver(j, mshName, resultsName)
     m_coeffDTincrease    = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
     m_coeffDTdecrease    = j["Solver"]["Time"]["coeffDTdecrease"].get<double>();
 
+    std::vector<std::string> whatCanBeWritten;
     if(dim == 2)
-        m_whatCanBeWriten = {"u", "v", "p", "ke", "velocity"};
+        whatCanBeWritten = {"u", "v", "p", "ke", "velocity"};
     else if(dim == 3)
-        m_whatCanBeWriten = {"u", "v", "w", "p", "ke", "velocity"};
+        whatCanBeWritten = {"u", "v", "w", "p", "ke", "velocity"};
 
-    std::vector<std::string> whatToWrite = j["Solver"]["whatToWrite"];
-    m_whatToWrite.resize(dim + 3, false);
-
-    for(unsigned short i = 0 ; i < whatToWrite.size() ; ++i)
+    auto extractors = j["Solver"]["Extractors"];
+    unsigned short GMSHExtractorCount = 0;
+    for(auto& extractor : extractors)
     {
-        bool found = false;
-        for(unsigned short j = 0 ; j < m_whatCanBeWriten.size() ; ++j)
+        if(extractor["type"].get<std::string>() == "Point")
         {
-            if(whatToWrite[i] == m_whatCanBeWriten[j])
+            m_pExtractor.push_back(std::make_unique<PointExtractor>(extractor["outputFile"].get<std::string>(),
+                                                                    extractor["timeBetweenWriting"].get<double>(),
+                                                                    extractor["stateToWrite"].get<unsigned short>(),
+                                                                    extractor["points"].get<std::vector<std::vector<double>>>(),
+                                                                    m_statesNumber));
+        }
+        else if(extractor["type"].get<std::string>() == "GMSH")
+        {
+            if(GMSHExtractorCount < 1)
             {
-                m_whatToWrite[j] = true;
-                found = true;
-                break;
+                m_pExtractor.push_back(std::make_unique<GMSHExtractor>(extractor["outputFile"].get<std::string>(),
+                                                                       extractor["timeBetweenWriting"].get<double>(),
+                                                                       extractor["whatToWrite"].get<std::vector<std::string>>(),
+                                                                       whatCanBeWritten,
+                                                                       extractor["writeAs"].get<std::string>(),
+                                                                       m_statesNumber));
+                GMSHExtractorCount++;
+            }
+            else
+            {
+                std::cerr << "Cannot add more than one GMSH extractor!" << std::endl;
             }
         }
-        if(!found)
-            throw std::runtime_error("Unknown quantity to write!");
+        else if(extractor["type"].get<std::string>() == "MinMax")
+        {
+            m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(extractor["outputFile"].get<std::string>(),
+                                                                     extractor["timeBetweenWriting"].get<double>(),
+                                                                     extractor["coordinate"].get<unsigned short>(),
+                                                                     extractor["minMax"].get<std::string>(),
+                                                                     dim));
+        }
+        else
+        {
+            std::string errotText = std::string("unknown extractor type ") + extractor["Type"].get<std::string>();
+            throw std::runtime_error(errotText);
+        }
     }
-
-    gmsh::initialize();
-
-#ifndef NDEBUG
-    gmsh::option::setNumber("General.Terminal", 1);
-#else
-    gmsh::option::setNumber("General.Terminal", 0);
-#endif // DEBUG
-
-    gmsh::option::setNumber("General.NumThreads", m_numOMPThreads);
 
     m_sumNTN.resize(dim*(dim + 1), dim*(dim + 1)); m_sumNTN.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
@@ -87,11 +110,12 @@ Solver(j, mshName, resultsName)
     }
 
     m_ddev *= m_mu;
+
+    setInitialCondition();
 }
 
 SolverIncompressible::~SolverIncompressible()
 {
-    gmsh::finalize();
 }
 
 void SolverIncompressible::applyBoundaryConditions()
@@ -101,7 +125,7 @@ void SolverIncompressible::applyBoundaryConditions()
     const unsigned short dim = m_mesh.getMeshDim();
 
     //Do not parallelize this
-    for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         if(m_mesh.isNodeFree(n))
         {
@@ -157,7 +181,6 @@ void SolverIncompressible::displaySolverParams() const
     std::cout << "Picard relative tolerance: " << m_picardRelTol  << std::endl;
     std::cout << "Maximum picard iteration number: " << m_picardMaxIter << std::endl;
     std::cout << "End simulation time: " << m_endTime << " s" << std::endl;
-    std::cout << "Write solution every: " << m_timeBetweenWriting << " s" << std::endl;
     std::cout << "Adapt time step: " << (m_adaptDT ? "yes" : "no") << std::endl;
     if(m_adaptDT)
     {
@@ -174,7 +197,7 @@ void SolverIncompressible::setInitialCondition()
     assert(m_mesh.getNodesNumber() != 0);
 
     #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         for(unsigned short s = 0 ; s < m_mesh.getMeshDim() + 1 ; ++s)
         {
@@ -205,9 +228,10 @@ void SolverIncompressible::solveProblem()
 
     std::cout << "----------------------------------------------------------------" << std::endl;
 
-    setInitialCondition();
-
-    writeData();
+    for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
+    {
+        m_pExtractor[i]->update(m_mesh, m_currentTime, m_currentStep);
+    }
 
     while(m_currentTime < m_endTime)
     {
@@ -229,10 +253,9 @@ void SolverIncompressible::solveProblem()
 
         if(solveCurrentTimeStep())
         {
-            if(m_currentTime >= m_nextWriteTrigger)
+            for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
             {
-                writeData();
-                m_nextWriteTrigger +=m_timeBetweenWriting;
+                m_pExtractor[i]->update(m_mesh, m_currentTime, m_currentStep);
             }
 
             if(m_adaptDT)
@@ -316,7 +339,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
             double num{0};
             double den{0};
 
-            for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+            for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
             {
                 if(!m_mesh.isNodeFree(n))
                 {
@@ -343,7 +366,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
 
             Eigen::VectorXd cont = m_D*qIter.head(dim*m_mesh.getNodesNumber());
 
-            for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+            for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
             {
                 if(m_mesh.isNodeBound(n) || m_mesh.isNodeFree(n))
                 {
@@ -450,7 +473,7 @@ void SolverIncompressible::buildPicardSystem()
     std::vector<Eigen::MatrixXd> He(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Eigen::MatrixXd Be = getB(elm);
         Eigen::MatrixXd Bep(dim, dim + 1);
@@ -501,7 +524,7 @@ void SolverIncompressible::buildPicardSystem()
     }
 
     //Big push_back ^^
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < (dim+1) ; ++i)
         {
@@ -613,7 +636,7 @@ void SolverIncompressible::computeTauPSPG()
     m_tauPSPG.resize(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         const double h = std::sqrt(m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)/M_PI);
 

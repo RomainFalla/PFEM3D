@@ -6,9 +6,11 @@
 
 #include "SolverCompressible.hpp"
 
+#include "extractors/Extractors.hpp"
 
-SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName) :
-Solver(j, mshName, resultsName)
+
+SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
+Solver(j, mshName)
 {
     unsigned short dim = m_mesh.getMeshDim();
 
@@ -26,39 +28,55 @@ Solver(j, mshName, resultsName)
 
     m_securityCoeff      = j["Solver"]["Time"]["securityCoeff"].get<double>();
 
+    std::vector<std::string> whatCanBeWritten;
     if(dim == 2)
-        m_whatCanBeWriten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
+        whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
     else if(dim == 3)
-        m_whatCanBeWriten = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "velocity"};
+        whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
 
-    std::vector<std::string> whatToWrite = j["Solver"]["whatToWrite"];
-    m_whatToWrite.resize(2*dim + 4, false);
-
-    for(unsigned short i = 0 ; i < whatToWrite.size() ; ++i)
+    auto extractors = j["Solver"]["Extractors"];
+    unsigned short GMSHExtractorCount = 0;
+    for(auto& extractor : extractors)
     {
-        bool found = false;
-        for(unsigned short j = 0 ; j < m_whatCanBeWriten.size() ; ++j)
+        if(extractor["type"].get<std::string>() == "Point")
         {
-            if(whatToWrite[i] == m_whatCanBeWriten[j])
+            m_pExtractor.push_back(std::make_unique<PointExtractor>(extractor["outputFile"].get<std::string>(),
+                                                                    extractor["timeBetweenWriting"].get<double>(),
+                                                                    extractor["stateToWrite"].get<unsigned short>(),
+                                                                    extractor["points"].get<std::vector<std::vector<double>>>(),
+                                                                    m_statesNumber));
+        }
+        else if(extractor["type"].get<std::string>() == "GMSH")
+        {
+            if(GMSHExtractorCount < 1)
             {
-                m_whatToWrite[j] = true;
-                found = true;
-                break;
+                m_pExtractor.push_back(std::make_unique<GMSHExtractor>(extractor["outputFile"].get<std::string>(),
+                                                                       extractor["timeBetweenWriting"].get<double>(),
+                                                                       extractor["whatToWrite"].get<std::vector<std::string>>(),
+                                                                       whatCanBeWritten,
+                                                                       extractor["writeAs"].get<std::string>(),
+                                                                       m_statesNumber));
+                GMSHExtractorCount++;
+            }
+            else
+            {
+                std::cerr << "Cannot add more than one GMSH extractor!" << std::endl;
             }
         }
-        if(!found)
-            throw std::runtime_error("Unknown quantity to write!");
+        else if(extractor["type"].get<std::string>() == "MinMax")
+        {
+            m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(extractor["outputFile"].get<std::string>(),
+                                                                     extractor["timeBetweenWriting"].get<double>(),
+                                                                     extractor["coordinate"].get<unsigned short>(),
+                                                                     extractor["minMax"].get<std::string>(),
+                                                                     dim));
+        }
+        else
+        {
+            std::string errotText = std::string("unknown extractor type ") + extractor["Type"].get<std::string>();
+            throw std::runtime_error(errotText);
+        }
     }
-
-    gmsh::initialize();
-
-#ifndef NDEBUG
-    gmsh::option::setNumber("General.Terminal", 1);
-#else
-    gmsh::option::setNumber("General.Terminal", 0);
-#endif // DEBUG
-
-    gmsh::option::setNumber("General.NumThreads", m_numOMPThreads);
 
     m_sumNTN.resize(dim + 1, dim + 1); m_sumNTN.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
@@ -86,6 +104,8 @@ Solver(j, mshName, resultsName)
     }
 
     m_ddev *= m_mu;
+
+    setInitialCondition();
 }
 
 SolverCompressible::~SolverCompressible()
@@ -100,7 +120,7 @@ void SolverCompressible::applyBoundaryConditionsMom()
     const unsigned short dim = m_mesh.getMeshDim();
 
     //Do not parallelize this
-    for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         if(m_mesh.isNodeFree(n) && !m_mesh.isNodeBound(n))
         {
@@ -129,7 +149,7 @@ void SolverCompressible::applyBoundaryConditionsCont()
     assert(m_mesh.getNodesNumber() != 0);
 
     //Do not parallelize this
-    for (std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         if(m_mesh.isNodeFree(n))
         {
@@ -149,7 +169,6 @@ void SolverCompressible::displaySolverParams() const
     std::cout << "hchar: " << m_mesh.getHchar() << std::endl;
     std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
     std::cout << "omega: " << m_mesh.getOmega() << std::endl;
-    std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
     std::cout << "Number of OpenMP threads: " << m_numOMPThreads << std::endl;
 #endif
@@ -160,7 +179,6 @@ void SolverCompressible::displaySolverParams() const
     std::cout << "K0prime: " << m_K0prime << std::endl;
     std::cout << "pInfty: " << m_pInfty << std::endl;
     std::cout << "End simulation time: " << m_endTime << " s" << std::endl;
-    std::cout << "Write solution every: " << m_timeBetweenWriting << " s" << std::endl;
     std::cout << "Adapt time step: " << (m_adaptDT ? "yes" : "no") << std::endl;
     if(m_adaptDT)
     {
@@ -178,9 +196,9 @@ void SolverCompressible::setInitialCondition()
     const unsigned short dim = m_mesh.getMeshDim();
 
     #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
-        for(unsigned short d = 0 ; d < dim + 1 ; ++d)
+        for(unsigned short d = 0 ; d < dim ; ++d)
         {
             if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
                 m_mesh.setNodeState(n, d, m_initialCondition[d]);
@@ -188,6 +206,7 @@ void SolverCompressible::setInitialCondition()
                 m_mesh.setNodeState(n, d, 0);
         }
 
+        m_mesh.setNodeState(n, dim, m_initialCondition[dim]);
         m_mesh.setNodeState(n, dim + 1, m_initialCondition[dim + 1]);
         for(unsigned short d = 0 ; d < dim ; ++d)
         {
@@ -212,9 +231,10 @@ void SolverCompressible::solveProblem()
 
     std::cout << "----------------------------------------------------------------" << std::endl;
 
-    setInitialCondition();
-
-    writeData();
+    for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
+    {
+        m_pExtractor[i]->update(m_mesh, m_currentTime, m_currentStep);
+    }
 
     while(m_currentTime < m_endTime)
     {
@@ -236,17 +256,16 @@ void SolverCompressible::solveProblem()
 
         solveCurrentTimeStep();
 
-        if(m_currentTime >= m_nextWriteTrigger)
+        for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
         {
-            writeData();
-            m_nextWriteTrigger += m_timeBetweenWriting;
+            m_pExtractor[i]->update(m_mesh, m_currentTime, m_currentStep);
         }
 
         if(m_adaptDT)
         {
             double U = 0;
             double c = 0;
-            for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+            for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
             {
                 if(m_mesh.isNodeBound(n) && m_mesh.isNodeFree(n))
                     continue;
@@ -340,7 +359,7 @@ void SolverCompressible::buildFrho()
     std::vector<Eigen::VectorXd> Frhoe(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Eigen::VectorXd Rho = getElementState(elm, dim + 1);
 
@@ -349,7 +368,7 @@ void SolverCompressible::buildFrho()
         Frhoe[elm] = Mrhoe*Rho;
     }
 
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
             m_Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
@@ -372,7 +391,7 @@ void SolverCompressible::buildMatricesCont()
     }
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Mrhoe[elm] = m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)*m_sumNTN;
 
@@ -422,7 +441,7 @@ void SolverCompressible::buildMatricesCont()
         }
     }
 
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
         {
@@ -436,7 +455,7 @@ void SolverCompressible::buildMatricesCont()
     }
 
     #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < m_invMrho.rows() ; ++i)
+    for(IndexType i = 0 ; i < m_invMrho.rows() ; ++i)
          m_invMrho.diagonal()[i] = 1/m_invMrho.diagonal()[i];
 }
 
@@ -451,7 +470,7 @@ void SolverCompressible::buildMatricesMom()
     std::vector<Eigen::VectorXd> FTote(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         Eigen::VectorXd Rho = getElementState(elm, dim + 1);
 
@@ -520,7 +539,7 @@ void SolverCompressible::buildMatricesMom()
         FTote[elm] = -Ke*V + De.transpose()*P + Fe;
     }
 
-    for(std::size_t elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
         {
@@ -541,6 +560,6 @@ void SolverCompressible::buildMatricesMom()
     }
 
     #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < dim*m_mesh.getNodesNumber() ; ++i)
+    for(IndexType i = 0 ; i < dim*m_mesh.getNodesNumber() ; ++i)
         m_invM.diagonal()[i] = 1/m_invM.diagonal()[i];
 }

@@ -29,7 +29,7 @@ bool Mesh::addNodes()
 
     bool addedNodes = false;
 
-    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
+    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
     {
         //If an element is too big, we add a node at his center
         if(m_elementsDetJ[i]*getRefElementSize() > m_omega*std::pow(m_hchar, m_dim))
@@ -86,7 +86,7 @@ bool Mesh::checkBoundingBox()
 
     bool outofBBNodes = false;
 
-    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         //If the node is out of the bounding box, we delete it.
         // Bounding box fromat: [xmin, ymin, zmin, xmax, ymax, zmax]
@@ -139,7 +139,7 @@ void Mesh::computeElementsDetJ()
     m_elementsDetJ.resize(m_elementsList.size());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
+    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
     {
         if(m_dim == 2)
         {
@@ -168,7 +168,7 @@ void Mesh::computeElementsInvJ()
     m_elementsInvJ.resize(m_elementsList.size());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
+    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
     {
         if(m_dim == 2)
         {
@@ -230,7 +230,7 @@ void Mesh::computeElementsJ()
     m_elementsJ.resize(m_elementsList.size());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t i = 0 ; i < m_elementsList.size() ; ++i)
+    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
     {
         if(m_dim == 2)
         {
@@ -291,7 +291,7 @@ void Mesh::computeElementsJ()
 //    m_freeSurfaceEdgeDetJ.resize(m_freeSurfaceEdgesList.size());
 //
 //    #pragma omp parallel for default(shared)
-//    for(std::size_t i = 0 ; i < m_freeSurfaceEdgesList.size() ; ++i)
+//    for(IndexType i = 0 ; i < m_freeSurfaceEdgesList.size() ; ++i)
 //    {
 //        m_freeSurfaceEdgeDetJ[i] = 0; //TO DO
 //    }
@@ -335,7 +335,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     if(file.is_open())
         file.close();
     else
-        throw std::runtime_error("The input .msh file does not exist!");
+        throw std::runtime_error("the input .msh file does not exist!");
 
     gmsh::open(fileName);
 
@@ -343,7 +343,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     m_dim = computeMeshDim();
 
     if(m_boundingBox.size() != 2*m_dim)
-        throw std::runtime_error("Bad bounding box format! Format: [xmin, ymin, xmax, ymax]");
+        throw std::runtime_error("bad bounding box format! Format: [xmin, ymin, xmax, ymax]");
 
     // We retrieve the tags of the physical groups of dimension m_dim and
     // m_dim-1
@@ -442,9 +442,9 @@ void Mesh::loadFromFile(const std::string& fileName)
     }
 
 #ifndef NDEBUG
-    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
-        for(std::size_t n2 = 0 ; n2 < m_nodesList.size() ; ++n2)
+        for(IndexType n2 = 0 ; n2 < m_nodesList.size() ; ++n2)
         {
             if(n != n2)
             {
@@ -460,7 +460,7 @@ void Mesh::loadFromFile(const std::string& fileName)
                             std::cout << ", ";
                     }
                     std::cerr << std::endl;
-                    throw std::runtime_error("Duplicates nodes!");
+                    throw std::runtime_error("duplicates nodes!");
                 }
             }
         }
@@ -468,7 +468,7 @@ void Mesh::loadFromFile(const std::string& fileName)
 #endif
 
     if(m_nodesList.empty())
-        throw std::runtime_error("No nodes loaded! Did you add the physical groups in the .geo file?");
+        throw std::runtime_error("no nodes loaded! Did you add the physical groups in the .geo file?");
 
     gmsh::finalize();
 
@@ -507,7 +507,7 @@ bool Mesh::removeNodes()
 
     bool removeNodes = false;
 
-    for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
+    for(IndexType i = 0 ; i < m_nodesList.size() ; ++i)
     {
         //We the node is free, it is not in an element; if a node is already tagged,
         //we can skip it (do not delete node twice)
@@ -585,7 +585,7 @@ bool Mesh::removeNodes()
 void Mesh::restoreNodesList()
 {
     if(m_nodesListSave.empty())
-        throw std::runtime_error("The nodes list was not saved before or does not exist!");
+        throw std::runtime_error("the nodes list was not saved before or does not exist!");
 
     m_nodesList = m_nodesListSave;
 
@@ -600,7 +600,7 @@ void Mesh::restoreNodesList()
 void Mesh::saveNodesList()
 {
     if(m_nodesList.empty())
-        throw std::runtime_error("The nodes list does not exist!");
+        throw std::runtime_error("the nodes list does not exist!");
 
     m_nodesListSave = m_nodesList;
 }
@@ -612,15 +612,15 @@ void Mesh::triangulateAlphaShape()
     else if(m_dim == 3)
         triangulateAlphaShape3D();
     else
-        throw std::runtime_error("Mesh dimension should be 2 or 3!");
+        throw std::runtime_error("mesh dimension should be 2 or 3!");
 }
 
 void Mesh::updateNodesPosition(std::vector<double> deltaPos)
 {
     if(deltaPos.size() != m_nodesList.size()*m_dim)
-        throw std::runtime_error("Invalid size of the deltaPos vector");
+        throw std::runtime_error("invalid size of the deltaPos vector");
 
-    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         if(!m_nodesList[n].isBound)
         {
@@ -640,11 +640,11 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
 void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
 {
     if(m_nodesListSave.empty())
-        throw std::runtime_error("You did not save the nodes list!");
+        throw std::runtime_error("you did not save the nodes list!");
     else if(deltaPos.size() != m_nodesListSave.size()*m_dim)
-        throw std::runtime_error("Invalid size of the deltaPos vector");
+        throw std::runtime_error("invalid size of the deltaPos vector");
 
-    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         if(!m_nodesList[n].isBound)
         {

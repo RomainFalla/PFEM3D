@@ -11,18 +11,13 @@
 class SOLVER_API SolverCompressible : public Solver
 {
     public:
-        SolverCompressible(const nlohmann::json& j, const std::string& mshName, const std::string& resultsName);
+        SolverCompressible(const nlohmann::json& j, const std::string& mshName);
         ~SolverCompressible();
 
         /**
          * \brief Display the parameters in SolverCompressibleParams structure.
          */
         void displaySolverParams() const;
-
-        /**
-         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
-         */
-        void setInitialCondition();
 
         /**
          * \brief Solve the Picard algorithm for one time step.
@@ -86,6 +81,12 @@ class SOLVER_API SolverCompressible : public Solver
          * \return The vector of nodal pressure, following a Tait-Murnagham state equation.
          */
         inline Eigen::VectorXd getPFromRhoTaitMurnagham(Eigen::VectorXd qRho) const;
+
+        /**
+         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
+         */
+        void setInitialCondition();
+
 };
 
 #include "SolverCompressible.inl"

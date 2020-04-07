@@ -10,7 +10,9 @@ SET(LIBSOLVERSRCS
 ./solver/SolverIncompressible.cpp
 ./solver/SolverIncompressible.hpp
 ./solver/SolverCompressible.cpp
-./solver/SolverCompressible.hpp ./solver/SolverCompressible.inl)
+./solver/SolverCompressible.hpp ./solver/SolverCompressible.inl
+./solver/extractors/Extractor.cpp ./solver/extractors/PointExtractor.cpp ./solver/extractors/GMSHExtractor.cpp ./solver/extractors/MinMaxExtractor.cpp
+./solver/extractors/Extractor.hpp ./solver/extractors/PointExtractor.hpp ./solver/extractors/GMSHExtractor.hpp ./solver/extractors/MinMaxExtractor.hpp)
 
 SET(SRCS
 main.cpp)
@@ -24,7 +26,7 @@ TARGET_LINK_LIBRARIES(Mesh ${GMSH_LIBRARIES})
 TARGET_LINK_LIBRARIES(Mesh CGAL::CGAL)
 
 ADD_LIBRARY(Solver SHARED ${LIBSOLVERSRCS})
-GENERATE_EXPORT_HEADER(Solver 
+GENERATE_EXPORT_HEADER(Solver
                        EXPORT_MACRO_NAME SOLVER_API
 					   EXPORT_FILE_NAME Solver_export.h)
 TARGET_INCLUDE_DIRECTORIES(Solver PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

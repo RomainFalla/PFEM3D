@@ -10,7 +10,7 @@
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel                     Kernel;
 typedef Kernel::FT                                                              FT;
-typedef CGAL::Triangulation_vertex_base_with_info_3<std::size_t, Kernel>        Vb3;
+typedef CGAL::Triangulation_vertex_base_with_info_3<IndexType, Kernel>          Vb3;
 typedef CGAL::Alpha_shape_vertex_base_3<Kernel, Vb3, CGAL::Tag_true>            asVb3;
 typedef CGAL::Alpha_shape_cell_base_3<Kernel, CGAL::Default, CGAL::Tag_true>    asCb3;
 typedef CGAL::Triangulation_data_structure_3<asVb3, asCb3>                      asTds3;
@@ -29,8 +29,8 @@ void Mesh::triangulateAlphaShape3D()
 
     // We have to construct an intermediate representation for CGAL. We also reset
     // nodes properties.
-    std::vector<std::pair<Point_3, std::size_t>> pointsList;
-    for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
+    std::vector<std::pair<Point_3, IndexType>> pointsList;
+    for(IndexType i = 0 ; i < m_nodesList.size() ; ++i)
     {
         pointsList.push_back(std::make_pair(Point_3(m_nodesList[i].position[0],
                                                     m_nodesList[i].position[1],
@@ -57,10 +57,10 @@ void Mesh::triangulateAlphaShape3D()
         {
             const Alpha_shape_3::Cell_handle cell{fit};
 
-            const std::vector<std::size_t> element{cell->vertex(0)->info(),
-                                                   cell->vertex(1)->info(),
-                                                   cell->vertex(2)->info(),
-                                                   cell->vertex(3)->info()};
+            const std::vector<IndexType> element{cell->vertex(0)->info(),
+                                                 cell->vertex(1)->info(),
+                                                 cell->vertex(2)->info(),
+                                                 cell->vertex(3)->info()};
 
             Tetrahedron_3 tetrahedron(pointsList[element[0]].first, pointsList[element[1]].first, pointsList[element[2]].first, pointsList[element[3]].first);
 
@@ -115,7 +115,7 @@ void Mesh::triangulateAlphaShape3D()
 //    {
 //        // We compute the free surface nodes
 //        const Alpha_shape_3::Facet facetAS = *it;
-//        const std::vector<std::size_t> edge{facetAS.first->vertex((facetAS.second+1)%3)->info(),
+//        const std::vector<IndexType> edge{facetAS.first->vertex((facetAS.second+1)%3)->info(),
 //                                            facetAS.first->vertex((facetAS.second+2)%3)->info(),
 //                                            facetAS.first->vertex((facetAS.second+3)%3)->info()};
 //
@@ -130,7 +130,7 @@ void Mesh::triangulateAlphaShape3D()
     // If an element is only composed of boundary nodes and the neighbour nodes of
     // each of the four are only boundary nodes, this is a spurious tetrahedron, we delete it
     m_elementsList.erase(
-    std::remove_if(m_elementsList.begin(),  m_elementsList.end(),  [this](const std::vector<std::size_t>& element)
+    std::remove_if(m_elementsList.begin(),  m_elementsList.end(),  [this](const std::vector<IndexType>& element)
     {
         if(this->m_nodesList[element[0]].isBound && this->m_nodesList[element[1]].isBound &&
            this->m_nodesList[element[2]].isBound && this->m_nodesList[element[3]].isBound)

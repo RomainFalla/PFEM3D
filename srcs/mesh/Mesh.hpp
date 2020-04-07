@@ -9,6 +9,13 @@
 #include "Mesh_export.h"
 
 /**
+ * \typedef IndexType
+ * \brief Type of the vector index for nodes and element (change it depending on
+ *        maximum number of elements you want.
+ */
+typedef unsigned int IndexType;
+
+/**
  * \class Mesh
  * \brief Represents a lagrangian mesh.
  */
@@ -28,13 +35,13 @@ class MESH_API Mesh
          * \return The vector containing the index of the nodes in nodesList
          *         making a certain element.
          */
-        inline std::vector<std::size_t> getElement(std::size_t elm) const;
+        inline std::vector<IndexType> getElement(IndexType elm) const;
 
         /**
          * \param elm The element index.
          * \return The determinant of the of the Jacobian matrix
          */
-        inline double getElementDetJ(std::size_t elm) const;
+        inline double getElementDetJ(IndexType elm) const;
 
         /**
          * \param elm The element index.
@@ -42,12 +49,12 @@ class MESH_API Mesh
          * \param j The column index in the Jacobian matrix.
          * \return The ij element of the Jacobian matrix for a certain element.
          */
-        inline double getElementInvJ(std::size_t elm, unsigned short i, unsigned short j) const;
+        inline double getElementInvJ(IndexType elm, unsigned short i, unsigned short j) const;
 
         /**
          * \return The number of elements in the mesh.
          */
-        inline std::size_t getElementsNumber() const;
+        inline IndexType getElementsNumber() const;
 
 //        /**
 //         * \param elm The element index.
@@ -104,21 +111,21 @@ class MESH_API Mesh
         /**
          * \return The number of nodes in the mesh.
          */
-        inline std::size_t getNodesNumber() const;
+        inline IndexType getNodesNumber() const;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \param coordinate The wanted coordinate (0, 1, ...).
          * \return The coordinate of the node.
          */
-        inline double getNodePosition(std::size_t nodeIndex, unsigned short coordinate) const;
+        inline double getNodePosition(IndexType nodeIndex, unsigned short coordinate) const;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \param state The wanted sate (0, 1, 2, 3, ...).
          * \return The value of the state for that node.
          */
-        inline double getNodeState(std::size_t nodeIndex, unsigned short state) const;
+        inline double getNodeState(IndexType nodeIndex, unsigned short state) const;
 
         /**
          * \return The characteristic node adding parameter.
@@ -135,21 +142,21 @@ class MESH_API Mesh
          * \param nodeIndex The index of the node in the nodes list.
          * \return true is the node is free, false otherwize.
          */
-        inline bool isNodeFree(std::size_t nodeIndex) const;
+        inline bool isNodeFree(IndexType nodeIndex) const;
 
         /**
          * \brief Check if a node is a boundary node.
          * \param nodeIndex The index of the node in the nodes list.
          * \return true is the node is on the boundary, false otherwize.
          */
-        inline bool isNodeBound(std::size_t nodeIndex) const;
+        inline bool isNodeBound(IndexType nodeIndex) const;
 
         /**
          * \brief Check if a node is not attached to a fluid element.
          * \param nodeIndex The index of the node in the nodes list.
          * \return true is the node is a fluid input, false otherwize.
          */
-        inline bool isNodeFluidInput(std::size_t nodeIndex) const;
+        inline bool isNodeFluidInput(IndexType nodeIndex) const;
 
         /**
          * \brief Load the nodes from a file using gmsh.
@@ -190,7 +197,7 @@ class MESH_API Mesh
          * \param stateIndex The index of the state;
          * \param state The new value of the state;
          */
-        inline void setNodeState(std::size_t nodeIndex, unsigned short stateIndex, double state);
+        inline void setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state);
 
         /**
          * \brief Set the number of states to be stored at node level.
@@ -211,8 +218,8 @@ class MESH_API Mesh
 
         std::vector<Node> m_nodesList;      /**< List of nodes of the mesh. */
         std::vector<Node> m_nodesListSave;  /**< A copy of the nodes list (usefull for non-linear algorithm). */
-        std::vector<std::vector<std::size_t>> m_elementsList;    /**< The list of element (triplet of index in the nodesList. */
-        //std::vector<std::vector<std::size_t>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
+        std::vector<std::vector<IndexType>> m_elementsList;    /**< The list of element (triplet of index in the nodesList. */
+        //std::vector<std::vector<IndexType>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
 
         std::vector<double> m_elementsDetJ;         /**< The Jacobian matrix determinant of each element. */
         std::vector<std::vector<std::vector<double>>> m_elementsInvJ;   /**< The inverse Jacobian matrix of each element. */

@@ -8,12 +8,11 @@
 /**
  * \param  argv[1] .json file that contains the parameters.
  * \param  argv[2] .msh file that contains the initial set of nodes.
- * \param  argv[3] name of the .msh file that will contain the results.
  */
 int main(int argc, char **argv)
 {
     // check that the file format is valid
-    if (argc < 4)
+    if (argc < 3)
     {
         std::cerr   << "Usage: " << argv[0] << " params.json mesh.msh results.msh"
                     <<  std::endl;
@@ -36,12 +35,12 @@ int main(int argc, char **argv)
 
         if(j["ProblemType"] == "Incompressible")
         {
-            SolverIncompressible solver(j, std::string(argv[2]), std::string(argv[3]));
+            SolverIncompressible solver(j, std::string(argv[2]));
             solver.solveProblem();
         }
         else if(j["ProblemType"] == "Compressible")
         {
-            SolverCompressible solver(j, std::string(argv[2]), std::string(argv[3]));
+            SolverCompressible solver(j, std::string(argv[2]));
             solver.solveProblem();
         }
         else
@@ -52,6 +51,13 @@ int main(int argc, char **argv)
         std::cout << "Ellapsed time for problem solving: "
                   << static_cast<double>(ellapsedTime.count())/1000.0
                   << " s" << std::endl;
+    }
+    catch(const std::bad_alloc& badAllocException)
+    {
+        std::cerr << "Something went wrong while allocating memory: "
+                  << badAllocException.what() << std::endl;
+
+        return -2;
     }
     catch(const std::exception& exception)
     {

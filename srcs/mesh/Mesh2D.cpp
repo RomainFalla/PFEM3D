@@ -10,7 +10,7 @@
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel                 Kernel;
 typedef Kernel::FT                                                          FT;
-typedef CGAL::Triangulation_vertex_base_with_info_2<std::size_t, Kernel>    Vb2;
+typedef CGAL::Triangulation_vertex_base_with_info_2<IndexType, Kernel>      Vb2;
 typedef CGAL::Alpha_shape_vertex_base_2<Kernel, Vb2>                        asVb2;
 typedef CGAL::Alpha_shape_face_base_2<Kernel>                               asFb2;
 typedef CGAL::Triangulation_data_structure_2<asVb2,asFb2>                   asTds2;
@@ -30,8 +30,8 @@ void Mesh::triangulateAlphaShape2D()
 
     // We have to construct an intermediate representation for CGAL. We also reset
     // nodes properties.
-    std::vector<std::pair<Point_2, std::size_t>> pointsList;
-    for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
+    std::vector<std::pair<Point_2, IndexType>> pointsList;
+    for(IndexType i = 0 ; i < m_nodesList.size() ; ++i)
     {
         pointsList.push_back(std::make_pair(Point_2(m_nodesList[i].position[0],
                                                     m_nodesList[i].position[1]), i));
@@ -57,9 +57,9 @@ void Mesh::triangulateAlphaShape2D()
         {
             const Alpha_shape_2::Face_handle face{fit};
 
-            const std::vector<std::size_t> element{face->vertex(0)->info(),
-                                                   face->vertex(1)->info(),
-                                                   face->vertex(2)->info()};
+            const std::vector<IndexType> element{face->vertex(0)->info(),
+                                                 face->vertex(1)->info(),
+                                                 face->vertex(2)->info()};
 
             // Those nodes are not free (flying nodes and not wetted boundary nodes)
             m_nodesList[element[0]].isFree = false;
@@ -99,7 +99,7 @@ void Mesh::triangulateAlphaShape2D()
 //    {
 //        // We compute the free surface nodes
 //        const Alpha_shape_2::Edge edgeAS = *it;
-//        const std::vector<std::size_t> edge{edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
+//        const std::vector<IndexType> edge{edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
 //                                            edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
 //
 //        if(!m_nodesList[edgeAS.first->vertex((edgeAS.second+1)%3)->info()].isBound &&
@@ -112,7 +112,7 @@ void Mesh::triangulateAlphaShape2D()
     // If an element is only composed of boundary nodes and the neighBournodes of
     // each of the three is equal to 2, this is a spurious triangle, we delete it
     m_elementsList.erase(
-    std::remove_if(m_elementsList.begin(),  m_elementsList.end(), [this](const std::vector<std::size_t>& element)
+    std::remove_if(m_elementsList.begin(),  m_elementsList.end(), [this](const std::vector<IndexType>& element)
     {
         if(this->m_nodesList[element[0]].isBound && this->m_nodesList[element[1]].isBound &&
            this->m_nodesList[element[2]].isBound && this->m_nodesList[element[0]].neighbourNodes.size() == 2 &&

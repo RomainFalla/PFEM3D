@@ -1,6 +1,6 @@
 #include "Solver.hpp"
 
-inline Eigen::MatrixXd Solver::getB(std::size_t elementIndex) const
+inline Eigen::MatrixXd Solver::getB(IndexType elementIndex) const
 {
     assert(elementIndex < m_mesh.getElementsNumber() && "elementIndex should be between 0 and size - 1 !");
 
@@ -43,7 +43,7 @@ inline double Solver::getCurrentDT() const
     return m_currentDT;
 }
 
-inline double Solver::getCurrentStep() const
+inline unsigned int Solver::getCurrentStep() const
 {
     return m_currentStep;
 }
@@ -53,7 +53,7 @@ inline double Solver::getCurrentTime() const
     return m_currentTime;
 }
 
-inline Eigen::VectorXd Solver::getElementState(std::size_t elm, unsigned short state) const
+inline Eigen::VectorXd Solver::getElementState(IndexType elm, unsigned short state) const
 {
     Eigen::VectorXd stateVec(m_mesh.getElement(elm).size());
 
@@ -82,6 +82,11 @@ inline double Solver::getEndTime() const
 inline double Solver::getMaxDT() const
 {
     return m_maxDT;
+}
+
+inline const Mesh& Solver::getMesh() const
+{
+    return m_mesh;
 }
 
 inline std::vector<Eigen::MatrixXd> Solver::getN() const
@@ -121,13 +126,18 @@ inline Eigen::VectorXd Solver::getQFromNodesStates(unsigned short beginState, un
     Eigen::VectorXd q((endState - beginState + 1)*m_mesh.getNodesNumber());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         for (unsigned short s = beginState ; s <= endState ; ++s)
             q((s - beginState)*m_mesh.getNodesNumber() + n) = m_mesh.getNodeState(n, s);
     }
 
     return q;
+}
+
+inline unsigned short Solver::getStatesNumber() const
+{
+    return m_statesNumber;
 }
 
 inline bool Solver::isDTAdaptable() const
@@ -151,7 +161,7 @@ inline void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short
     assert (q.rows() == (endState - beginState + 1)*m_mesh.getNodesNumber());
 
     #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
         for (unsigned short s = beginState ; s <= endState ; ++s)
             m_mesh.setNodeState(n, s, q((s - beginState)*m_mesh.getNodesNumber() + n));

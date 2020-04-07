@@ -15,8 +15,7 @@
     		"coeffDTdecrease": 2.0,
     		"maxDT": 0.002,
 			"initialDT": 0.002,
-    		"endTime": 4,
-    		"timeBetweenWriting": 0.05
+    		"endTime": 4
 		},
 		"Picard": {
 			"relTol": 5e-6,
@@ -26,9 +25,23 @@
 			"rho": 1000,
 			"mu": 1e-3	
 		},
-		"whatToWrite": ["p", "ke"],
-		"writeAs": "NodesElements",
-		"initialCondition" : [0, 0, 0]
+		"initialCondition" : [0, 0, 0],
+		"Extractors" : [
+			{
+				"type": "MinMax",
+				"outputFile": "tipPosition.txt",
+                "timeBetweenWriting": 0.01,
+                "minMax": "max",
+                "coordinate": 0
+			},
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 0.01,
+                "whatToWrite": ["p", "ke"],
+				"writeAs": "NodesElements"
+			}
+		]
 	},
-	"verboseOutput": false
+	"verboseOutput": true
 }
