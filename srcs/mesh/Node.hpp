@@ -4,6 +4,13 @@
 #include <vector>
 
 /**
+ * \typedef IndexType
+ * \brief Type of the vector index for nodes and element (change it depending on
+ *        maximum number of elements you want.
+ */
+typedef unsigned int IndexType;
+
+/**
  * \struct Node
  * \brief Represents a node in PFEM method.
  */
@@ -14,7 +21,7 @@ struct Node
     std::vector<double> states;         /**< Variables defined at the node.
                                              Can be u,v,p or u,v,p,rho, etc. */
 
-    std::vector<std::size_t> neighbourNodes;    /**< Indexes in the nodes list of the
+    std::vector<IndexType> neighbourNodes;    /**< Indexes in the nodes list of the
                                                      neighbour nodes */
 
     bool isBound;                       /**< Is the node a wall node */

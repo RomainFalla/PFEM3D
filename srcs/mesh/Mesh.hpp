@@ -9,13 +9,6 @@
 #include "Mesh_export.h"
 
 /**
- * \typedef IndexType
- * \brief Type of the vector index for nodes and element (change it depending on
- *        maximum number of elements you want.
- */
-typedef unsigned int IndexType;
-
-/**
  * \class Mesh
  * \brief Represents a lagrangian mesh.
  */
