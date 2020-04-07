@@ -2,8 +2,6 @@
 
 #include <iostream>
 
-#include "extractors/Extractors.hpp"
-
 
 Solver::Solver(const nlohmann::json& j, const std::string& mshName) :
 m_mesh(j)

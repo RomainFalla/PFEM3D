@@ -7,10 +7,10 @@
 #include <nlohmann/json.hpp>
 
 #include "../mesh/Mesh.hpp"
+#include "extractors/Extractors.hpp"
 
 #include "Solver_export.h"
 
-class Extractor;
 
 /**
  * \class Solver

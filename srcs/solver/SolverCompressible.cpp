@@ -6,8 +6,6 @@
 
 #include "SolverCompressible.hpp"
 
-#include "extractors/Extractors.hpp"
-
 
 SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
