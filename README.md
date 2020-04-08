@@ -17,15 +17,13 @@ It is highly recommended to build the project using MinGW-w64 compiler from [MSY
 
 ```
 pacman -S mingw-w64-x86_64-cmake mingw-w64-x86_64-toolchain mingw-w64-x86_64-eigen3 mingw-w64-x86_64-nlohmann-json
-wget http://repo.msys2.org/mingw/x86_64/mingw-w64-x86_64-cgal-4.11-1-any.pkg.tar.xz
-pacman -U path/to/mingw-w64-x86_64-cgal-4.11-1-any.pkg.tar.xz
 ```
+
+You should also download [CGAL](CGAL-5.0.2-Setup.exe) and install it. Then run the `buildCGAL.sh` file in a MinGW64 shell.
 
 The cmake command should be append by `-DCMAKE_SH=SH-NOTFOUND` if you use cmake from the MinGW64 shell (the easiest way to have everything in `PATH`)
 
-An older version of CGAL is downloaded due to a bug in the latest version proposed by MSYS2. However another bug affect the chosen version. The files `srcs/CMakeFiles/pfem.dir/build.make`, `srcs/CMakeFiles/pfem.dir/linklibs.rsp`, `srcs/CMakeFiles/Mesh.dir/build.make`, `srcs/CMakeFiles/Mesh.dir/linklibs.rsp`, `srcs/CMakeFiles/Solver.dir/build.make`and `srcs/CMakeFiles/Solver.dir/linklibs.rsp` will contain reference to a `C:/building/msys64` directory. Replace that directory by the installation directory of MSYS2 (everything is handled if you use the `run/windows/genCBproject.sh` file. 
-
-Do not forget to download gmsh (it will be downloaded automatically if you use the `run/windows/genCBproject.sh` file).
+Do not forget to download gmsh!
 
 ### MacOS
 Nothing should prevent the project to be built on macOS and it is nearly like linux (it is highly recommende to install a compiler supporting OpenMP).
