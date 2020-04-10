@@ -10,6 +10,7 @@
 SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
 {
+    m_solverType = WeaklyCompressible;
     unsigned short dim = m_mesh.getDim();
 
     m_statesNumber = 2*dim + 2;
@@ -38,22 +39,22 @@ Solver(j, mshName)
     {
         if(extractor["type"].get<std::string>() == "Point")
         {
-            m_pExtractor.push_back(std::make_unique<PointExtractor>(extractor["outputFile"].get<std::string>(),
+            m_pExtractor.push_back(std::make_unique<PointExtractor>(*this,
+                                                                    extractor["outputFile"].get<std::string>(),
                                                                     extractor["timeBetweenWriting"].get<double>(),
                                                                     extractor["stateToWrite"].get<unsigned short>(),
-                                                                    extractor["points"].get<std::vector<std::vector<double>>>(),
-                                                                    m_statesNumber));
+                                                                    extractor["points"].get<std::vector<std::vector<double>>>()));
         }
         else if(extractor["type"].get<std::string>() == "GMSH")
         {
             if(GMSHExtractorCount < 1)
             {
-                m_pExtractor.push_back(std::make_unique<GMSHExtractor>(extractor["outputFile"].get<std::string>(),
+                m_pExtractor.push_back(std::make_unique<GMSHExtractor>(*this,
+                                                                       extractor["outputFile"].get<std::string>(),
                                                                        extractor["timeBetweenWriting"].get<double>(),
                                                                        extractor["whatToWrite"].get<std::vector<std::string>>(),
                                                                        whatCanBeWritten,
-                                                                       extractor["writeAs"].get<std::string>(),
-                                                                       m_statesNumber));
+                                                                       extractor["writeAs"].get<std::string>()));
                 GMSHExtractorCount++;
             }
             else
@@ -63,11 +64,17 @@ Solver(j, mshName)
         }
         else if(extractor["type"].get<std::string>() == "MinMax")
         {
-            m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(extractor["outputFile"].get<std::string>(),
+            m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(*this,
+                                                                     extractor["outputFile"].get<std::string>(),
                                                                      extractor["timeBetweenWriting"].get<double>(),
                                                                      extractor["coordinate"].get<unsigned short>(),
-                                                                     extractor["minMax"].get<std::string>(),
-                                                                     dim));
+                                                                     extractor["minMax"].get<std::string>()));
+        }
+        else if(extractor["type"].get<std::string>() == "Mass")
+        {
+            m_pExtractor.push_back(std::make_unique<MassExtractor>(*this,
+                                                                   extractor["outputFile"].get<std::string>(),
+                                                                   extractor["timeBetweenWriting"].get<double>()));
         }
         else
         {
@@ -108,7 +115,6 @@ Solver(j, mshName)
 
 SolverCompressible::~SolverCompressible()
 {
-    gmsh::finalize();
 }
 
 void SolverCompressible::applyBoundaryConditionsMom()
@@ -231,7 +237,7 @@ void SolverCompressible::solveProblem()
 
     for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
     {
-        m_pExtractor[i]->update(m_mesh, m_currentTime, m_currentStep);
+        m_pExtractor[i]->update();
     }
 
     while(m_currentTime < m_endTime)
@@ -256,7 +262,7 @@ void SolverCompressible::solveProblem()
 
         for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
         {
-            m_pExtractor[i]->update(m_mesh, m_currentTime, m_currentStep);
+            m_pExtractor[i]->update();
         }
 
         if(m_adaptDT)

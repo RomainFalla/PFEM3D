@@ -8,15 +8,18 @@
 
 #include "Solver_export.h"
 
+class Solver;
+
 class SOLVER_NO_EXPORT Extractor
 {
     public:
-        Extractor(const std::string& outFileName, double timeBetweenWriting);
+        Extractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting);
         ~Extractor();
 
-        virtual void update(const Mesh& mesh, double currentTime, unsigned int currentStep);
+        virtual void update();
 
     protected:
+        const Solver& m_solver;
         std::string m_outFileName;
 
         double m_timeBetweenWriting;

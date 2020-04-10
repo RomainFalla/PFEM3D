@@ -7,20 +7,18 @@
 class SOLVER_NO_EXPORT GMSHExtractor : public Extractor
 {
     public:
-        GMSHExtractor(const std::string& outFileName, double timeBetweenWriting,
+        GMSHExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                       const std::vector<std::string>& whatToWrite,
-                      std::vector<std::string> whatCanBeWritten, std::string writeAs,
-                      unsigned short statesNumber);
+                      std::vector<std::string> whatCanBeWritten, std::string writeAs);
 
         ~GMSHExtractor();
 
-        void update(const Mesh& mesh, double currentTime, unsigned int currentStep) override;
+        void update() override;
 
     private:
         std::vector<std::string> m_whatCanBeWritten;
         std::vector<bool> m_whatToWrite;
         std::string m_writeAs;
-        unsigned short m_statesNumber;
 };
 
 #endif // GMSHEXTRACTOR_HPP_INCLUDED

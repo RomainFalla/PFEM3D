@@ -1,14 +1,13 @@
 #include "MinMaxExtractor.hpp"
 
-#include <iostream>
-#include <Eigen/Dense>
+#include "../Solver.hpp"
 
 
-MinMaxExtractor::MinMaxExtractor(const std::string& outFileName, double timeBetweenWriting,
-                                 unsigned short coordinate, const std::string& minMax, unsigned short meshDim) :
-Extractor(outFileName, timeBetweenWriting), m_coordinate(coordinate), m_minMax(minMax)
+MinMaxExtractor::MinMaxExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
+                                 unsigned short coordinate, const std::string& minMax) :
+Extractor(solver, outFileName, timeBetweenWriting), m_coordinate(coordinate), m_minMax(minMax)
 {
-    if(m_coordinate > meshDim - 1)
+    if(m_coordinate > m_solver.getMesh().getDim() - 1)
         throw std::runtime_error("bad coordinate to write!");
 
     if(m_minMax != "min" && m_minMax != "max")
@@ -20,7 +19,6 @@ Extractor(outFileName, timeBetweenWriting), m_coordinate(coordinate), m_minMax(m
         std::string errorText = std::string("cannot open file to write point extractor: ") + m_outFileName;
         throw std::runtime_error(errorText);
     }
-
 }
 
 MinMaxExtractor::~MinMaxExtractor()
@@ -28,10 +26,12 @@ MinMaxExtractor::~MinMaxExtractor()
     m_outFile.close();
 }
 
-void MinMaxExtractor::update(const Mesh& mesh, double currentTime, unsigned int currentStep)
+void MinMaxExtractor::update()
 {
-    if(currentTime >= m_nextWriteTrigger)
+    if(m_solver.getCurrentTime() >= m_nextWriteTrigger)
     {
+        const Mesh& mesh = m_solver.getMesh();
+
         double valueToWrite;
 
         if(m_minMax == "min")
@@ -53,7 +53,7 @@ void MinMaxExtractor::update(const Mesh& mesh, double currentTime, unsigned int 
             }
         }
 
-        m_outFile << std::to_string(currentTime) << "," << std::to_string(valueToWrite) << std::endl;
+        m_outFile << std::to_string(m_solver.getCurrentTime()) << "," << std::to_string(valueToWrite) << std::endl;
 
         m_nextWriteTrigger += m_timeBetweenWriting;
     }

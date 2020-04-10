@@ -9,16 +9,14 @@
 class SOLVER_NO_EXPORT PointExtractor : public Extractor
 {
     public:
-        PointExtractor(const std::string& outFileName, double timeBetweenWriting,
-                       unsigned short stateToWrite, const std::vector<std::vector<double>>& pos,
-                       unsigned short statesNumber);
+        PointExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
+                       unsigned short stateToWrite, const std::vector<std::vector<double>>& points);
         ~PointExtractor();
 
-        void update(const Mesh& mesh, double currentTime, unsigned int currentStep) override;
+        void update() override;
 
     private:
         std::ofstream m_outFile;
-        unsigned short m_statesNumber;
         unsigned short m_stateToWrite;
         std::vector<std::vector<double>> m_points;
 

@@ -3,13 +3,13 @@
 #include <utility>
 #include <gmsh.h>
 
+#include "../Solver.hpp"
 
-GMSHExtractor::GMSHExtractor(const std::string& outFileName, double timeBetweenWriting,
+
+GMSHExtractor::GMSHExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                              const std::vector<std::string>& whatToWrite,
-                             std::vector<std::string> whatCanBeWritten, std::string writeAs,
-                             unsigned short statesNumber) :
-Extractor(outFileName, timeBetweenWriting), m_whatCanBeWritten(std::move(whatCanBeWritten)), m_writeAs(std::move(writeAs)),
-m_statesNumber(statesNumber)
+                             std::vector<std::string> whatCanBeWritten, std::string writeAs) :
+Extractor(solver, outFileName, timeBetweenWriting), m_whatCanBeWritten(std::move(whatCanBeWritten)), m_writeAs(std::move(writeAs))
 {
     if(!(m_writeAs == "Nodes" || m_writeAs == "Elements" || m_writeAs == "NodesElements"))
     {
@@ -51,10 +51,12 @@ GMSHExtractor::~GMSHExtractor()
     gmsh::finalize();
 }
 
-void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int currentStep)
+void GMSHExtractor::update()
 {
-    if(currentTime < m_nextWriteTrigger)
+    if(m_solver.getCurrentTime() < m_nextWriteTrigger)
         return;
+
+    const Mesh& mesh = m_solver.getMesh();
 
     gmsh::model::add("theModel");
     gmsh::model::setCurrent("theModel");
@@ -110,23 +112,23 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
     std::vector<std::vector<double>> dataKe;
     std::vector<std::vector<double>> dataVelocity;
 
-    dataNodesStates.resize(m_statesNumber);
+    dataNodesStates.resize(m_solver.getStatesNumber());
 
-    for(unsigned short i = 0 ; i < m_statesNumber ; ++i)
+    for(unsigned short i = 0 ; i < m_solver.getStatesNumber() ; ++i)
     {
         if(m_whatToWrite[i])
             dataNodesStates[i].resize(mesh.getNodesNumber());
     }
 
-    if(m_whatToWrite[m_statesNumber])
+    if(m_whatToWrite[m_solver.getStatesNumber()])
         dataKe.resize(mesh.getNodesNumber());
-    if(m_whatToWrite[m_statesNumber + 1])
+    if(m_whatToWrite[m_solver.getStatesNumber() + 1])
         dataVelocity.resize(mesh.getNodesNumber());
 
     #pragma omp parallel for default(shared)
     for(std::size_t n = 0 ; n < mesh.getNodesNumber() ; ++n)
     {
-        for(unsigned short i = 0 ; i < m_statesNumber ; ++i)
+        for(unsigned short i = 0 ; i < m_solver.getStatesNumber() ; ++i)
         {
             if(m_whatToWrite[i])
             {
@@ -134,7 +136,7 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
                 dataNodesStates[i][n] = state;
             }
         }
-        if(m_whatToWrite[m_statesNumber])
+        if(m_whatToWrite[m_solver.getStatesNumber()])
         {
             double ke = 0;
             for(unsigned short d = 0 ; d < mesh.getDim() ; ++d)
@@ -145,7 +147,7 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
             const std::vector<double> keVector{ke};
             dataKe[n] = keVector;
         }
-        if(m_whatToWrite[m_statesNumber + 1])
+        if(m_whatToWrite[m_solver.getStatesNumber() + 1])
         {
             if(mesh.getDim() == 2)
             {
@@ -160,23 +162,23 @@ void GMSHExtractor::update(const Mesh& mesh, double currentTime, unsigned int cu
         }
     }
 
-    for(unsigned short i = 0 ; i < m_statesNumber ; ++i)
+    for(unsigned short i = 0 ; i < m_solver.getStatesNumber() ; ++i)
     {
         if(m_whatToWrite[i])
-            gmsh::view::addModelData(i + 1, currentStep, "theModel", "NodeData", nodesTags, dataNodesStates[i], currentTime, 1);
+            gmsh::view::addModelData(i + 1, m_solver.getCurrentStep(), "theModel", "NodeData", nodesTags, dataNodesStates[i], m_solver.getCurrentTime(), 1);
     }
 
-    if(m_whatToWrite[m_statesNumber])
-        gmsh::view::addModelData(m_statesNumber + 1, currentStep, "theModel", "NodeData", nodesTags, dataKe, currentTime, 1);
-    if(m_whatToWrite[m_statesNumber + 1])
-        gmsh::view::addModelData(m_statesNumber + 2, currentStep, "theModel", "NodeData", nodesTags, dataVelocity, currentTime, 3);
+    if(m_whatToWrite[m_solver.getStatesNumber()])
+        gmsh::view::addModelData(m_solver.getStatesNumber() + 1, m_solver.getCurrentStep(), "theModel", "NodeData", nodesTags, dataKe, m_solver.getCurrentTime(), 1);
+    if(m_whatToWrite[m_solver.getStatesNumber() + 1])
+        gmsh::view::addModelData(m_solver.getStatesNumber() + 2, m_solver.getCurrentStep(), "theModel", "NodeData", nodesTags, dataVelocity, m_solver.getCurrentTime(), 3);
 
     const std::string baseName = m_outFileName.substr(0, m_outFileName.find(".msh"));
 
     for(unsigned short i = 0; i < m_whatToWrite.size(); ++i)
     {
         if(m_whatToWrite[i] == true)
-            gmsh::view::write(i + 1, baseName + "_" + std::to_string(currentTime) + ".msh" , true);
+            gmsh::view::write(i + 1, baseName + "_" + std::to_string(m_solver.getCurrentTime()) + ".msh" , true);
     }
 
     gmsh::model::remove();

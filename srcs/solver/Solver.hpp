@@ -11,6 +11,13 @@
 
 #include "Solver_export.h"
 
+enum SOLVER_TYPE
+{
+    Undefined,
+    Incompressible_PSPG,
+    WeaklyCompressible
+};
+
 
 /**
  * \class Solver
@@ -66,9 +73,14 @@ class SOLVER_API Solver
          */
         inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;
 
-         /**
-         * \return Return the number of state the solver is using.
-         */
+        /**
+        * \return What solver it is.
+        */
+        inline SOLVER_TYPE getSolverType() const;
+
+        /**
+        * \return Return the number of state the solver is using.
+        */
         inline unsigned short getStatesNumber() const;
 
         /**
@@ -91,6 +103,8 @@ class SOLVER_API Solver
         inline void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState);
 
     protected:
+        SOLVER_TYPE m_solverType;
+
         bool m_verboseOutput;           /**< Should the output be verbose? */
         unsigned int m_numOMPThreads;   /**< Number of OpenMP threads used. */
 

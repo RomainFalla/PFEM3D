@@ -135,6 +135,11 @@ inline Eigen::VectorXd Solver::getQFromNodesStates(unsigned short beginState, un
     return q;
 }
 
+inline SOLVER_TYPE Solver::getSolverType() const
+{
+    return m_solverType;
+}
+
 inline unsigned short Solver::getStatesNumber() const
 {
     return m_statesNumber;

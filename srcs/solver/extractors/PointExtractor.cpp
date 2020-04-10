@@ -1,13 +1,13 @@
 #include "PointExtractor.hpp"
 
-#include <iostream>
 #include <Eigen/Dense>
 
+#include "../Solver.hpp"
 
-PointExtractor::PointExtractor(const std::string& outFileName, double timeBetweenWriting,
-                               unsigned short stateToWrite, const std::vector<std::vector<double>>& points,
-                               unsigned short statesNumber) :
-Extractor(outFileName, timeBetweenWriting), m_statesNumber(statesNumber), m_stateToWrite(stateToWrite), m_points(points)
+
+PointExtractor::PointExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
+                               unsigned short stateToWrite, const std::vector<std::vector<double>>& points) :
+Extractor(solver, outFileName, timeBetweenWriting), m_stateToWrite(stateToWrite), m_points(points)
 {
     m_outFile.open(m_outFileName);
     if(!m_outFile.is_open())
@@ -15,7 +15,7 @@ Extractor(outFileName, timeBetweenWriting), m_statesNumber(statesNumber), m_stat
         std::string errorText = std::string("cannot open file to write point extractor: ") + m_outFileName;
         throw std::runtime_error(errorText);
     }
-    if(stateToWrite > statesNumber)
+    if(stateToWrite > m_solver.getStatesNumber())
         throw std::runtime_error("unexpected state to write.");
 }
 
@@ -24,11 +24,14 @@ PointExtractor::~PointExtractor()
     m_outFile.close();
 }
 
-void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int currentStep)
+void PointExtractor::update()
 {
-    if(currentTime >= m_nextWriteTrigger)
+    if(m_solver.getCurrentTime() >= m_nextWriteTrigger)
     {
-        m_outFile << std::to_string(currentTime);
+        const Mesh& mesh = m_solver.getMesh();
+
+        m_outFile << std::to_string(m_solver.getCurrentTime());
+
         for(auto& point : m_points)
         {
             IndexType elm;
@@ -55,7 +58,7 @@ void PointExtractor::update(const Mesh& mesh, double currentTime, unsigned int c
                 }
 
                 Eigen::VectorXd b(mesh.getDim() + 1);
-                if(m_stateToWrite < m_statesNumber)
+                if(m_stateToWrite < m_solver.getStatesNumber())
                 {
                     if(mesh.getDim() == 2)
                     {
@@ -135,15 +138,14 @@ bool PointExtractor::findElementIndex(const Mesh& mesh, IndexType& elementIndex,
 
         unsigned short ok = 0;
 
+        std::vector<double> normal(mesh.getDim());
+        std::vector<double> vMiddleToBary(mesh.getDim());
+        std::vector<double> vPointToVertex(mesh.getDim());
+
         if(mesh.getDim() == 2)
         {
-            std::vector<double> normal(mesh.getDim());
-            std::vector<double> vMiddleToBary(mesh.getDim());
-            std::vector<double> vPointToVertex(mesh.getDim());
-
             for(unsigned short i = 0 ; i < mesh.getDim() + 1 ; ++i)
             {
-                //Segment 1-0
                 unsigned short j = i + 1;
                 if(i == mesh.getDim())
                     j = 0;
@@ -176,8 +178,61 @@ bool PointExtractor::findElementIndex(const Mesh& mesh, IndexType& elementIndex,
             }
         }
         else
-            throw std::runtime_error("3D meshes currently unsupported for Point Extractor");
+        {
+            for(unsigned short i = 0 ; i < mesh.getDim() + 1 ; ++i)
+            {
+                unsigned short j = i + 1;
+                unsigned short k = i + 2;
+                if(i == mesh.getDim() - 1)
+                    k = 0;
+                else if(i == mesh.getDim())
+                {
+                    j = 0;
+                    k = 1;
+                }
 
+                normal[0] = ((mesh.getNodePosition(mesh.getElement(elm)[j], 1) - mesh.getNodePosition(mesh.getElement(elm)[i], 1))
+                             *(mesh.getNodePosition(mesh.getElement(elm)[k], 2) - mesh.getNodePosition(mesh.getElement(elm)[i], 2)))
+                          - ((mesh.getNodePosition(mesh.getElement(elm)[j], 2) - mesh.getNodePosition(mesh.getElement(elm)[i], 2))
+                             *(mesh.getNodePosition(mesh.getElement(elm)[k], 1) - mesh.getNodePosition(mesh.getElement(elm)[i], 1))) ;
+
+                normal[1] = ((mesh.getNodePosition(mesh.getElement(elm)[j], 2) - mesh.getNodePosition(mesh.getElement(elm)[i], 2))
+                             *(mesh.getNodePosition(mesh.getElement(elm)[k], 0) - mesh.getNodePosition(mesh.getElement(elm)[i], 0)))
+                          - ((mesh.getNodePosition(mesh.getElement(elm)[j], 0) - mesh.getNodePosition(mesh.getElement(elm)[i], 0))
+                             *(mesh.getNodePosition(mesh.getElement(elm)[k], 2) - mesh.getNodePosition(mesh.getElement(elm)[i], 2))) ;
+
+                normal[2] = ((mesh.getNodePosition(mesh.getElement(elm)[j], 0) - mesh.getNodePosition(mesh.getElement(elm)[i], 0))
+                             *(mesh.getNodePosition(mesh.getElement(elm)[k], 1) - mesh.getNodePosition(mesh.getElement(elm)[i], 1)))
+                          - ((mesh.getNodePosition(mesh.getElement(elm)[j], 1) - mesh.getNodePosition(mesh.getElement(elm)[i], 1))
+                             *(mesh.getNodePosition(mesh.getElement(elm)[k], 0) - mesh.getNodePosition(mesh.getElement(elm)[i], 0))) ;
+
+                vMiddleToBary[0] = baryCenter[0] - (1.0f/3.0f)*(mesh.getNodePosition(mesh.getElement(elm)[i], 0) + mesh.getNodePosition(mesh.getElement(elm)[j], 0) + mesh.getNodePosition(mesh.getElement(elm)[k], 0));
+                vMiddleToBary[1] = baryCenter[1] - (1.0f/3.0f)*(mesh.getNodePosition(mesh.getElement(elm)[i], 1) + mesh.getNodePosition(mesh.getElement(elm)[j], 1) + mesh.getNodePosition(mesh.getElement(elm)[k], 1));
+                vMiddleToBary[2] = baryCenter[2] - (1.0f/3.0f)*(mesh.getNodePosition(mesh.getElement(elm)[i], 2) + mesh.getNodePosition(mesh.getElement(elm)[j], 2) + mesh.getNodePosition(mesh.getElement(elm)[k], 2));
+
+                if((normal[0]*vMiddleToBary[0] + normal[1]*vMiddleToBary[1] + normal[2]*vMiddleToBary[2]) > 0)
+                {
+                    normal[0] *= -1;
+                    normal[1] *= -1;
+                    normal[2] *= -1;
+                }
+
+                vPointToVertex[0] = point[0] - mesh.getNodePosition(mesh.getElement(elm)[i], 0);
+                vPointToVertex[1] = point[1] - mesh.getNodePosition(mesh.getElement(elm)[i], 1);
+                vPointToVertex[1] = point[2] - mesh.getNodePosition(mesh.getElement(elm)[i], 2);
+
+                if((normal[0]*vPointToVertex[0] + normal[1]*vPointToVertex[1] + normal[2]*vPointToVertex[2]) > 0)
+                    break;
+                else
+                    ok++;
+            }
+
+            if(ok == 4)
+            {
+                elementIndex = elm;
+                return true;
+            }
+        }
     }
 
     return false;

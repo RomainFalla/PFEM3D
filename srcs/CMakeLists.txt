@@ -5,8 +5,10 @@ SET(LIBMESHSRCS
 ./mesh/Mesh.hpp ./mesh/Mesh.inl ./mesh/Node.hpp)
 
 SET(LIBSOLVERSRCS
-./solver/extractors/Extractor.cpp ./solver/extractors/PointExtractor.cpp ./solver/extractors/GMSHExtractor.cpp ./solver/extractors/MinMaxExtractor.cpp
-./solver/extractors/Extractor.hpp ./solver/extractors/PointExtractor.hpp ./solver/extractors/GMSHExtractor.hpp ./solver/extractors/MinMaxExtractor.hpp
+./solver/extractors/Extractor.cpp ./solver/extractors/PointExtractor.cpp
+./solver/extractors/GMSHExtractor.cpp ./solver/extractors/MinMaxExtractor.cpp ./solver/extractors/MassExtractor.cpp
+./solver/extractors/Extractor.hpp ./solver/extractors/PointExtractor.hpp ./solver/extractors/MassExtractor.hpp
+./solver/extractors/GMSHExtractor.hpp ./solver/extractors/MinMaxExtractor.hpp
 ./solver/Solver.cpp
 ./solver/Solver.hpp ./solver/Solver.inl
 ./solver/SolverIncompressible.cpp

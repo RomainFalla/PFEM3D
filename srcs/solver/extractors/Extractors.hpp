@@ -5,5 +5,6 @@
 #include "PointExtractor.hpp"
 #include "MinMaxExtractor.hpp"
 #include "GMSHExtractor.hpp"
+#include "MassExtractor.hpp"
 
 #endif // EXTRACTORS_HPP_INCLUDED

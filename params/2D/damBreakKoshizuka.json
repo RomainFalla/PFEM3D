@@ -30,18 +30,23 @@
 			{
 				"type": "MinMax",
 				"outputFile": "tipPosition.txt",
-                "timeBetweenWriting": 0.01,
+                "timeBetweenWriting": 0.1,
                 "minMax": "max",
                 "coordinate": 0
 			},
 			{
+				"type": "Mass",
+				"outputFile": "mass.txt",
+                "timeBetweenWriting": 0.1
+			},
+			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.01,
+                "timeBetweenWriting": 0.1,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			}
 		]
 	},
-	"verboseOutput": true
+	"verboseOutput": false
 }

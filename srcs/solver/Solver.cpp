@@ -6,6 +6,7 @@
 Solver::Solver(const nlohmann::json& j, const std::string& mshName) :
 m_mesh(j)
 {
+    m_solverType = Undefined;
     m_mesh.loadFromFile(mshName);
 
     m_verboseOutput             = j["verboseOutput"].get<bool>();

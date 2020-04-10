@@ -9,11 +9,11 @@
 class SOLVER_NO_EXPORT MinMaxExtractor : public Extractor
 {
     public:
-        MinMaxExtractor(const std::string& outFileName, double timeBetweenWriting,
-                        unsigned short coordinate, const std::string& minMax, unsigned short meshDim);
+        MinMaxExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
+                        unsigned short coordinate, const std::string& minMax);
         ~MinMaxExtractor();
 
-        void update(const Mesh& mesh, double currentTime, unsigned int currentStep) override;
+        void update() override;
 
     private:
         std::ofstream m_outFile;
