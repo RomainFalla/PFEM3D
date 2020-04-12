@@ -31,7 +31,7 @@ Solver(j, mshName)
     if(dim == 2)
         whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
     else
-        whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
+        whatCanBeWritten = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "velocity"};
 
     auto extractors = j["Solver"]["Extractors"];
     unsigned short GMSHExtractorCount = 0;
@@ -539,7 +539,6 @@ void SolverCompressible::buildMatricesMom()
 
         Fe *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
 
-        Eigen::MatrixXd FeTot(dim*(dim + 1), 1); FeTot.setZero();
         FTote[elm] = -Ke*V + De.transpose()*P + Fe;
     }
 
@@ -558,7 +557,6 @@ void SolverCompressible::buildMatricesMom()
                                                 Build f
                 ************************************************************************/
                 m_F(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()) += FTote[elm](i + d*(dim + 1));
-
             }
         }
     }

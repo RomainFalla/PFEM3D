@@ -153,6 +153,13 @@ class MESH_API Mesh
         inline bool isNodeFluidInput(IndexType nodeIndex) const;
 
         /**
+         * \brief Check if a node is on the free surface.
+         * \param nodeIndex The index of the node in the nodes list.
+         * \return true is the node is on the free surface, false otherwize.
+         */
+        inline bool isNodeOnFreeSurface(IndexType nodeIndex) const;
+
+        /**
          * \brief Load the nodes from a file using gmsh.
          * \param fileName The name of the .msh file
          */

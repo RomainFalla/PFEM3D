@@ -168,6 +168,11 @@ inline bool Mesh::isNodeFluidInput(IndexType nodeIndex) const
     return m_nodesList[nodeIndex].isFluidInput;
 }
 
+inline bool Mesh::isNodeOnFreeSurface(IndexType nodeIndex) const
+{
+    return m_nodesList[nodeIndex].isOnFreeSurface;
+}
+
 inline void Mesh::setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state)
 {
     m_nodesList[nodeIndex].states[stateIndex] = state;

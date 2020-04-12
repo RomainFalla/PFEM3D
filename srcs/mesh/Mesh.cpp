@@ -146,7 +146,7 @@ void Mesh::computeElementsDetJ()
             m_elementsDetJ[i] = m_elementsJ[i][0][0]*m_elementsJ[i][1][1]
                               - m_elementsJ[i][1][0]*m_elementsJ[i][0][1];
         }
-        else if(m_dim == 3)
+        else
         {
             m_elementsDetJ[i] = m_elementsJ[i][0][0]*m_elementsJ[i][1][1]*m_elementsJ[i][2][2]
                               + m_elementsJ[i][0][1]*m_elementsJ[i][1][2]*m_elementsJ[i][2][0]
@@ -184,7 +184,7 @@ void Mesh::computeElementsInvJ()
 
             m_elementsInvJ[i][1][1] = m_elementsJ[i][0][0]/m_elementsDetJ[i];
         }
-        else if(m_dim == 3)
+        else
         {
             m_elementsInvJ[i].resize(3);
             m_elementsInvJ[i][0].resize(3);
@@ -250,7 +250,7 @@ void Mesh::computeElementsJ()
             m_elementsJ[i][1][0] = y1 - y0;
             m_elementsJ[i][1][1] = y2 - y0;
         }
-        else if(m_dim == 3)
+        else
         {
             m_elementsJ[i].resize(3);
             m_elementsJ[i][0].resize(3);
@@ -610,10 +610,8 @@ void Mesh::triangulateAlphaShape()
 {
     if(m_dim == 2)
         triangulateAlphaShape2D();
-    else if(m_dim == 3)
-        triangulateAlphaShape3D();
     else
-        throw std::runtime_error("mesh dimension should be 2 or 3!");
+        triangulateAlphaShape3D();
 }
 
 void Mesh::updateNodesPosition(std::vector<double> deltaPos)
