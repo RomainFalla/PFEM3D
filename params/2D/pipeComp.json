@@ -22,7 +22,7 @@
 			"mu": 1e-3,	
 			"K0": 2200000,
             "K0prime": 7.6,
-            "pInfty": 101325
+            "pInfty": 0
 		},
 		"initialCondition" : [1, 0, 0, 1000],
 		"Extractors" : [
