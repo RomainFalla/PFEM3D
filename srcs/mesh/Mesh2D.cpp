@@ -38,8 +38,6 @@ void Mesh::triangulateAlphaShape2D()
 
         m_nodesList[i].isFree = true;
         m_nodesList[i].isOnFreeSurface = false;
-        m_nodesList[i].touched =  false;
-        m_nodesList[i].toBeDeleted = false;
         m_nodesList[i].neighbourNodes.clear();
     }
 

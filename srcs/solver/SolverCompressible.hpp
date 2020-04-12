@@ -44,37 +44,39 @@ class SOLVER_API SolverCompressible : public Solver
         Eigen::MatrixXd m_sumNTN;
         Eigen::MatrixXd m_ddev;
 
-        Eigen::VectorXd m_qVPrev;           /**< The precedent speed. */
-        Eigen::VectorXd m_qAccPrev;         /**< The precedent acceleration. */
-        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;    /**< The mass matrix for momentum equation.. */
-        Eigen::VectorXd m_F;                /**< The rhs of the momentum equation. */
-        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invMrho; /**< The mass matrix of the continuity. */
-        Eigen::VectorXd m_Frho;             /**< The rhos of the continuity equation.. */
-
-        /**
-         * \brief Apply boundary conditions to the matrix M and vector F
-         */
-        void applyBoundaryConditionsMom();
-
         /**
          * \brief Apply boundary conditions to the matrix Mrho and vector Frho
+         * \param invMrho A reference to the inverse mass matrix.
+         * \param Frho A reference to the vector Frho.
          */
-        void applyBoundaryConditionsCont();
+        void applyBoundaryConditionsCont(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invMrho, Eigen::VectorXd& Frho);
+
+        /**
+         * \brief Apply boundary conditions to the matrix invM and vector F
+         * \param invM A reference to the inverse mass matrix.
+         * \param F A reference to the vector F.
+         */
+        void applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
 
         /**
          * \brief Build the rhs of the continuity equation.
+         * \param Frho A reference to the vector Fho.
          */
-        void buildFrho();
-
-        /**
-         * \brief Build the matrix M and the vector F.
-         */
-        void buildMatricesMom();
+        void buildFrho(Eigen::VectorXd& Frho);
 
         /**
          * \brief Build the matrix Mrho and the vector Frho.
+         * \param invMrho A reference to the inverse mass matrix.
+         * \param Frho A reference to the vector Frho.
          */
-        void buildMatricesCont();
+        void buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invMrho, Eigen::VectorXd& Frho);
+
+        /**
+         * \brief Build the matrix M and the vector F.
+         * \param invM A reference to the inverse mass matrix.
+         * \param F A reference to the vector F.
+         */
+        void buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
 
         /**
          * \param qRho The vector of nodal density.

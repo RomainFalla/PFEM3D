@@ -42,31 +42,37 @@ class SOLVER_API SolverIncompressible : public Solver
         Eigen::MatrixXd m_sumNTN;
         Eigen::MatrixXd m_ddev;
 
-        Eigen::VectorXd m_qprev;            /**< The precedent solution */
-        Eigen::SparseMatrix<double> m_A;    /**< The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L]. */
-        Eigen::VectorXd m_b;                /**< The vector b representing the problem: [M/dt*qprev + F; H]. */
-        Eigen::SparseMatrix<double> m_M;    /**< The mass matrix. */
-        Eigen::SparseMatrix<double> m_K;    /**< The viscosity matrix. */
-        Eigen::SparseMatrix<double> m_D;    /**< The pressure matrix. */
-        Eigen::VectorXd m_F;                /**< The volume force vector. */
-        std::vector<double> m_tauPSPG;      /**< tau_PSPG parameters for each element. */
-
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
 
         /**
-         * \brief Apply boundary conditions to the matrix A
+         * \brief Apply boundary conditions to the matrix A.
+         * \param A the global sparse matrix
+         * \param b the global rhs
+         * \param qprev a vector containing the solution at the previous time step
          */
-        void applyBoundaryConditions();
+        void applyBoundaryConditions(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qprev);
 
         /**
          * \brief Build the matrix A and the vector b of the Picard Algorithm.
+         * \param A the global sparse matrix
+         * \param b the global rhs
+         * \param M the mass matrix
+         * \param K the viscosity matrix
+         * \param D the pressure gradient matrix
+         * \param F the body force vector
+         * \param tauPSPG a vector containing the value of tauPSPG for each element
+         * \param qprev a vector containing the solution at the previous time step
          */
-        void buildPicardSystem();
+        void buildPicardSystem(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b,
+                               Eigen::SparseMatrix<double>& M, Eigen::SparseMatrix<double>& K,
+                               Eigen::SparseMatrix<double>& D, Eigen::VectorXd& F, const std::vector<double>& tauPSPG,
+                               const Eigen::VectorXd& qprev);
 
         /**
-         * \brief Build the matrix A and the vector b of the Picard Algorithm.
+         * \brief Build the coefficient tauPSPG for each element.
+         * \param tauPSPG a vector which will contain the value of tauPSPG for each element
          */
-        void computeTauPSPG();
+        void computeTauPSPG(std::vector<double>& tauPSPG);
 
         /**
          * \brief Set the initial condition on u, v, p for the initial cloud of nodes.

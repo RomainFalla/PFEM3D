@@ -84,6 +84,8 @@ bool Mesh::checkBoundingBox()
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
+    std::vector<bool> toBeDeleted(m_nodesList.size(), false);   //Should the node be deleted
+
     bool outofBBNodes = false;
 
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
@@ -95,7 +97,7 @@ bool Mesh::checkBoundingBox()
             if(m_nodesList[n].position[d] < m_boundingBox[d] ||
                m_nodesList[n].position[d] > m_boundingBox[d + m_dim])
             {
-                m_nodesList[n].toBeDeleted = true;
+                toBeDeleted[n] = true;
                 outofBBNodes = true;
                 break;
             }
@@ -103,9 +105,9 @@ bool Mesh::checkBoundingBox()
     }
 
     m_nodesList.erase(
-    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this](const Node& node)
+    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted](const Node& node)
     {
-       if(node.toBeDeleted)
+       if(toBeDeleted[&node - &*std::begin(m_nodesList)])
        {
            if(this->m_verboseOutput)
            {
@@ -506,13 +508,16 @@ bool Mesh::removeNodes()
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
+    std::vector<bool> touched(m_nodesList.size(), false);       //Is the node next to a node which should be deleted
+    std::vector<bool> toBeDeleted(m_nodesList.size(), false);   //Should the node be deleted
+
     bool removeNodes = false;
 
     for(IndexType i = 0 ; i < m_nodesList.size() ; ++i)
     {
         //We the node is free, it is not in an element; if a node is already tagged,
         //we can skip it (do not delete node twice)
-        if(m_nodesList[i].toBeDeleted || m_nodesList[i].isFree)
+        if(toBeDeleted[i] || m_nodesList[i].isFree)
             continue;
 
         for(unsigned int j = 0 ; j < m_nodesList[i].neighbourNodes.size() ; ++j)
@@ -530,13 +535,13 @@ bool Mesh::removeNodes()
             if(d <= m_gamma*m_hchar)
             {
                 //If the neighbour nodes is touched, we delete the current nodes
-                if(m_nodesList[m_nodesList[i].neighbourNodes[j]].touched)
+                if(touched[m_nodesList[i].neighbourNodes[j]])
                 {
                     //Do not delete bounded or free surface nodes
                     if(m_nodesList[i].isBound || m_nodesList[i].isOnFreeSurface)
                         continue;
 
-                    m_nodesList[i].toBeDeleted = true;
+                    toBeDeleted[i] = true;
                     removeNodes = true;
                 }
                 //If the neighbour nodes is not touched, we delete the neoghbour nodes
@@ -547,8 +552,8 @@ bool Mesh::removeNodes()
                        m_nodesList[m_nodesList[i].neighbourNodes[j]].isOnFreeSurface)
                         continue;
 
-                    m_nodesList[i].touched = true;
-                    m_nodesList[m_nodesList[i].neighbourNodes[j]].toBeDeleted = true;
+                    touched[i] = true;
+                    toBeDeleted[m_nodesList[i].neighbourNodes[j]] = true;
                     removeNodes = true;
                 }
             }
@@ -556,9 +561,9 @@ bool Mesh::removeNodes()
     }
 
     m_nodesList.erase(
-    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this](const Node& node)
+    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted](const Node& node)
     {
-       if(node.toBeDeleted)
+       if(toBeDeleted[&node - &*std::begin(m_nodesList)])
        {
            if(this->m_verboseOutput)
            {

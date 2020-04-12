@@ -31,10 +31,6 @@ struct Node
 
     bool isFluidInput;                  /**< Is the node representing a fluid input */
 
-    bool touched;                       /**< Is the node next to a node which should
-                                             be deleted */
-    bool toBeDeleted;                   /**< Should the node be deleted */
-
     /**
      * \brief Constructor
      * \param dim The spatial dimension (2 or 3).
@@ -48,9 +44,6 @@ struct Node
         this->isFree = true;
 
         this->isFluidInput = false;
-
-        this->touched = false;
-        this->toBeDeleted = false;
     }
 };
 

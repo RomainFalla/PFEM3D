@@ -117,7 +117,23 @@ SolverCompressible::~SolverCompressible()
 {
 }
 
-void SolverCompressible::applyBoundaryConditionsMom()
+void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invMrho, Eigen::VectorXd& Frho)
+{
+    assert(m_mesh.getNodesNumber() != 0);
+
+    //Do not parallelize this
+    for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    {
+        if(m_mesh.isNodeFree(n))
+        {
+           Frho(n) = m_mesh.getNodeState(n, m_mesh.getDim() + 1);
+
+           invMrho.diagonal()[n] = 1;
+        }
+    }
+}
+
+void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
 {
     assert(m_mesh.getNodesNumber() != 0);
 
@@ -130,36 +146,20 @@ void SolverCompressible::applyBoundaryConditionsMom()
         {
             for(unsigned short d = 0 ; d < dim - 1 ; ++d)
             {
-                m_F(n + d*m_mesh.getNodesNumber()) = 0;
-                m_invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
+                F(n + d*m_mesh.getNodesNumber()) = 0;
+                invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
             }
 
-             m_F(n + (dim - 1)*m_mesh.getNodesNumber()) = - m_gravity;
-             m_invM.diagonal()[n + (dim - 1)*m_mesh.getNodesNumber()] = 1;
+             F(n + (dim - 1)*m_mesh.getNodesNumber()) = - m_gravity;
+             invM.diagonal()[n + (dim - 1)*m_mesh.getNodesNumber()] = 1;
         }
         else if(m_mesh.isNodeBound(n))
         {
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
-                m_F(n + d*m_mesh.getNodesNumber()) = 0;
-                m_invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
+                F(n + d*m_mesh.getNodesNumber()) = 0;
+                invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
             }
-        }
-    }
-}
-
-void SolverCompressible::applyBoundaryConditionsCont()
-{
-    assert(m_mesh.getNodesNumber() != 0);
-
-    //Do not parallelize this
-    for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        if(m_mesh.isNodeFree(n))
-        {
-           m_Frho(n) = m_mesh.getNodeState(n, m_mesh.getDim() + 1);
-
-           m_invMrho.diagonal()[n] = 1;
         }
     }
 }
@@ -217,9 +217,6 @@ void SolverCompressible::setInitialCondition()
             m_mesh.setNodeState(n, dim + 2 + d, 0);
         }
     }
-
-    m_qVPrev = getQFromNodesStates(0, dim - 1);
-    m_qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);
 }
 
 void SolverCompressible::solveProblem()
@@ -294,41 +291,54 @@ void SolverCompressible::solveProblem()
 
 bool SolverCompressible::solveCurrentTimeStep()
 {
-    assert(m_qVPrev.size() == m_qAccPrev.size());
-    assert(m_qVPrev.size() == m_mesh.getDim()*m_mesh.getNodesNumber());
-
     auto startTime = std::chrono::high_resolution_clock::now();
 
     const unsigned short dim = m_mesh.getDim();
 
+    Eigen::VectorXd qVPrev = getQFromNodesStates(0, dim - 1);           //The precedent speed.
+    Eigen::VectorXd qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);  //The precedent acceleration.
+
+    Eigen::VectorXd Frho;                                 //The rhos of the continuity equation.
+
     if(m_strongContinuity)
-        buildFrho();
+        buildFrho(Frho);
 
-    Eigen::VectorXd qV1half = m_qVPrev + 0.5*m_currentDT*m_qAccPrev;
+    Eigen::VectorXd qV1half = qVPrev + 0.5*m_currentDT*qAccPrev;
 
-    setNodesStatesfromQ(qV1half, 0, dim - 1);
-    Eigen::VectorXd deltaPos = qV1half*m_currentDT;
-    m_mesh.updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
+    {
+        setNodesStatesfromQ(qV1half, 0, dim - 1);
+        Eigen::VectorXd deltaPos = qV1half*m_currentDT;
+        m_mesh.updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
+    }
 
-    buildMatricesCont();
-    applyBoundaryConditionsCont();
+    {
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> invMrho; //The mass matrix of the continuity.
+        buildMatricesCont(invMrho, Frho);
+        applyBoundaryConditionsCont(invMrho, Frho);
 
-    Eigen::VectorXd qRho(m_mesh.getNodesNumber());
-    qRho = m_invMrho*m_Frho;
-    setNodesStatesfromQ(qRho, dim + 1, dim + 1);
-    Eigen::VectorXd qP = getPFromRhoTaitMurnagham(qRho);
+        Eigen::VectorXd qRho(m_mesh.getNodesNumber());
+        qRho = invMrho*Frho;
+        setNodesStatesfromQ(qRho, dim + 1, dim + 1);
+        Eigen::VectorXd qP = getPFromRhoTaitMurnagham(qRho);
 
-    setNodesStatesfromQ(qP, dim, dim);
+        setNodesStatesfromQ(qP, dim, dim);
+        Frho.resize(0,0);
+    }
 
-    buildMatricesMom();
-    applyBoundaryConditionsMom();
+    {
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> invM; //The mass matrix for momentum equation.
+        Eigen::VectorXd F;                                  //The rhs of the momentum equation.
 
-    m_qAccPrev = m_invM*m_F;
+        buildMatricesMom(invM, F);
+        applyBoundaryConditionsMom(invM, F);
 
-    m_qVPrev = qV1half + 0.5*m_currentDT*m_qAccPrev;
+        qAccPrev = invM*F;
 
-    setNodesStatesfromQ(m_qVPrev, 0, dim - 1);
-    setNodesStatesfromQ(m_qAccPrev, dim + 2, 2*dim + 1);
+        qVPrev = qV1half + 0.5*m_currentDT*qAccPrev;
+
+        setNodesStatesfromQ(qVPrev, 0, dim - 1);
+        setNodesStatesfromQ(qAccPrev, dim + 2, 2*dim + 1);
+    }
 
     m_currentTime += m_currentDT;
     m_currentStep++;
@@ -339,12 +349,8 @@ bool SolverCompressible::solveCurrentTimeStep()
         std::cout << "Problem solved in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
 
     startTime = std::chrono::high_resolution_clock::now();
-    //Remeshing step
-    m_mesh.remesh();
 
-    //We have to compute qPrev here due to new nodes !
-    m_qVPrev = getQFromNodesStates(0, dim - 1);
-    m_qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);
+    m_mesh.remesh();
 
     endTime = std::chrono::high_resolution_clock::now();
     ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
@@ -354,11 +360,11 @@ bool SolverCompressible::solveCurrentTimeStep()
     return true;
 }
 
-void SolverCompressible::buildFrho()
+void SolverCompressible::buildFrho(Eigen::VectorXd& Frho)
 {
     const unsigned short dim = m_mesh.getDim();
 
-    m_Frho.resize(m_mesh.getNodesNumber()); m_Frho.setZero();
+    Frho.resize(m_mesh.getNodesNumber()); Frho.setZero();
 
     std::vector<Eigen::VectorXd> Frhoe(m_mesh.getElementsNumber());
 
@@ -375,22 +381,22 @@ void SolverCompressible::buildFrho()
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
-            m_Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
+            Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
     }
 }
 
-void SolverCompressible::buildMatricesCont()
+void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invMrho, Eigen::VectorXd& Frho)
 {
     const unsigned short dim = m_mesh.getDim();
 
-    m_invMrho.resize(m_mesh.getNodesNumber()); m_invMrho.setZero();
+    invMrho.resize(m_mesh.getNodesNumber()); invMrho.setZero();
 
     std::vector<Eigen::MatrixXd> Mrhoe(m_mesh.getElementsNumber());
     std::vector<Eigen::VectorXd> Frhoe;
 
     if(!m_strongContinuity)
     {
-        m_Frho.resize(m_mesh.getNodesNumber()); m_Frho.setZero();
+        Frho.resize(m_mesh.getNodesNumber()); Frho.setZero();
         Frhoe.resize((m_mesh.getElementsNumber()));
     }
 
@@ -449,28 +455,28 @@ void SolverCompressible::buildMatricesCont()
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
         {
-            m_invMrho.diagonal()[m_mesh.getElement(elm)[i]] += Mrhoe[elm](i,i);
+            invMrho.diagonal()[m_mesh.getElement(elm)[i]] += Mrhoe[elm](i,i);
 
             if(!m_strongContinuity)
             {
-                m_Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
+                Frho(m_mesh.getElement(elm)[i]) += Frhoe[elm](i);
             }
         }
     }
 
     #pragma omp parallel for default(shared)
-    for(IndexType i = 0 ; i < m_invMrho.rows() ; ++i)
-         m_invMrho.diagonal()[i] = 1/m_invMrho.diagonal()[i];
+    for(IndexType i = 0 ; i < invMrho.rows() ; ++i)
+         invMrho.diagonal()[i] = 1/invMrho.diagonal()[i];
 }
 
-void SolverCompressible::buildMatricesMom()
+void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
 {
     const unsigned short dim = m_mesh.getDim();
 
-    m_invM.resize(dim*m_mesh.getNodesNumber()); m_invM.setZero();
+    invM.resize(dim*m_mesh.getNodesNumber()); invM.setZero();
     std::vector<Eigen::MatrixXd> Me(m_mesh.getElementsNumber());
 
-    m_F.resize(dim*m_mesh.getNodesNumber()); m_F.setZero();
+    F.resize(dim*m_mesh.getNodesNumber()); F.setZero();
     std::vector<Eigen::VectorXd> FTote(m_mesh.getElementsNumber());
 
     #pragma omp parallel for default(shared)
@@ -551,17 +557,17 @@ void SolverCompressible::buildMatricesMom()
                 /********************************************************************
                                              Build M
                 ********************************************************************/
-                m_invM.diagonal()[m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()] += Me[elm](i + d*(dim + 1), i + d*(dim + 1));
+                invM.diagonal()[m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()] += Me[elm](i + d*(dim + 1), i + d*(dim + 1));
 
                 /************************************************************************
                                                 Build f
                 ************************************************************************/
-                m_F(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()) += FTote[elm](i + d*(dim + 1));
+                F(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()) += FTote[elm](i + d*(dim + 1));
             }
         }
     }
 
     #pragma omp parallel for default(shared)
     for(IndexType i = 0 ; i < dim*m_mesh.getNodesNumber() ; ++i)
-        m_invM.diagonal()[i] = 1/m_invM.diagonal()[i];
+        invM.diagonal()[i] = 1/invM.diagonal()[i];
 }
