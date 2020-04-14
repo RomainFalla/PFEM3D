@@ -55,8 +55,9 @@ class SOLVER_API SolverCompressible : public Solver
          * \brief Apply boundary conditions to the matrix invM and vector F
          * \param invM A reference to the inverse mass matrix.
          * \param F A reference to the vector F.
+         * \param qVPrev A reference to the precedent velocity of all nodes.
          */
-        void applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
+        void applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F, const Eigen::VectorXd& qVPrev);
 
         /**
          * \brief Build the rhs of the continuity equation.
@@ -83,12 +84,6 @@ class SOLVER_API SolverCompressible : public Solver
          * \return The vector of nodal pressure, following a Tait-Murnagham state equation.
          */
         inline Eigen::VectorXd getPFromRhoTaitMurnagham(Eigen::VectorXd qRho) const;
-
-        /**
-         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
-         */
-        void setInitialCondition();
-
 };
 
 #include "SolverCompressible.inl"

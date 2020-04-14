@@ -17,14 +17,6 @@ Solver(j, mshName)
 
     m_mesh.setStatesNumber(m_statesNumber);
 
-    if(m_initialCondition.size() != m_statesNumber)
-    {
-        std::string errorText = std::string("invalid number of initial condition ") + std::to_string(m_initialCondition.size())
-                              + std::string(", should be ") + std::to_string(m_statesNumber);
-
-        throw std::runtime_error(errorText);
-    }
-
     m_rho               = j["Solver"]["Fluid"]["rho"].get<double>();
     m_mu                = j["Solver"]["Fluid"]["mu"].get<double>();
 
@@ -155,14 +147,24 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
 
         if(m_mesh.isNodeBound(n))
         {
+            std::vector<double> result;
+            result = m_lua[m_mesh.getNodeType(n)](m_mesh.getNodePosition(n),
+                                                  m_mesh.getNodeInitialPosition(n),
+                                                  m_currentTime + m_currentDT).get<std::vector<double>>();
+
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
                 A.row(n + d*m_mesh.getNodesNumber()) *= 0;
-                b(n + d*m_mesh.getNodesNumber()) = qPrev(n + d*m_mesh.getNodesNumber());
+                if(m_mesh.isNodeDirichlet(n)) //Dirichlet node, directly set speed
+                    b(n + d*m_mesh.getNodesNumber()) = result[d];
+                else                          //Not Dirichlet node, set speed through dx
+                    b(n + d*m_mesh.getNodesNumber()) = (result[d] - m_mesh.getNodePosition(n, d))/m_currentDT;
                 A.coeffRef(n + d*m_mesh.getNodesNumber(), n + d*m_mesh.getNodesNumber()) = 1;
             }
         }
     }
+    char a;
+    std::cin >> a;
 
     A.prune(0, 0);
 }
@@ -195,27 +197,6 @@ void SolverIncompressible::displaySolverParams() const
     }
     else
         std::cout << "Time step: " << m_maxDT << " s" << std::endl;
-}
-
-void SolverIncompressible::setInitialCondition()
-{
-    assert(m_mesh.getNodesNumber() != 0);
-
-    #pragma omp parallel for default(shared)
-    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        for(unsigned short s = 0 ; s < m_mesh.getDim() + 1 ; ++s)
-        {
-            if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
-            {
-                m_mesh.setNodeState(n, s, m_initialCondition[s]);
-            }
-            else
-            {
-                m_mesh.setNodeState(n, s, 0);
-            }
-        }
-    }
 }
 
 void SolverIncompressible::solveProblem()

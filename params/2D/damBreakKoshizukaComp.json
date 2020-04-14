@@ -23,7 +23,7 @@
             "K0prime": 7.6,
             "pInfty": 0
 		},
-		"initialCondition" : [0, 0, 0, 1000],
+		"IBCs": "../../bc/2D/damBreakKoshizukaComp.lua",
 		"Extractors" : [
 			{
 				"type": "MinMax",

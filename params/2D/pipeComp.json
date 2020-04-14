@@ -1,7 +1,7 @@
 {
     "ProblemType": "Compressible",
 	"Remeshing": {
-		"hchar": 0.05,
+		"hchar": 0.1,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
@@ -15,16 +15,16 @@
 			"securityCoeff": 0.1,
     		"maxDT": 0.005,
 			"initialDT": 1e-8,
-    		"endTime": 6,
+    		"endTime": 6
 		},
 		"Fluid": {
 			"rho0": 1000,
-			"mu": 1e-3,	
+			"mu": 200,	
 			"K0": 2200000,
             "K0prime": 7.6,
             "pInfty": 0
 		},
-		"initialCondition" : [1, 0, 0, 1000],
+		"IBCs": "../../bc/2D/pipeComp.lua",
 		"Extractors" : [
 			{
 				"type": "Point",

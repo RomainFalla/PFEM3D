@@ -45,16 +45,25 @@ void PointExtractor::update()
                 Eigen::MatrixXd A(mesh.getDim() + 1, mesh.getDim() + 1);
                 if(mesh.getDim() == 2)
                 {
-                    A << mesh.getNodePosition(mesh.getElement(elm)[0], 0), mesh.getNodePosition(mesh.getElement(elm)[0], 1), 1,
-                         mesh.getNodePosition(mesh.getElement(elm)[1], 0), mesh.getNodePosition(mesh.getElement(elm)[1], 1), 1,
-                         mesh.getNodePosition(mesh.getElement(elm)[2], 0), mesh.getNodePosition(mesh.getElement(elm)[2], 1), 1;
+                    std::vector<double> posV0 = mesh.getNodePosition(mesh.getElement(elm)[0]);
+                    std::vector<double> posV1 = mesh.getNodePosition(mesh.getElement(elm)[1]);
+                    std::vector<double> posV2 = mesh.getNodePosition(mesh.getElement(elm)[2]);
+
+                    A << posV0[0], posV0[1], 1,
+                         posV1[0], posV1[1], 1,
+                         posV2[0], posV2[1], 1;
                 }
                 else
                 {
-                    A << mesh.getNodePosition(mesh.getElement(elm)[0], 0), mesh.getNodePosition(mesh.getElement(elm)[0], 1), mesh.getNodePosition(mesh.getElement(elm)[0], 2), 1,
-                         mesh.getNodePosition(mesh.getElement(elm)[1], 0), mesh.getNodePosition(mesh.getElement(elm)[1], 1), mesh.getNodePosition(mesh.getElement(elm)[1], 2), 1,
-                         mesh.getNodePosition(mesh.getElement(elm)[2], 0), mesh.getNodePosition(mesh.getElement(elm)[2], 1), mesh.getNodePosition(mesh.getElement(elm)[2], 2), 1,
-                         mesh.getNodePosition(mesh.getElement(elm)[3], 0), mesh.getNodePosition(mesh.getElement(elm)[3], 1), mesh.getNodePosition(mesh.getElement(elm)[3], 2), 1;
+                    std::vector<double> posV0 = mesh.getNodePosition(mesh.getElement(elm)[0]);
+                    std::vector<double> posV1 = mesh.getNodePosition(mesh.getElement(elm)[1]);
+                    std::vector<double> posV2 = mesh.getNodePosition(mesh.getElement(elm)[2]);
+                    std::vector<double> posV3 = mesh.getNodePosition(mesh.getElement(elm)[3]);
+
+                    A << posV0[0], posV0[1], posV0[2], 1,
+                         posV1[0], posV1[1], posV1[2], 1,
+                         posV2[0], posV2[1], posV2[2], 1,
+                         posV3[0], posV3[1], posV3[2], 1;
                 }
 
                 Eigen::VectorXd b(mesh.getDim() + 1);

@@ -9,6 +9,8 @@ m_mesh(j)
     m_solverType = Undefined;
     m_mesh.loadFromFile(mshName);
 
+    m_lua.open_libraries(sol::lib::base, sol::lib::math);
+
     m_verboseOutput             = j["verboseOutput"].get<bool>();
 
     // set the desired number of OpenMP threads
@@ -28,8 +30,6 @@ m_mesh(j)
 
     m_gravity                   = j["Solver"]["gravity"].get<double>();
 
-    m_initialCondition          = j["Solver"]["initialCondition"].get<std::vector<double>>();
-
     m_adaptDT                   = j["Solver"]["Time"]["adaptDT"].get<bool>();
     m_currentDT                 = j["Solver"]["Time"]["initialDT"].get<double>();
 
@@ -47,6 +47,9 @@ m_mesh(j)
 
     if(m_maxDT <= 0)
         throw std::runtime_error("the maximum time interval should be strictly greater than 0!");
+
+    std::string IBConditions = j["Solver"]["IBCs"].get<std::string>();
+    m_lua.script_file(IBConditions);
 
     m_N = getN();
 
@@ -71,4 +74,23 @@ m_mesh(j)
 Solver::~Solver()
 {
 
+}
+
+void Solver::setInitialCondition()
+{
+    assert(m_mesh.getNodesNumber() != 0);
+
+    //With lua, not thread safe !
+    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    {
+        std::pair<std::vector<double>, bool> result;
+        result = m_lua[std::string("init") + m_mesh.getNodeType(n)](m_mesh.getNodePosition(n)).get<std::pair<std::vector<double>, bool>>();
+
+        for(unsigned short i = 0 ; i < m_statesNumber ; ++i)
+        {
+            m_mesh.setNodeState(n, i, result.first[i]);
+            m_mesh.setNodeIsDirichlet(n, result.second);
+        }
+
+    }
 }

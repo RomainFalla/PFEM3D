@@ -25,7 +25,7 @@
 			"rho": 1000,
 			"mu": 1e-3	
 		},
-		"initialCondition" : [0, 0, 0],
+		"IBCs": "../../bc/2D/damBreakKoshizuka.lua",
 		"Extractors" : [
 			{
 				"type": "MinMax",

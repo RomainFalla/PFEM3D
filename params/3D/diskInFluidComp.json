@@ -1,10 +1,10 @@
 {
     "ProblemType": "Compressible",
 	"Remeshing": {
-		"hchar": 0.1,
-		"alpha": 1.1,
-		"omega": 0.7,
-		"gamma": 0.7,
+		"hchar": 0.05,
+		"alpha": 1.2,
+		"omega": 0.35,
+		"gamma": 0.8,
 		"boundingBox": [-1, -1, -1, 1, 1, 100]
 	},
 	"Solver": {

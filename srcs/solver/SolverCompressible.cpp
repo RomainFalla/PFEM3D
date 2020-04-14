@@ -133,7 +133,7 @@ void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<doubl
     }
 }
 
-void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
+void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F, const Eigen::VectorXd& qVPrev)
 {
     assert(m_mesh.getNodesNumber() != 0);
 
@@ -155,9 +155,18 @@ void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double
         }
         else if(m_mesh.isNodeBound(n))
         {
+            std::vector<double> result;
+            result = m_lua[m_mesh.getNodeType(n)](m_mesh.getNodePosition(n),
+                                                  m_mesh.getNodeInitialPosition(n),
+                                                  m_currentTime + m_currentDT).get<std::vector<double>>();
+
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
-                F(n + d*m_mesh.getNodesNumber()) = 0;
+                if(m_mesh.isNodeDirichlet(n)) //Dirichlet node, directly set speed
+                    F(n + d*m_mesh.getNodesNumber()) = (result[d] - qVPrev[n + d*m_mesh.getNodesNumber()])/m_currentDT;
+                else                          //Not Dirichlet node, set speed through dx
+                    F(n + d*m_mesh.getNodesNumber()) = ((result[d] - m_mesh.getNodePosition(n, d))/m_currentDT - qVPrev[n + d*m_mesh.getNodesNumber()])/m_currentDT;
+
                 invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
             }
         }
@@ -191,32 +200,6 @@ void SolverCompressible::displaySolverParams() const
     }
     else
         std::cout << "Time step: " << m_maxDT << " s" << std::endl;
-}
-
-void SolverCompressible::setInitialCondition()
-{
-    assert(m_mesh.getNodesNumber() != 0);
-
-    const unsigned short dim = m_mesh.getDim();
-
-    #pragma omp parallel for default(shared)
-    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
-    {
-        for(unsigned short d = 0 ; d < dim ; ++d)
-        {
-            if(!m_mesh.isNodeBound(n) || m_mesh.isNodeFluidInput(n))
-                m_mesh.setNodeState(n, d, m_initialCondition[d]);
-            else
-                m_mesh.setNodeState(n, d, 0);
-        }
-
-        m_mesh.setNodeState(n, dim, m_initialCondition[dim]);
-        m_mesh.setNodeState(n, dim + 1, m_initialCondition[dim + 1]);
-        for(unsigned short d = 0 ; d < dim ; ++d)
-        {
-            m_mesh.setNodeState(n, dim + 2 + d, 0);
-        }
-    }
 }
 
 void SolverCompressible::solveProblem()
@@ -330,7 +313,7 @@ bool SolverCompressible::solveCurrentTimeStep()
         Eigen::VectorXd F;                                  //The rhs of the momentum equation.
 
         buildMatricesMom(invM, F);
-        applyBoundaryConditionsMom(invM, F);
+        applyBoundaryConditionsMom(invM, F, qVPrev);
 
         qAccPrev = invM*F;
 

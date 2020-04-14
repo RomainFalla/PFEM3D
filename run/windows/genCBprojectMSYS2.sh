@@ -13,9 +13,10 @@
 export CGAL_DIR=/c/tools/CGAL-5.0.2
 export GMSHSDK=/c/tools/gmsh-4.5.4-Windows64-sdk #put gmsh sdk here
 export EIGENSDK=/c/tools/msys64/mingw64/include/eigen3
+export SOL3SDK=/c/tools/
 
 export PATH=${GMSHSDK}/bin:${GMSHSDK}/lin:${PATH}
-export INCLUDE=${GMSHSDK}/include:${EIGENSDK}
+export INCLUDE=${GMSHSDK}/include:${EIGENSDK}:${SOL3SDK}
 export LIB=${GMSHSDK}/lib
 
 cd ../../

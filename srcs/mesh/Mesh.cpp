@@ -362,7 +362,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     {
         std::string name;
         gmsh::model::getPhysicalName(m_dim - 1, physGroupLD.second, name);
-        if(name == "Boundary" || name == "FluidInput")
+        if(name != "FreeSurface")
         {
             std::vector<double> coord;
             std::vector<std::size_t> dummyNodesTagsBoundary;
@@ -372,16 +372,29 @@ void Mesh::loadFromFile(const std::string& fileName)
             for(std::size_t i = 0 ; i < dummyNodesTagsBoundary.size() ; ++i)
             {
                 Node node(m_dim);
+                node.initialPosition.resize(m_dim);
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
+                {
                     node.position[d] = coord[3*i + d];
+                    node.initialPosition[d] = coord[3*i + d];
+                }
 
                 //If the nodes is already on the boundary, we do not add it twice
                 if(std::find(m_nodesList.begin(), m_nodesList.end(), node) != m_nodesList.end())
                     continue;
 
                 node.isBound = true;
-                if(name == "FluidInput")
-                    node.isFluidInput = true;
+
+                auto posBCinTagNames = std::find(m_tagNames.begin(), m_tagNames.end(), name);
+                if(posBCinTagNames == std::end(m_tagNames))
+                {
+                    m_tagNames.push_back(name);
+                    node.tag = m_tagNames.size() - 1;
+                }
+                else
+                {
+                    node.tag = static_cast<unsigned int>(std::distance(m_tagNames.begin(), posBCinTagNames));
+                }
 
                 m_nodesList.push_back(node);
 
@@ -406,40 +419,49 @@ void Mesh::loadFromFile(const std::string& fileName)
     {
         std::string name;
         gmsh::model::getPhysicalName(m_dim, physGroupHD.second, name);
-        if(name == "Fluid")
+
+        std::vector<std::size_t> dummyNodesTags;
+        std::vector<double> coord;
+        gmsh::model::mesh::getNodesForPhysicalGroup(m_dim, physGroupHD.second,
+                                                    dummyNodesTags, coord);
+
+        for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
         {
-            std::vector<std::size_t> dummyNodesTags;
-            std::vector<double> coord;
-            gmsh::model::mesh::getNodesForPhysicalGroup(m_dim, physGroupHD.second,
-                                                        dummyNodesTags, coord);
+            Node node(m_dim);
+            for(unsigned short d = 0 ; d < m_dim ; ++d)
+                node.position[d] = coord[3*i + d];
 
-            for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
+            //If the nodes is already on the boundary, we do not add it twice
+            if(std::find(m_nodesList.begin(), m_nodesList.end(), node) != m_nodesList.end())
+                continue;
+
+            node.isBound = false;
+
+            auto posBCinTagNames = std::find(m_tagNames.begin(), m_tagNames.end(), name);
+            if(posBCinTagNames == std::end(m_tagNames))
             {
-                Node node(m_dim);
+                m_tagNames.push_back(name);
+                node.tag = m_tagNames.size() - 1;
+            }
+            else
+            {
+                node.tag = static_cast<unsigned int>(std::distance(m_tagNames.begin(), posBCinTagNames));
+            }
+
+            m_nodesList.push_back(node);
+
+            if(m_verboseOutput)
+            {
+                std::cout << "Loading fluid node: " << "(";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
-                    node.position[d] = coord[3*i + d];
-
-                //If the nodes is already on the boundary, we do not add it twice
-                if(std::find(m_nodesList.begin(), m_nodesList.end(), node) != m_nodesList.end())
-                    continue;
-
-                node.isBound = false;
-
-                m_nodesList.push_back(node);
-
-                if(m_verboseOutput)
                 {
-                    std::cout << "Loading fluid node: " << "(";
-                    for(unsigned short d = 0 ; d < m_dim ; ++d)
-                    {
-                        std::cout << node.position[d];
-                        if(d == m_dim - 1)
-                            std::cout << ")";
-                        else
-                            std::cout << ", ";
-                    }
-                    std::cout << std::endl;
+                    std::cout << node.position[d];
+                    if(d == m_dim - 1)
+                        std::cout << ")";
+                    else
+                        std::cout << ", ";
                 }
+                std::cout << std::endl;
             }
         }
     }
@@ -467,6 +489,11 @@ void Mesh::loadFromFile(const std::string& fileName)
                 }
             }
         }
+    }
+    std::cout << "List of founded BC names: " << std::endl;
+    for (auto& aString : m_tagNames)
+    {
+        std::cout << aString << std::endl;
     }
 #endif
 
@@ -626,7 +653,7 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
 
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
-        if(!m_nodesList[n].isBound)
+        if(!m_nodesList[n].isDirichlet)
         {
             for(unsigned short d = 0 ; d < m_dim ; ++d)
             {
@@ -650,7 +677,7 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
 
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
-        if(!m_nodesList[n].isBound)
+        if(!m_nodesList[n].isDirichlet)
         {
             for(unsigned short d = 0 ; d < m_dim ; ++d)
             {
