@@ -127,7 +127,7 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
         if(m_mesh.isNodeFree(n))
         {
             A.row(n + dim*m_mesh.getNodesNumber()) *= 0;
-            b(n + dim*m_mesh.getNodesNumber()) = qPrev(n + dim*m_mesh.getNodesNumber());
+            b(n + dim*m_mesh.getNodesNumber()) = 0;
             A.coeffRef(n + dim*m_mesh.getNodesNumber(), n + dim*m_mesh.getNodesNumber()) = 1;
 
             if(!m_mesh.isNodeBound(n))
