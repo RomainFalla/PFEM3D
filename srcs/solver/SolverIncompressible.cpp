@@ -171,8 +171,6 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
             }
         }
     }
-    char a;
-    std::cin >> a;
 
     A.prune(0, 0);
 }
