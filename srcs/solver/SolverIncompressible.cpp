@@ -82,11 +82,19 @@ Solver(j, mshName)
         }
     }
 
-    m_sumNTN.resize(dim*(dim + 1), dim*(dim + 1)); m_sumNTN.setZero();
+    m_MPrev.resize(dim*(dim + 1), dim*(dim + 1)); m_MPrev.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
     {
-        m_sumNTN += m_N[k].transpose()*m_N[k]*m_mesh.getGaussWeight(k);
+        m_MPrev += m_N[k].transpose()*m_N[k]*m_mesh.getGaussWeight(k);
     }
+    m_MPrev *= m_mesh.getRefElementSize()*m_rho;
+
+    m_FPrev.resize(dim*(dim + 1)); m_FPrev.setZero();
+    for(unsigned short k = 0 ; k < m_N.size() ; ++k)
+    {
+        m_FPrev += m_N[k].transpose()*m_bodyForces*m_mesh.getGaussWeight(k);;
+    }
+    m_FPrev *= m_mesh.getRefElementSize()*m_rho;
 
     if(dim == 2)
     {
@@ -451,7 +459,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
     Eigen::VectorXd H(m_mesh.getNodesNumber());
     H.setZero();
 
-    Eigen::MatrixXd MPrev = m_sumNTN*m_mesh.getRefElementSize()*(m_rho/m_currentDT);
+    Eigen::MatrixXd MPrev = m_MPrev/m_currentDT;
 
     std::vector<Eigen::MatrixXd> Me(m_mesh.getElementsNumber());
     std::vector<Eigen::MatrixXd> Ke(m_mesh.getElementsNumber());
@@ -502,10 +510,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
         //Fe = S Nv^T bodyforce dV
         Fe[elm].resize(dim*(dim+1),1); Fe[elm].setZero();
 
-        for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Fe[elm] += m_N[k].transpose()*m_bodyForces*m_mesh.getGaussWeight(k);
-
-        Fe[elm] *= m_mesh.getRefElementSize()*m_rho*m_mesh.getElementDetJ(elm);
+        Fe[elm] = m_FPrev*m_mesh.getElementDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
         He[elm] = m_mesh.getRefElementSize()*tauPSPG[elm]*Bep.transpose()
