@@ -39,7 +39,8 @@ class SOLVER_API SolverIncompressible : public Solver
         double m_coeffDTincrease;
         double m_coeffDTdecrease;
 
-        Eigen::MatrixXd m_sumNTN;
+        Eigen::MatrixXd m_MPrev;
+        Eigen::VectorXd m_FPrev;
         Eigen::MatrixXd m_ddev;
 
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
@@ -73,11 +74,6 @@ class SOLVER_API SolverIncompressible : public Solver
          * \param tauPSPG a vector which will contain the value of tauPSPG for each element
          */
         void computeTauPSPG(std::vector<double>& tauPSPG);
-
-        /**
-         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
-         */
-        void setInitialCondition();
 };
 
 #endif // SOLVERINCOMPRESSIBLE_HPP_INCLUDED

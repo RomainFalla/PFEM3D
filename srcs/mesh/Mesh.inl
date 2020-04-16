@@ -1,5 +1,7 @@
 #include "Mesh.hpp"
 
+#include <iostream>
+
 inline double Mesh::getAlpha() const
 {
     return m_alpha;
@@ -125,6 +127,19 @@ inline IndexType Mesh::getNodesNumber() const
     return m_nodesList.size();
 }
 
+inline std::vector<double> Mesh::getNodeInitialPosition(IndexType nodeIndex) const
+{
+    if(m_nodesList[nodeIndex].isBound)
+        return m_nodesList[nodeIndex].initialPosition;
+    else
+        throw std::runtime_error("initial position is only available for boundary nodes!");
+}
+
+inline std::vector<double> Mesh::getNodePosition(IndexType nodeIndex) const
+{
+    return m_nodesList[nodeIndex].position;
+}
+
 inline double Mesh::getNodePosition(IndexType nodeIndex, unsigned short coordinate) const
 {
     return m_nodesList[nodeIndex].position[coordinate];
@@ -133,6 +148,11 @@ inline double Mesh::getNodePosition(IndexType nodeIndex, unsigned short coordina
 inline double Mesh::getNodeState(IndexType nodeIndex, unsigned short state) const
 {
     return m_nodesList[nodeIndex].states[state];
+}
+
+inline std::string Mesh::getNodeType(IndexType nodeIndex) const
+{
+    return m_tagNames[m_nodesList[nodeIndex].tag];
 }
 
 inline double Mesh::getOmega() const
@@ -163,14 +183,19 @@ inline bool Mesh::isNodeBound(IndexType nodeIndex) const
     return m_nodesList[nodeIndex].isBound;
 }
 
-inline bool Mesh::isNodeFluidInput(IndexType nodeIndex) const
+inline bool Mesh::isNodeDirichlet(IndexType nodeIndex) const
 {
-    return m_nodesList[nodeIndex].isFluidInput;
+    return m_nodesList[nodeIndex].isDirichlet;
 }
 
 inline bool Mesh::isNodeOnFreeSurface(IndexType nodeIndex) const
 {
     return m_nodesList[nodeIndex].isOnFreeSurface;
+}
+
+inline void Mesh::setNodeIsDirichlet(IndexType nodeIndex, bool isDirichlet)
+{
+    m_nodesList[nodeIndex].isDirichlet = isDirichlet;
 }
 
 inline void Mesh::setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state)

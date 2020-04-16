@@ -109,6 +109,18 @@ class MESH_API Mesh
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
+         * \return The vector initial position of the node.
+         */
+        inline std::vector<double> getNodeInitialPosition(IndexType nodeIndex) const;
+
+        /**
+         * \param nodeIndex The index of the node in the nodes list.
+         * \return The vector position of the node.
+         */
+        inline std::vector<double> getNodePosition(IndexType nodeIndex) const;
+
+        /**
+         * \param nodeIndex The index of the node in the nodes list.
          * \param coordinate The wanted coordinate (0, 1, ...).
          * \return The coordinate of the node.
          */
@@ -122,6 +134,12 @@ class MESH_API Mesh
         inline double getNodeState(IndexType nodeIndex, unsigned short state) const;
 
         /**
+         * \param nodeIndex The index of the node in the nodes list.
+         * \return The physical group of that node.
+         */
+        inline std::string getNodeType(IndexType nodeIndex) const;
+
+        /**
          * \return The characteristic node adding parameter.
          */
         inline double getOmega() const;
@@ -132,36 +150,32 @@ class MESH_API Mesh
         inline double getRefElementSize() const;
 
         /**
-         * \brief Check if a node is not attached to a fluid element.
          * \param nodeIndex The index of the node in the nodes list.
-         * \return true is the node is free, false otherwize.
+         * \return true if the node is free, false otherwise.
          */
         inline bool isNodeFree(IndexType nodeIndex) const;
 
         /**
-         * \brief Check if a node is a boundary node.
          * \param nodeIndex The index of the node in the nodes list.
-         * \return true is the node is on the boundary, false otherwize.
+         * \return true if the node is on the boundary, false otherwise.
          */
         inline bool isNodeBound(IndexType nodeIndex) const;
 
-        /**
-         * \brief Check if a node is not attached to a fluid element.
+         /**
          * \param nodeIndex The index of the node in the nodes list.
-         * \return true is the node is a fluid input, false otherwize.
+         * \return true if the node is on a Dirichlet boundary, false otherwise.
          */
-        inline bool isNodeFluidInput(IndexType nodeIndex) const;
+        inline bool isNodeDirichlet(IndexType nodeIndex) const;
 
         /**
-         * \brief Check if a node is on the free surface.
          * \param nodeIndex The index of the node in the nodes list.
-         * \return true is the node is on the free surface, false otherwize.
+         * \return true is the node is on the free surface, false otherwise.
          */
         inline bool isNodeOnFreeSurface(IndexType nodeIndex) const;
 
         /**
          * \brief Load the nodes from a file using gmsh.
-         * \param fileName The name of the .msh file
+         * \param fileName The name of the .msh file.
          */
         void loadFromFile(const std::string& fileName);
 
@@ -181,28 +195,35 @@ class MESH_API Mesh
         void saveNodesList();
 
         /**
+         * \brief Set if the node is in a Dirichlet BC (i.e. a BC which we impose speed but do not move!).
+         * \param nodeIndex The index of the node in the internal nodes list;
+         * \param isDirichlet true if the node is in a Dirichlet BC, false otherwise;
+         */
+        inline void setNodeIsDirichlet(IndexType nodeIndex, bool isDirichlet);
+
+        /**
          * \brief Update the nodes position.
-         * \param deltaPos The variation of the coordinate;
+         * \param deltaPos The variation of the coordinate.
          */
         void updateNodesPosition(std::vector<double> deltaPos);
 
         /**
          * \brief Update the nodes position (from the saved nodeS List).
-         * \param deltaPos The variation of the coordinate;
+         * \param deltaPos The variation of the coordinate.
          */
         void updateNodesPositionFromSave(std::vector<double> deltaPos);
 
         /**
          * \brief Set the position of a node.
-         * \param nodeIndex The index of the node in the nodes list;
-         * \param stateIndex The index of the state;
-         * \param state The new value of the state;
+         * \param nodeIndex The index of the node in the nodes list.
+         * \param stateIndex The index of the state.
+         * \param state The new value of the state.
          */
         inline void setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state);
 
         /**
          * \brief Set the number of states to be stored at node level.
-         * \param statesNumber The number of state per nodes;
+         * \param statesNumber The number of state per nodes.
          */
         inline void setStatesNumber(unsigned short statesNumber);
 
@@ -221,6 +242,8 @@ class MESH_API Mesh
         std::vector<Node> m_nodesListSave;  /**< A copy of the nodes list (usefull for non-linear algorithm). */
         std::vector<std::vector<IndexType>> m_elementsList;    /**< The list of element (triplet of index in the nodesList. */
         //std::vector<std::vector<IndexType>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
+
+        std::vector<std::string> m_tagNames; /**< The name of the tag of the nodes */
 
         std::vector<double> m_elementsDetJ;         /**< The Jacobian matrix determinant of each element. */
         std::vector<std::vector<std::vector<double>>> m_elementsInvJ;   /**< The inverse Jacobian matrix of each element. */

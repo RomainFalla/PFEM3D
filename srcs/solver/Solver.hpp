@@ -5,6 +5,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <nlohmann/json.hpp>
+#ifndef SOL_ALL_SAFETIES_ON
+    #define SOL_ALL_SAFETIES_ON 1
+#endif
+#include <sol3/sol.hpp>
 
 #include "../mesh/Mesh.hpp"
 #include "extractors/Extractors.hpp"
@@ -17,7 +21,6 @@ enum SOLVER_TYPE
     Incompressible_PSPG,
     WeaklyCompressible
 };
-
 
 /**
  * \class Solver
@@ -105,14 +108,14 @@ class SOLVER_API Solver
     protected:
         SOLVER_TYPE m_solverType;
 
+        sol::state m_lua;
+
         bool m_verboseOutput;           /**< Should the output be verbose? */
         unsigned int m_numOMPThreads;   /**< Number of OpenMP threads used. */
 
         unsigned short m_statesNumber;
 
         double m_gravity;               /**< Acceleration of the gravity (g > 0). */
-
-        std::vector<double> m_initialCondition; /**< Initial condition on the states **/
 
         //Time Parameters
         bool m_adaptDT;                 /**< Should the time step be changed during the computation? */
@@ -142,6 +145,11 @@ class SOLVER_API Solver
          *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
          */
         inline std::vector<Eigen::MatrixXd> getN() const;
+
+        /**
+         * \brief Set the initial condition on u, v, p for the initial cloud of nodes.
+         */
+        void setInitialCondition();
 };
 
 #include "Solver.inl"

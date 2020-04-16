@@ -93,7 +93,7 @@ void Mesh::triangulateAlphaShape3D()
 
     for(auto& node : m_nodesList)
     {
-        std::sort(node.neighbourNodes.begin(), node.neighbourNodes.begin());
+        std::sort(node.neighbourNodes.begin(), node.neighbourNodes.end());
         node.neighbourNodes.erase(std::unique(node.neighbourNodes.begin(), node.neighbourNodes.end()), node.neighbourNodes.end());
     }
 

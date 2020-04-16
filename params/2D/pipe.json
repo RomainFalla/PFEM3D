@@ -1,7 +1,7 @@
 {
     "ProblemType": "Incompressible",
 	"Remeshing": {
-		"hchar": 0.05,
+		"hchar": 0.1,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
@@ -25,7 +25,7 @@
 			"rho": 1000,
 			"mu": 200
 		},
-		"initialCondition" : [1, 0, 0],
+		"IBCs": "../../bc/2D/pipe.lua",
 		"Extractors" : [
 			{
 				"type": "Point",

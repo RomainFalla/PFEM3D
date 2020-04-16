@@ -24,12 +24,15 @@ struct Node
     std::vector<IndexType> neighbourNodes;    /**< Indexes in the nodes list of the
                                                      neighbour nodes */
 
+    std::vector<double> initialPosition; //Only for boundary nodes;
+
     bool isBound;                       /**< Is the node a wall node */
     bool isOnFreeSurface;               /**< Is the node on the free surface */
     bool isFree;                        /**< Is the node disconnected from any fluid
                                              elements */
+    bool isDirichlet;                   /**< Is the node a Dirichlet BC node (has a speed but do not move) */
 
-    bool isFluidInput;                  /**< Is the node representing a fluid input */
+    unsigned int tag;                   /**< Identify to which BC this node belongs to*/
 
     /**
      * \brief Constructor
@@ -40,10 +43,9 @@ struct Node
         this->position.resize(dim);
 
         this->isBound = false;
+        this->isDirichlet = false;
         this->isOnFreeSurface = false;
         this->isFree = true;
-
-        this->isFluidInput = false;
     }
 };
 

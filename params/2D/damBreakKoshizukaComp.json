@@ -1,18 +1,19 @@
 {
 	"ProblemType": "Compressible",
 	"Remeshing": {
+		"hchar": 0.0146,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
-		"boundingBox": [-0.1, -0.1, 0.684, 100]
+		"boundingBox": [-0.01, -0.01, 0.594, 100]
 	},
 	"Solver": {
 		"gravity": 9.81,
 		"strongContinuity": true,
 		"Time": {
 			"adaptDT": true,
-			"securityCoeff": 0.1,
-    		"maxDT": 0.002,
+			"securityCoeff": 0.05,
+    		"maxDT": 0.001,
 			"initialDT": 1e-8,
     		"endTime": 4
 		},
@@ -23,7 +24,7 @@
             "K0prime": 7.6,
             "pInfty": 0
 		},
-		"initialCondition" : [0, 0, 0, 1000],
+		"IBCs": "../../bc/2D/damBreakKoshizukaComp.lua",
 		"Extractors" : [
 			{
 				"type": "MinMax",
@@ -35,7 +36,7 @@
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.01,
+                "timeBetweenWriting": 0.05,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			}
