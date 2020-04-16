@@ -41,7 +41,8 @@ class SOLVER_API SolverCompressible : public Solver
 
         bool m_strongContinuity;
 
-        Eigen::MatrixXd m_sumNTN;
+        Eigen::MatrixXd m_MrhoPrev;
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_MrhoLumpedPrev;
         Eigen::MatrixXd m_ddev;
 
         /**

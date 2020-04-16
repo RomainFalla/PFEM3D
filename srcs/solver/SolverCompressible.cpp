@@ -83,11 +83,20 @@ Solver(j, mshName)
         }
     }
 
-    m_sumNTN.resize(dim + 1, dim + 1); m_sumNTN.setZero();
+    m_MrhoPrev.resize(dim + 1, dim + 1); m_MrhoPrev.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
     {
-        for(unsigned short k = 0 ; k < m_N.size() ; ++k)
-            m_sumNTN += (m_N[k].topLeftCorner(1, dim + 1)).transpose()*m_N[k].topLeftCorner(1,  dim + 1)*m_mesh.getGaussWeight(k);
+        m_MrhoPrev += (m_N[k].topLeftCorner(1, dim + 1)).transpose()*m_N[k].topLeftCorner(1,  dim + 1)*m_mesh.getGaussWeight(k);
+    }
+    m_MrhoPrev *= m_mesh.getRefElementSize();
+
+    m_MrhoLumpedPrev.resize(dim + 1); m_MrhoLumpedPrev.setZero();
+    for(unsigned short i = 0 ; i < m_MrhoPrev.rows() ; ++i)
+    {
+        for(unsigned short j = 0 ; j < m_MrhoPrev.cols() ; ++j)
+        {
+                m_MrhoLumpedPrev.diagonal()[i] += m_MrhoPrev(i, j);
+        }
     }
 
     if(dim == 2)
@@ -356,7 +365,7 @@ void SolverCompressible::buildFrho(Eigen::VectorXd& Frho)
     {
         Eigen::VectorXd Rho = getElementState(elm, dim + 1);
 
-        Eigen::MatrixXd Mrhoe = m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)*m_sumNTN;
+        Eigen::MatrixXd Mrhoe = m_MrhoPrev*m_mesh.getElementDetJ(elm);
 
         Frhoe[elm] = Mrhoe*Rho;
     }
@@ -374,7 +383,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
 
     invMrho.resize(m_mesh.getNodesNumber()); invMrho.setZero();
 
-    std::vector<Eigen::MatrixXd> Mrhoe(m_mesh.getElementsNumber());
+    std::vector<Eigen::DiagonalMatrix<double,Eigen::Dynamic>> MrhoeLumped(m_mesh.getElementsNumber());
     std::vector<Eigen::VectorXd> Frhoe;
 
     if(!m_strongContinuity)
@@ -386,7 +395,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
     #pragma omp parallel for default(shared)
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
-        Mrhoe[elm] = m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm)*m_sumNTN;
+        MrhoeLumped[elm] = m_mesh.getElementDetJ(elm)*m_MrhoLumpedPrev;
 
         if(!m_strongContinuity)
         {
@@ -418,19 +427,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
 
             Drhoe *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
 
-            Frhoe[elm] = Mrhoe[elm]*Rho - m_currentDT*Drhoe*V;
-        }
-
-        for(unsigned short i = 0 ; i < Mrhoe[elm].rows() ; ++i)
-        {
-            for(unsigned short j = 0 ; j < Mrhoe[elm].cols() ; ++j)
-            {
-                if(i != j)
-                {
-                    Mrhoe[elm](i, i) += Mrhoe[elm](i, j);
-                    Mrhoe[elm](i, j) = 0;
-                }
-            }
+            Frhoe[elm] = m_mesh.getElementDetJ(elm)*m_MrhoPrev*Rho - m_currentDT*Drhoe*V;
         }
     }
 
@@ -438,7 +435,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
         {
-            invMrho.diagonal()[m_mesh.getElement(elm)[i]] += Mrhoe[elm](i,i);
+            invMrho.diagonal()[m_mesh.getElement(elm)[i]] += MrhoeLumped[elm].diagonal()[i];
 
             if(!m_strongContinuity)
             {
