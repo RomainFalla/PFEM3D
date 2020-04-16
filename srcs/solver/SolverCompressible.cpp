@@ -135,7 +135,7 @@ void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<doubl
     {
         if(m_mesh.isNodeFree(n))
         {
-           Frho(n) = m_mesh.getNodeState(n, m_mesh.getDim() + 1);
+           Frho(n) = m_rho0;
 
            invMrho.diagonal()[n] = 1;
         }
