@@ -1,6 +1,7 @@
 {
 	"ProblemType": "Compressible",
 	"Remeshing": {
+		"hchar": 0.0146,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
@@ -35,7 +36,7 @@
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.01,
+                "timeBetweenWriting": 0.05,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			}
