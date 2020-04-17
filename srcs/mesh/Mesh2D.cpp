@@ -83,29 +83,25 @@ void Mesh::triangulateAlphaShape2D()
         node.neighbourNodes.erase(std::unique(node.neighbourNodes.begin(), node.neighbourNodes.end()), node.neighbourNodes.end());
     }
 
-    for(Alpha_shape_2::Alpha_shape_vertices_iterator it = as.alpha_shape_vertices_begin() ;
-        it != as.alpha_shape_vertices_end() ; ++it)
+    for(Alpha_shape_2::Alpha_shape_edges_iterator it = as.alpha_shape_edges_begin() ;
+        it != as.alpha_shape_edges_end() ; ++it)
     {
         // We compute the free surface nodes
-        const Alpha_shape_2::Vertex_handle vert = *it;
-        if(!m_nodesList[vert->info()].isBound)
-            m_nodesList[vert->info()].isOnFreeSurface = true;
-    }
+        const Alpha_shape_2::Edge edgeAS = *it;
+        if(as.classify(edgeAS) == Alpha_shape_2::REGULAR)
+        {
+            const std::vector<IndexType> edge{edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
+                                              edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
 
-//    for(Alpha_shape_2::Alpha_shape_edges_iterator it = as.alpha_shape_edges_begin() ;
-//        it != as.alpha_shape_edges_end() ; ++it)
-//    {
-//        // We compute the free surface nodes
-//        const Alpha_shape_2::Edge edgeAS = *it;
-//        const std::vector<IndexType> edge{edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
-//                                            edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
-//
-//        if(!m_nodesList[edgeAS.first->vertex((edgeAS.second+1)%3)->info()].isBound &&
-//           !m_nodesList[edgeAS.first->vertex((edgeAS.second+2)%3)->info()].isBound)
-//        {
-//            m_freeSurfaceEdgesList.push_back(edge);
-//        }
-//    }
+            if(!(m_nodesList[edge[0]].isBound && m_nodesList[edge[1]].isBound))
+            {
+                m_nodesList[edge[0]].isOnFreeSurface = true;
+                m_nodesList[edge[1]].isOnFreeSurface = true;
+
+                //m_freeSurfaceEdgesList.push_back(edge);
+            }
+        }
+    }
 
     // If an element is only composed of boundary nodes and the neighBournodes of
     // each of the three is equal to 2, this is a spurious triangle, we delete it

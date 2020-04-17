@@ -97,30 +97,29 @@ void Mesh::triangulateAlphaShape3D()
         node.neighbourNodes.erase(std::unique(node.neighbourNodes.begin(), node.neighbourNodes.end()), node.neighbourNodes.end());
     }
 
-    for(Alpha_shape_3::Alpha_shape_vertices_iterator it = as.alpha_shape_vertices_begin() ;
-        it != as.alpha_shape_vertices_end() ; ++it)
+    //This could take edges from bad elements-> construct tetrahedron from nodes edges to check
+    for(Alpha_shape_3::Alpha_shape_facets_iterator it = as.alpha_shape_facets_begin() ;
+        it != as.alpha_shape_facets_end() ; ++it)
     {
-        if(!m_nodesList[it->info()].isBound)
-            m_nodesList[it->info()].isOnFreeSurface = true;
-    }
+        // We compute the free surface nodes
+        const Alpha_shape_3::Facet facetAS = *it;
 
-//    //This could take edges from bad elements-> construct tetrahedron from nodes edges to check
-//    for(Alpha_shape_3::Alpha_shape_facets_iterator it = as.alpha_shape_facets_begin() ;
-//        it != as.alpha_shape_facets_end() ; ++it)
-//    {
-//        // We compute the free surface nodes
-//        const Alpha_shape_3::Facet facetAS = *it;
-//        const std::vector<IndexType> edge{facetAS.first->vertex((facetAS.second+1)%3)->info(),
-//                                            facetAS.first->vertex((facetAS.second+2)%3)->info(),
-//                                            facetAS.first->vertex((facetAS.second+3)%3)->info()};
-//
-//        if(!m_nodesList[facetAS.first->vertex((facetAS.second+1)%3)->info()].isBound &&
-//           !m_nodesList[facetAS.first->vertex((facetAS.second+2)%3)->info()].isBound &&
-//           !m_nodesList[facetAS.first->vertex((facetAS.second+3)%3)->info()].isBound)
-//        {
-//            m_freeSurfaceEdgesList.push_back(edge);
-//        }
-//    }
+        if(as.classify(facetAS) == Alpha_shape_3::REGULAR)
+        {
+            const std::vector<IndexType> edge{facetAS.first->vertex((facetAS.second+1)%3)->info(),
+                                            facetAS.first->vertex((facetAS.second+2)%3)->info(),
+                                            facetAS.first->vertex((facetAS.second+3)%3)->info()};
+
+
+            if(!(m_nodesList[edge[0]].isBound && m_nodesList[edge[1]].isBound && m_nodesList[edge[2]].isBound))
+            {
+                m_nodesList[edge[0]].isOnFreeSurface = true;
+                m_nodesList[edge[1]].isOnFreeSurface = true;
+                m_nodesList[edge[2]].isOnFreeSurface = true;
+                //m_freeSurfaceEdgesList.push_back(edge);
+            }
+        }
+    }
 
     // If an element is only composed of boundary nodes and the neighbour nodes of
     // each of the four are only boundary nodes, this is a spurious tetrahedron, we delete it
