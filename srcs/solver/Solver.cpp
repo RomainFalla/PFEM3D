@@ -51,6 +51,7 @@ m_mesh(j)
 
     std::string IBConditions = j["Solver"]["IBCs"].get<std::string>();
     m_lua.script_file(IBConditions);
+    m_lua["g"] = m_gravity;
 
     m_N = getN();
 

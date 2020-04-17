@@ -82,6 +82,9 @@ Solver(j, mshName)
         }
     }
 
+    m_lua["rho"] = m_rho;
+    m_lua["mu"] = m_mu;
+
     m_MPrev.resize(dim*(dim + 1), dim*(dim + 1)); m_MPrev.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
     {

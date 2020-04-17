@@ -1,19 +1,15 @@
-K0 = 2200000
-K0p = 7.6
-rho0 = 1000
 z0 = 1
-g = 9.81
 
 function initFluid(pos) 
-	rho = rho0*(((K0p-1)/K0)*(rho0*g*(z0-pos[2])) + 1)^(1/(K0p -1))
-	p = (K0/K0p)*((rho/rho0)^K0p - 1)
+	rho = rho0*(((K0prime-1)/K0)*(rho0*g*(z0-pos[2])) + 1)^(1/(K0prime -1))
+	p = (K0/K0prime)*((rho/rho0)^K0prime - 1)
 
 	return {0, 0, p, rho, 0, 0}, false 
 end
 
 function initBoundary(pos)
-	rho = rho0*(((K0p-1)/K0)*(rho0*g*(z0-pos[2])) + 1)^(1/(K0p -1))
-	p = (K0/K0p)*((rho/rho0)^K0p - 1)
+	rho = rho0*(((K0prime-1)/K0)*(rho0*g*(z0-pos[2])) + 1)^(1/(K0prime -1))
+	p = (K0/K0prime)*((rho/rho0)^K0prime - 1)
 	
 	if(pos[2] > z0) then
 		p = 0
@@ -24,8 +20,8 @@ function initBoundary(pos)
 end
 
 function initDiskBoundary(pos) 
-	rho = rho0*(((K0p-1)/K0)*(rho0*g*(z0-pos[2])) + 1)^(1/(K0p -1))
-	p = (K0/K0p)*((rho/rho0)^K0p - 1)
+	rho = rho0*(((K0prime-1)/K0)*(rho0*g*(z0-pos[2])) + 1)^(1/(K0prime -1))
+	p = (K0/K0prime)*((rho/rho0)^K0prime - 1)
 
 	return {0, 0, p, rho, 0, 0}, false	
 end

@@ -83,6 +83,12 @@ Solver(j, mshName)
         }
     }
 
+    m_lua["rho0"] = m_rho0;
+    m_lua["K0"] = m_K0;
+    m_lua["K0prime"] = m_K0prime;
+    m_lua["mu"] = m_mu;
+    m_lua["pInfty"] = m_pInfty;
+
     m_MrhoPrev.resize(dim + 1, dim + 1); m_MrhoPrev.setZero();
     for(unsigned short k = 0 ; k < m_N.size() ; ++k)
     {
