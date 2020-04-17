@@ -29,6 +29,7 @@ m_mesh(j)
 #endif
 
     m_gravity                   = j["Solver"]["gravity"].get<double>();
+    m_strongPAtFS               = j["Solver"]["strongPAtFS"].get<bool>();
 
     m_adaptDT                   = j["Solver"]["Time"]["adaptDT"].get<bool>();
     m_currentDT                 = j["Solver"]["Time"]["initialDT"].get<double>();

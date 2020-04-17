@@ -163,12 +163,16 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
                 A.row(n + d*m_mesh.getNodesNumber()) *= 0;
-                if(m_mesh.isNodeDirichlet(n)) //Dirichlet node, directly set speed
-                    b(n + d*m_mesh.getNodesNumber()) = result[d];
-                else                          //Not Dirichlet node, set speed through dx
-                    b(n + d*m_mesh.getNodesNumber()) = (result[d] - m_mesh.getNodePosition(n, d))/m_currentDT;
+                b(n + d*m_mesh.getNodesNumber()) = result[d];
                 A.coeffRef(n + d*m_mesh.getNodesNumber(), n + d*m_mesh.getNodesNumber()) = 1;
             }
+        }
+
+        if(m_strongPAtFS && m_mesh.isNodeOnFreeSurface(n))
+        {
+            A.row(n + dim*m_mesh.getNodesNumber()) *= 0;
+            b(n + dim*m_mesh.getNodesNumber()) = 0;
+            A.coeffRef(n + dim*m_mesh.getNodesNumber(), n + dim*m_mesh.getNodesNumber()) = 1;
         }
     }
 

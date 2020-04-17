@@ -7,5 +7,5 @@ function initBoundary(pos)
 end
 
 function Boundary(pos, initPos, t) 
-	return {initPos[1], initPos[2], initPos[3]}
+	return {0, 0, 0}
 end

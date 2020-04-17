@@ -135,9 +135,15 @@ void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<doubl
     {
         if(m_mesh.isNodeFree(n))
         {
-           Frho(n) = m_rho0;
+            Frho(n) = m_rho0;
 
-           invMrho.diagonal()[n] = 1;
+            invMrho.diagonal()[n] = 1;
+        }
+        else if(m_strongPAtFS && m_mesh.isNodeOnFreeSurface(n))
+        {
+            Frho(n) = m_rho0;
+
+            invMrho.diagonal()[n] = 1;
         }
     }
 }
@@ -171,11 +177,7 @@ void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double
 
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
-                if(m_mesh.isNodeDirichlet(n)) //Dirichlet node, directly set speed
-                    F(n + d*m_mesh.getNodesNumber()) = (result[d] - qVPrev[n + d*m_mesh.getNodesNumber()])/m_currentDT;
-                else                          //Not Dirichlet node, set speed through dx
-                    F(n + d*m_mesh.getNodesNumber()) = ((result[d] - m_mesh.getNodePosition(n, d))/m_currentDT - qVPrev[n + d*m_mesh.getNodesNumber()])/m_currentDT;
-
+                F(n + d*m_mesh.getNodesNumber()) = result[d];
                 invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
             }
         }

@@ -116,6 +116,7 @@ class SOLVER_API Solver
         unsigned short m_statesNumber;
 
         double m_gravity;               /**< Acceleration of the gravity (g > 0). */
+        bool m_strongPAtFS;
 
         //Time Parameters
         bool m_adaptDT;                 /**< Should the time step be changed during the computation? */

@@ -11,9 +11,9 @@ function initFluidInput(pos)
 end
 
 function Boundary(pos, initPos, t) 
-	return {initPos[1], initPos[2]}
+	return {0, 0}
 end
 
 function FluidInput(pos)
-	return {1, 0}, false
+	return {0, 0}
 end

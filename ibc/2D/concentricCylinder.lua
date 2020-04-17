@@ -3,7 +3,12 @@ function initFluid(pos)
 end
 
 function initMovingBoundary(pos)
-	return {0, 0, 0}, false
+	phi = math.acos(initPos[1])
+	if(initPos[2] < 0) then
+		phi = - phi
+	end
+		
+	return {-0.5*math.sin(0.5*t + phi), 0.5*math.cos(0.5*t + phi), 0}
 end
 
 function initStaticBoundary(pos) 
@@ -16,9 +21,9 @@ function MovingBoundary(pos, initPos, t)
 		phi = - phi
 	end
 		
-	return {math.cos(0.5*t + phi), math.sin(0.5*t + phi)}
+	return {-0.5*math.sin(0.5*t + phi), 0.5*math.cos(0.5*t + phi)}
 end
 
 function StaticBoundary(pos, initPos, t) 
-	return {pos[1], pos[2]}
+	return {0, 0}
 end

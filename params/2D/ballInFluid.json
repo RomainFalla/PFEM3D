@@ -1,11 +1,11 @@
 {
 	"ProblemType": "Incompressible",
 	"Remeshing": {
-		"hchar": 1,
+		"hchar": 0.025,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
-		"boundingBox": [-2, -1, 12, 100]
+		"boundingBox": [-0.05, -0.05, 10.05, 100]
 	},
 	"Solver": {
 		"gravity": 9.81,
@@ -16,7 +16,7 @@
     		"coeffDTdecrease": 2.0,
     		"maxDT": 0.01,
 			"initialDT": 0.01,
-    		"endTime": 4,
+    		"endTime": 4
 		},
 		"Picard": {
 			"relTol": 5e-6,
@@ -24,14 +24,14 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 1e-3	
+			"mu": 1	
 		},
-		"IBCs": "../../ibc/2D/square_disk_diksInFluid.lua",
+		"IBCs": "../../ibc/2D/ballInFluid.lua",
 		"Extractors" : [
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.2,
+                "timeBetweenWriting": 0.01,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			}

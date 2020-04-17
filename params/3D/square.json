@@ -9,6 +9,7 @@
 	},
 	"Solver": {
 		"gravity": 9.81,
+		"strongPAtFS": true,
 		"Time": {
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
@@ -25,7 +26,7 @@
 			"rho": 1000,
 			"mu": 1e-3	
 		},
-		"initialCondition" : [0, 0, 0, 0],
+		"IBCs": "../../ibc/3D/square.lua",
 		"Extractors" : [
 			{
 				"type": "GMSH",

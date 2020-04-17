@@ -1,11 +1,11 @@
 {
 	"ProblemType": "Compressible",
 	"Remeshing": {
-		"hchar": 0.5,
+		"hchar": 0.025,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
-		"boundingBox": [-1, -1, -1, 11, 11, 100]
+		"boundingBox": [-0.05, -0.05, 10.05, 100]
 	},
 	"Solver": {
 		"gravity": 9.81,
@@ -13,25 +13,25 @@
 		"strongContinuity": true,
 		"Time": {
 			"adaptDT": true,
-    		"securityCoeff": 0.1,
-    		"maxDT": 0.001,
+			"securityCoeff": 0.05,
+    		"maxDT": 0.01,
 			"initialDT": 1e-8,
-    		"endTime": 0.2,
+    		"endTime": 4
 		},
 		"Fluid": {
 			"rho0": 1000,
-			"mu": 1e-3,
-            "K0": 2200000,
+			"mu": 1,	
+			"K0": 2200000,
             "K0prime": 7.6,
-            "pInfty": 0			
+            "pInfty": 0
 		},
-		"IBCs": "../../ibc/3D/squareComp.lua",
+		"IBCs": "../../ibc/2D/ballInFluidComp.lua",
 		"Extractors" : [
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.2,
-                "whatToWrite": ["p", "ke"],
+                "timeBetweenWriting": 0.01,
+                "whatToWrite": ["p", "ke", "rho"],
 				"writeAs": "NodesElements"
 			}
 		]

@@ -9,6 +9,7 @@
 	},
 	"Solver": {
 		"gravity": 0,
+		"strongPAtFS": true,
 		"Time": {
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
@@ -25,7 +26,7 @@
 			"rho": 1000,
 			"mu": 200
 		},
-		"initialCondition" : [1, 0, 0],
+		"IBCs": "../../ibc/3D/pipe.lua",
 		"Extractors" : [
 			{
 				"type": "Point",

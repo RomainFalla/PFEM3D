@@ -9,12 +9,13 @@
 	},
 	"Solver": {
 		"gravity": 0,
+		"strongPAtFS": true,
 		"Time": {
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
     		"coeffDTdecrease": 2.0,
-    		"maxDT": 0.005,
-			"initialDT": 0.005,
+    		"maxDT": 0.0001,
+			"initialDT": 0.0001,
     		"endTime": 5.1
 		},
 		"Picard": {
@@ -25,13 +26,13 @@
 			"rho": 1000,
 			"mu": 200
 		},
-		"IBCs": "../../bc/2D/concentricCylinder.lua",
+		"IBCs": "../../ibc/2D/concentricCylinder.lua",
 		"Extractors" : [
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.2,
-                "whatToWrite": ["ke", "p", "u", "v"],
+                "timeBetweenWriting": 0.005,
+                "whatToWrite": ["ke", "p"],
 				"writeAs": "NodesElements"
 			}
 		]

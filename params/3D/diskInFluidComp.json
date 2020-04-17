@@ -9,6 +9,7 @@
 	},
 	"Solver": {
 		"gravity": 9.81,
+		"strongPAtFS": true,
 		"strongContinuity": true,
 		"Time": {
 			"adaptDT": true,
@@ -24,7 +25,7 @@
             "K0prime": 7.6,
             "pInfty": 0			
 		},
-		"initialCondition" : [0, 0, 0, 0, 1000],
+		"IBCs": "../../ibc/3D/diskInFluidComp.lua",
 		"Extractors" : [
 			{
 				"type": "GMSH",

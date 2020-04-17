@@ -9,6 +9,7 @@
 	},
 	"Solver": {
 		"gravity": 0,
+		"strongPAtFS": true,
 		"Time": {
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
@@ -25,7 +26,7 @@
 			"rho": 1000,
 			"mu": 200
 		},
-		"IBCs": "../../bc/2D/pipe.lua",
+		"IBCs": "../../ibc/2D/pipe.lua",
 		"Extractors" : [
 			{
 				"type": "Point",
