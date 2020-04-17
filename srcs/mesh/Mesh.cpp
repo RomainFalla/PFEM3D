@@ -511,24 +511,26 @@ void Mesh::loadFromFile(const std::string& fileName)
 
 void Mesh::remesh()
 {
-    if(checkBoundingBox())
-    {
-        triangulateAlphaShape();
-    }
+    checkBoundingBox();
+    triangulateAlphaShape();
 
     if(removeNodes())
+        triangulateAlphaShape();
+
+    computeElementsJ();
+    computeElementsDetJ();
+
+    if(addNodes())
     {
         triangulateAlphaShape();
         computeElementsJ();
         computeElementsDetJ();
+        computeElementsInvJ();
     }
-
-    addNodes();
-    triangulateAlphaShape();
-    //computeFreeSurfaceEdgeDetJ();
-    computeElementsJ();
-    computeElementsDetJ();
-    computeElementsInvJ();
+    else
+    {
+        computeElementsInvJ();
+    }
 }
 
 bool Mesh::removeNodes()
