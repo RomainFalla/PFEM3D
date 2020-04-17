@@ -2,5 +2,5 @@
 
 @ECHO OFF
 SET OMP_NUM_THREADS=2
-pfem.exe ../../params/xD/params.json ../../geometry/xD/mesh.msh results.msh
+pfem.exe ../../params/xD/params.json ../../geometry/xD/mesh.msh
 PAUSE

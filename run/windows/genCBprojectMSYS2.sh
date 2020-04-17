@@ -35,5 +35,6 @@ cp -r /c/tools/msys64/mingw64/bin/libgomp-1.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libstdc++-6.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libwinpthread-1.dll bin
 cp -r /c/tools/CGAL-5.0.2/bin/libCGAL.dll bin
+cp -r /c/tools/msys64/mingw64/bin/lua53.dll bin
 
 cd ../
