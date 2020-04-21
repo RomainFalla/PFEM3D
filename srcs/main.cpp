@@ -5,17 +5,16 @@
 #include "solver/SolverIncompressible.hpp"
 #include "solver/SolverCompressible.hpp"
 
-
 /**
  * \param  argv[1] .json file that contains the parameters.
  * \param  argv[2] .msh file that contains the initial set of nodes.
  */
 int main(int argc, char **argv)
 {
-    // check that the file format is valid
+    //Check that the file format is valid
     if (argc < 3)
     {
-        std::cerr   << "Usage: " << argv[0] << " params.json mesh.msh results.msh"
+        std::cerr   << "Usage: " << argv[0] << " params.json mesh.msh"
                     <<  std::endl;
         return 1;
     }
