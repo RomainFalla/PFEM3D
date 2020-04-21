@@ -1,0 +1,40 @@
+{
+	"ProblemType": "Compressible",
+	"Remeshing": {
+		"hchar": 0.0292,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-1, -1, -1, 1.584, 1.175, 100]
+	},
+	"Solver": {
+		"gravity": 9.81,
+		"strongPAtFS": true,
+		"strongContinuity": true,
+		"Time": {
+			"adaptDT": true,
+    		"securityCoeff": 0.1,
+    		"maxDT": 0.001,
+			"initialDT": 1e-8,
+    		"endTime": 1,
+		},
+		"Fluid": {
+			"rho0": 1000,
+			"mu": 1,
+            "K0": 2200000,
+            "K0prime": 7.6,
+            "pInfty": 0			
+		},
+		"IBCs": "../../examples/3D/damBreakKoshizuka/IBC_Comp.lua",
+		"Extractors" : [
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 0.2,
+                "whatToWrite": ["p", "ke"],
+				"writeAs": "NodesElements"
+			}
+		]
+	},
+	"verboseOutput": true
+}

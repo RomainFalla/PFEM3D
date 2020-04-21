@@ -1,0 +1,40 @@
+{
+    "ProblemType": "Compressible",
+	"Remeshing": {
+		"hchar": 0.1,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-1.5, -1.5, 1.5, 1.5]
+	},
+	"Solver": {
+		"gravity": 0,
+		"strongPAtFS": true,
+		"strongContinuity": true,
+		"Time": {
+			"adaptDT": true,
+			"securityCoeff": 0.1,
+    		"maxDT": 0.0001,
+			"initialDT": 1e-8,
+    		"endTime": 5.1
+		},
+		"Fluid": {
+			"rho0": 1000,
+			"mu": 200,	
+			"K0": 2200000,
+            "K0prime": 7.6,
+            "pInfty": 0
+		},
+		"IBCs": "../../examples/2D/concentricCylinder/IBC_Comp.lua",
+		"Extractors" : [
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 0.005,
+                "whatToWrite": ["ke", "p"],
+				"writeAs": "NodesElements"
+			}
+		]
+	},
+	"verboseOutput": false
+}

@@ -1,0 +1,47 @@
+{
+	"ProblemType": "Incompressible",
+	"Remeshing": {
+		"hchar": 0.02,
+		"alpha": 1.4,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-2, -1, 12, 100]
+	},
+	"Solver": {
+		"gravity": 9.81,
+		"strongPAtFS": true,
+		"strongContinuity": true,
+		"Time": {
+			"adaptDT": false,
+    		"securityCoeff": 0.1,
+    		"maxDT": 0.01,
+			"initialDT": 0.01,
+    		"endTime": 1,
+		},
+		"Fluid": {
+			"rho0": 1,
+			"K0": 2200000,
+			"K0prime": 7.6,
+			"mu": 0.01	,
+			"pInfty": 0
+		},
+		"IBCs": "../../examples/2D/sloshing/IBC_Comp.lua",
+		"Extractors" : [
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 0.2,
+                "whatToWrite": ["p", "ke"],
+				"writeAs": "NodesElements"
+			},
+			{
+				"type": "MinMax",
+				"outputFile": "topPositionSloshing.txt",
+                "timeBetweenWriting": 0.01,
+				"minMax": "max",
+                "coordinate": 1
+			}
+		]
+	},
+	"verboseOutput": false
+}
