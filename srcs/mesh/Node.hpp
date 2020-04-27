@@ -24,11 +24,10 @@ struct Node
 
     std::vector<double> initialPosition; //Only for boundary nodes;
 
-    bool isBound;                       /**< Is the node a wall node */
-    bool isOnFreeSurface;               /**< Is the node on the free surface */
-    bool isFree;                        /**< Is the node disconnected from any fluid
-                                             elements */
-    bool isDirichlet;                   /**< Is the node a Dirichlet BC node (has a speed but do not move) */
+    bool isBound = false;                       /**< Is the node a wall node */
+    bool isOnFreeSurface = false;               /**< Is the node on the free surface */
+    bool isFree = false;                        /**< Is the node disconnected from any fluid elements */
+    bool isDirichlet = false;                   /**< Is the node a Dirichlet BC node (has a speed but do not move) */
 
     unsigned short tag;                   /**< Identify to which BC this node belongs to*/
 };

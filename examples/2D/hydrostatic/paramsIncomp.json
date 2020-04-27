@@ -11,12 +11,12 @@
 		"gravity": 9.81,
 		"strongPAtFS": true,
 		"Time": {
-			"adaptDT": true,
+			"adaptDT": false,
     		"coeffDTincrease": 1.5,
     		"coeffDTdecrease": 2.0,
-    		"maxDT": 0.01,
-			"initialDT": 0.01,
-    		"endTime": 4,
+    		"maxDT": 0.1,
+			"initialDT": 0.1,
+    		"endTime": 4
 		},
 		"Picard": {
 			"relTol": 5e-6,
@@ -34,6 +34,18 @@
                 "timeBetweenWriting": 0.2,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
+			},
+			{
+				"type": "Point",
+				"outputFile": "line_h_1.txt",
+                "timeBetweenWriting": 0.1,
+                "stateToWrite": 0,
+                "points": [[5, 0.1], [5, 0.5], [5, 1], [5, 1.5], [5, 2], [5, 2.5], [5, 3], [5, 3.5], [5, 4], [5, 4.5], [5, 4.9]]
+			},
+			{
+				"type": "Mass",
+				"outputFile": "mass_h_1.txt",
+                "timeBetweenWriting": 0.1
 			}
 		]
 	},

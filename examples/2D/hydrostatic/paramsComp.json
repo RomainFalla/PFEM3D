@@ -16,7 +16,7 @@
     		"securityCoeff": 0.05,
     		"maxDT": 0.001,
 			"initialDT": 1e-8,
-    		"endTime": 16,
+    		"endTime": 4
 		},
 		"Fluid": {
 			"rho0": 1000,
@@ -33,6 +33,19 @@
                 "timeBetweenWriting": 0.2,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
+			},
+			{
+				"type": "Point",
+				"outputFile": "line_h_1.txt",
+                "timeBetweenWriting": 0.1,
+                "stateToWrite": 0,
+                "points": [[5, 0.1], [5, 0.5], [5, 1], [5, 1.5], [5, 2], [5, 2.5], [5, 3], [5, 3.5], [5, 4], [5, 4.5], [5, 4.9]]
+			}
+			,
+			{
+				"type": "Mass",
+				"outputFile": "mass.txt",
+                "timeBetweenWriting": 0.1
 			}
 		]
 	},
