@@ -6,6 +6,15 @@
 
 #include "SolverIncompressible.hpp"
 
+using Clock = std::chrono::high_resolution_clock;
+using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;
+
+void displayDT(TimeType startTime, TimeType endTime, std::string text)
+{
+    auto ellapsedTimeMeasure = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    std::cout << text << static_cast<double>(ellapsedTimeMeasure.count())/1000.0 << " s" << std::endl;
+}
+
 
 SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
@@ -193,7 +202,7 @@ void SolverIncompressible::displaySolverParams() const
     std::cout << "omega: " << m_mesh.getOmega() << std::endl;
     std::cout << "Eigen sparse solver: SparseLU" << std::endl;
 #if defined(_OPENMP)
-    std::cout << "Number of OpenMP threads: " << m_numOMPThreads << std::endl;
+    std::cout << "Number of OpenMP threads: " << m_numOMPThreads << "/" << omp_get_num_procs() << std::endl;
 #endif
     std::cout << "Gravity: " << m_gravity << " m/s^2" << std::endl;
     std::cout << "Density: " << m_rho << " kg/m^3" << std::endl;
@@ -286,8 +295,10 @@ void SolverIncompressible::solveProblem()
 
 bool SolverIncompressible::solveCurrentTimeStep()
 {
-    auto startTime = std::chrono::high_resolution_clock::now();
+    TimeType startTime, endTime, startTimeMeasure, endTimeMeasure;
+    startTime = Clock::now();
 
+    startTimeMeasure = Clock::now();
     const unsigned short dim = m_mesh.getDim();
 
     Eigen::VectorXd qPrev = getQFromNodesStates(0, m_statesNumber - 1);    //The precedent solution
@@ -306,6 +317,9 @@ bool SolverIncompressible::solveCurrentTimeStep()
     Eigen::VectorXd qIter(m_statesNumber*m_mesh.getNodesNumber()); qIter.setZero();
     Eigen::VectorXd qIterPrev(m_statesNumber*m_mesh.getNodesNumber()); qIterPrev.setZero();
     double res = std::numeric_limits<double>::max();
+    endTimeMeasure = Clock::now();
+    if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, "Picard algorithm set up in ");
 
     while(res > m_picardRelTol)
     {
@@ -317,10 +331,25 @@ bool SolverIncompressible::solveCurrentTimeStep()
 
         qIterPrev = qIter;
 
+        startTimeMeasure = Clock::now();
         computeTauPSPG(tauPSPG);
-        buildPicardSystem(A, b, M, K, D, F, tauPSPG, qPrev);
-        applyBoundaryConditions(A, b, qPrev);
+        endTimeMeasure = Clock::now();
+        if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, " * TauPSPG computed in ");
 
+        startTimeMeasure = Clock::now();
+        buildPicardSystem(A, b, M, K, D, F, tauPSPG, qPrev);
+        endTimeMeasure = Clock::now();
+        if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, " * Ax = b built in ");
+
+        startTimeMeasure = Clock::now();
+        applyBoundaryConditions(A, b, qPrev);
+        endTimeMeasure = Clock::now();
+        if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, " * BC applied in ");
+
+        startTimeMeasure = Clock::now();
         m_solverLU.compute(A);
         if(m_solverLU.info() == Eigen::Success)
         {
@@ -331,12 +360,21 @@ bool SolverIncompressible::solveCurrentTimeStep()
             m_mesh.restoreNodesList();
             return false;
         }
+        endTimeMeasure = Clock::now();
+        if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, " * System solved in ");
 
+
+        startTimeMeasure = Clock::now();
         setNodesStatesfromQ(qIter, 0, m_statesNumber - 1);
         Eigen::VectorXd deltaPos = qIter*m_currentDT;
         m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + dim*m_mesh.getNodesNumber()));
         m_picardCurrentNumIter++;
+        endTimeMeasure = Clock::now();
+        if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, " * Solution updated in ");
 
+        startTimeMeasure = Clock::now();
         if(m_picardCurrentNumIter == 1)
             res = std::numeric_limits<double>::max();
         else
@@ -358,9 +396,13 @@ bool SolverIncompressible::solveCurrentTimeStep()
 
             res = std::sqrt(num/den);
         }
+        endTimeMeasure = Clock::now();
+        if(m_verboseOutput)
+            displayDT(startTimeMeasure, endTimeMeasure, " * Residual computed in ");
 
         if(m_verboseOutput)
         {
+            startTimeMeasure = Clock::now();
             std::cout << " * Relative 2-norm of q: " << res << " vs "
                       << m_picardRelTol << std::endl;
 
@@ -384,6 +426,8 @@ bool SolverIncompressible::solveCurrentTimeStep()
 
             std::cout << " * Error on momentum: " << mom.norm() <<std::endl;
             std::cout << " * Error on mass: " << cont.norm() <<std::endl;
+            endTimeMeasure = Clock::now();
+            displayDT(startTimeMeasure, endTimeMeasure, " * Error computed in ");
         }
 
         if(m_picardCurrentNumIter >= m_picardMaxIter || std::isnan(res))
@@ -396,21 +440,15 @@ bool SolverIncompressible::solveCurrentTimeStep()
     m_currentTime += m_currentDT;
     m_currentStep++;
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    endTime = Clock::now();
     if(m_verboseOutput)
-        std::cout << "Picard algorithm solved in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
+        displayDT(startTime, endTime, "Picard algorithm solved in ");
 
-    startTime = std::chrono::high_resolution_clock::now();
-    //Remeshing step
+    startTime = Clock::now();
     m_mesh.remesh();
-
-    endTime = std::chrono::high_resolution_clock::now();
-
-    endTime = std::chrono::high_resolution_clock::now();
-    ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    endTime = Clock::now();
     if(m_verboseOutput)
-        std::cout << "Remeshing done in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
+        displayDT(startTime, endTime, "Remeshing done in ");
 
     return true;
 }

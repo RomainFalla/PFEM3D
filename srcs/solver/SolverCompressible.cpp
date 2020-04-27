@@ -200,7 +200,7 @@ void SolverCompressible::displaySolverParams() const
     std::cout << "gamma: " << m_mesh.getGamma() << std::endl;
     std::cout << "omega: " << m_mesh.getOmega() << std::endl;
 #if defined(_OPENMP)
-    std::cout << "Number of OpenMP threads: " << m_numOMPThreads << std::endl;
+    std::cout << "Number of OpenMP threads: " << m_numOMPThreads << "/" << omp_get_num_procs() << std::endl;
 #endif
     std::cout << "Gravity: " << m_gravity << " m/s^2" << std::endl;
     std::cout << "Density: " << m_rho0 << " kg/m^3" << std::endl;

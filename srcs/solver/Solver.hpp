@@ -10,6 +10,10 @@
 #endif
 #include <sol3/sol.hpp>
 
+#if defined(_OPENMP)
+    #include <omp.h>
+#endif // defined
+
 #include "../mesh/Mesh.hpp"
 #include "extractors/Extractors.hpp"
 

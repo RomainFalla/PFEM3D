@@ -18,11 +18,9 @@ struct Node
 {
     std::vector<double> position;       /**< Position of the node in 2D or 3D */
 
-    std::vector<double> states;         /**< Variables defined at the node.
-                                             Can be u,v,p or u,v,p,rho, etc. */
+    std::vector<double> states;         /**< Variables defined at the node. Can be u,v,p or u,v,p,rho, etc. */
 
-    std::vector<IndexType> neighbourNodes;    /**< Indexes in the nodes list of the
-                                                     neighbour nodes */
+    std::vector<IndexType> neighbourNodes;    /**< Indexes in the nodes list of the neighbour nodes */
 
     std::vector<double> initialPosition; //Only for boundary nodes;
 
@@ -32,21 +30,7 @@ struct Node
                                              elements */
     bool isDirichlet;                   /**< Is the node a Dirichlet BC node (has a speed but do not move) */
 
-    unsigned int tag;                   /**< Identify to which BC this node belongs to*/
-
-    /**
-     * \brief Constructor
-     * \param dim The spatial dimension (2 or 3).
-     */
-    Node(unsigned int dim)
-    {
-        this->position.resize(dim);
-
-        this->isBound = false;
-        this->isDirichlet = false;
-        this->isOnFreeSurface = false;
-        this->isFree = true;
-    }
+    unsigned short tag;                   /**< Identify to which BC this node belongs to*/
 };
 
 inline bool operator==(const Node& a, const Node& b)

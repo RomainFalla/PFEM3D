@@ -34,7 +34,8 @@ bool Mesh::addNodes()
         //If an element is too big, we add a node at his center
         if(m_elementsDetJ[i]*getRefElementSize() > m_omega*std::pow(m_hchar, m_dim))
         {
-            Node newNode(m_dim);
+            Node newNode;
+            newNode.position.resize(m_dim);
 
             for(unsigned short k = 0 ; k < m_dim ; ++k)
             {
@@ -57,7 +58,7 @@ bool Mesh::addNodes()
                 newNode.states[k] /= (m_dim + 1);
             }
 
-            m_nodesList.push_back(newNode);
+            m_nodesList.push_back(std::move(newNode));
 
             if(m_verboseOutput)
             {
@@ -371,7 +372,8 @@ void Mesh::loadFromFile(const std::string& fileName)
 
             for(std::size_t i = 0 ; i < dummyNodesTagsBoundary.size() ; ++i)
             {
-                Node node(m_dim);
+                Node node;
+                node.position.resize(m_dim);
                 node.initialPosition.resize(m_dim);
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
                 {
@@ -396,21 +398,7 @@ void Mesh::loadFromFile(const std::string& fileName)
                     node.tag = static_cast<unsigned int>(std::distance(m_tagNames.begin(), posBCinTagNames));
                 }
 
-                m_nodesList.push_back(node);
-
-                if(m_verboseOutput)
-                {
-                    std::cout << "Loading boundary node: " << "(";
-                    for(unsigned short d = 0 ; d < m_dim ; ++d)
-                    {
-                        std::cout << node.position[d];
-                        if(d == m_dim - 1)
-                            std::cout << ")";
-                        else
-                            std::cout << ", ";
-                    }
-                    std::cout << std::endl;
-                }
+                m_nodesList.push_back(std::move(node));
             }
         }
     }
@@ -427,7 +415,8 @@ void Mesh::loadFromFile(const std::string& fileName)
 
         for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
         {
-            Node node(m_dim);
+            Node node;
+            node.position.resize(m_dim);
             for(unsigned short d = 0 ; d < m_dim ; ++d)
                 node.position[d] = coord[3*i + d];
 
@@ -448,21 +437,7 @@ void Mesh::loadFromFile(const std::string& fileName)
                 node.tag = static_cast<unsigned int>(std::distance(m_tagNames.begin(), posBCinTagNames));
             }
 
-            m_nodesList.push_back(node);
-
-            if(m_verboseOutput)
-            {
-                std::cout << "Loading fluid node: " << "(";
-                for(unsigned short d = 0 ; d < m_dim ; ++d)
-                {
-                    std::cout << node.position[d];
-                    if(d == m_dim - 1)
-                        std::cout << ")";
-                    else
-                        std::cout << ", ";
-                }
-                std::cout << std::endl;
-            }
+            m_nodesList.push_back(std::move(node));
         }
     }
 
@@ -653,6 +628,7 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
     if(deltaPos.size() != m_nodesList.size()*m_dim)
         throw std::runtime_error("invalid size of the deltaPos vector");
 
+    #pragma omp paralel for default(shared)
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         if(!m_nodesList[n].isDirichlet)
@@ -677,6 +653,7 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
     else if(deltaPos.size() != m_nodesListSave.size()*m_dim)
         throw std::runtime_error("invalid size of the deltaPos vector");
 
+    #pragma omp paralel for default(shared)
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         if(!m_nodesList[n].isDirichlet)
