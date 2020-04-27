@@ -512,6 +512,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
     std::vector<Eigen::MatrixXd> Fe(m_mesh.getElementsNumber());
     std::vector<Eigen::MatrixXd> He(m_mesh.getElementsNumber());
 
+    Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
@@ -559,6 +560,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
         He[elm] = m_mesh.getRefElementSize()*tauPSPG[elm]*Bep.transpose()
                 *m_bodyForces*m_mesh.getElementDetJ(elm);
     }
+    Eigen::setNbThreads(m_numOMPThreads);
 
     //Big push_back ^^
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
