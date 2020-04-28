@@ -1,23 +1,27 @@
 //+
-d = 0.125;
+L = 0.584;
 //+
-Point(1) = {10, 0, 0, d};
+H = L/4;
+//+
+d = H/5;
+//+
+Point(1) = {L, 0, 0, d};
 //+
 Point(2) = {0, 0, 0, d};
 //+
-Point(3) = {0, 10, 0, d};
+Point(3) = {0, L, 0, d};
 //+
-Point(4) = {10, 10, 0, d};
+Point(4) = {L, L, 0, d};
 //+
-Point(5) = {5, 7.5, 0, d};
+Point(5) = {L/2, 2.5*H, 0, d};
 //+
-Point(6) = {6, 7.5, 0, d};
+Point(6) = {L/2+H/2, 2.5*H, 0, d};
 //+
-Point(7) = {4, 7.5, 0, d};
+Point(7) = {L/2-H/2, 2.5*H, 0, d};
 //+
-Point(8) = {0, 2.5, 0, d};
+Point(8) = {0, H, 0, d};
 //+
-Point(9) = {10, 2.5, 0, d};
+Point(9) = {L, H, 0, d};
 //+
 Line(1) = {3, 8};
 //+
@@ -48,3 +52,5 @@ Curve Loop(2) = {7, 8};
 Plane Surface(2) = {2};
 //+
 Physical Surface("Fluid") = {1, 2};
+//+
+Transfinite Surface(1);
