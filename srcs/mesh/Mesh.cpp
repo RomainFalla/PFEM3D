@@ -65,7 +65,7 @@ bool Mesh::addNodes()
                 std::cout << "Adding node (" << "(";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
                 {
-                    std::cout << newNode.position[d];
+                    std::cout << m_nodesList[m_nodesList.size() - 1].position[d];
                     if(d == m_dim - 1)
                         std::cout << ")";
                     else
