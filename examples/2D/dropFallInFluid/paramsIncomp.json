@@ -1,11 +1,11 @@
 {
 	"ProblemType": "Incompressible",
 	"Remeshing": {
-		"hchar": 1,
+		"hchar": 0.0073,
 		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
-		"boundingBox": [-2, -1, 12, 100]
+		"boundingBox": [-0.05, -0.05, 0.634, 100]
 	},
 	"Solver": {
 		"gravity": 9.81,
@@ -14,9 +14,9 @@
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
     		"coeffDTdecrease": 2.0,
-    		"maxDT": 0.01,
-			"initialDT": 0.01,
-    		"endTime": 4,
+    		"maxDT": 0.005,
+			"initialDT": 0.005,
+    		"endTime": 4
 		},
 		"Picard": {
 			"relTol": 5e-6,
@@ -34,8 +34,13 @@
                 "timeBetweenWriting": 0.2,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
+			},
+			{
+				"type": "Mass",
+				"outputFile": "mass.txt",
+                "timeBetweenWriting": 0.05
 			}
 		]
 	},
-	"verboseOutput": false
+	"verboseOutput": true
 }
