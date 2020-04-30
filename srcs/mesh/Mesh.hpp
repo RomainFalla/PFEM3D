@@ -15,18 +15,23 @@
 class MESH_API Mesh
 {
     public:
+        Mesh()                              = delete;
         Mesh(const nlohmann::json& j);
-        ~Mesh();
+        Mesh(const Mesh& mesh)              = delete;
+        Mesh& operator=(const Mesh& mesh)   = delete;
+        Mesh(Mesh&& mesh)                   = delete;
+        Mesh& operator=(Mesh&& mesh)        = delete;
+        ~Mesh()                             = default;
 
         /**
          * \return The characteristic alpha-shape parameter.
          */
-        inline double getAlpha() const;
+        inline double getAlpha() const noexcept;
 
         /**
          * \return The mesh dimension.
          */
-        inline unsigned short getDim() const;
+        inline unsigned short getDim() const noexcept;
 
 
         /**
@@ -34,13 +39,13 @@ class MESH_API Mesh
          * \return The vector containing the index of the nodes in nodesList
          *         making a certain element.
          */
-        inline std::vector<IndexType> getElement(IndexType elm) const;
+        inline std::vector<IndexType> getElement(IndexType elm) const noexcept;
 
         /**
          * \param elm The element index.
          * \return The determinant of the of the Jacobian matrix
          */
-        inline double getElementDetJ(IndexType elm) const;
+        inline double getElementDetJ(IndexType elm) const noexcept;
 
         /**
          * \param elm The element index.
@@ -48,12 +53,12 @@ class MESH_API Mesh
          * \param j The column index in the Jacobian matrix.
          * \return The ij element of the Jacobian matrix for a certain element.
          */
-        inline double getElementInvJ(IndexType elm, unsigned short i, unsigned short j) const;
+        inline double getElementInvJ(IndexType elm, unsigned short i, unsigned short j) const noexcept;
 
         /**
          * \return The number of elements in the mesh.
          */
-        inline IndexType getElementsNumber() const;
+        inline IndexType getElementsNumber() const noexcept;
 
 //        /**
 //         * \param elm The element index.
@@ -77,35 +82,35 @@ class MESH_API Mesh
         /**
          * \return The characteristic node removing parameter.
          */
-        inline double getGamma() const;
+        inline double getGamma() const noexcept;
 
         /**
          * \param point The index to the considered Gauss point.
          * \param coordinate The index of the coordinate we want.
          * \return The coordinate of the wanted Gauss point.
          */
-        inline double getGaussPoints(unsigned short point, unsigned short coordinate) const;
+        inline double getGaussPoints(unsigned short point, unsigned short coordinate) const noexcept;
 
         /**
          * \return The number of gauss point used (depends on the mesh dimension).
          */
-        inline unsigned short getGaussPointsNumber() const;
+        inline unsigned short getGaussPointsNumber() const noexcept;
 
         /**
          * \param point The index to the considered Gauss point.
          * \return The weight associated to this Gauss Point.
          */
-        inline double getGaussWeight(unsigned short point) const;
+        inline double getGaussWeight(unsigned short point) const noexcept;
 
         /**
          * \return The characteristic size of the mesh.
          */
-        inline double getHchar() const;
+        inline double getHchar() const noexcept;
 
         /**
          * \return The number of nodes in the mesh.
          */
-        inline IndexType getNodesNumber() const;
+        inline IndexType getNodesNumber() const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
@@ -117,61 +122,61 @@ class MESH_API Mesh
          * \param nodeIndex The index of the node in the nodes list.
          * \return The vector position of the node.
          */
-        inline std::vector<double> getNodePosition(IndexType nodeIndex) const;
+        inline std::vector<double> getNodePosition(IndexType nodeIndex) const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \param coordinate The wanted coordinate (0, 1, ...).
          * \return The coordinate of the node.
          */
-        inline double getNodePosition(IndexType nodeIndex, unsigned short coordinate) const;
+        inline double getNodePosition(IndexType nodeIndex, unsigned short coordinate) const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \param state The wanted sate (0, 1, 2, 3, ...).
          * \return The value of the state for that node.
          */
-        inline double getNodeState(IndexType nodeIndex, unsigned short state) const;
+        inline double getNodeState(IndexType nodeIndex, unsigned short state) const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \return The physical group of that node.
          */
-        inline std::string getNodeType(IndexType nodeIndex) const;
+        inline std::string getNodeType(IndexType nodeIndex) const noexcept;
 
         /**
          * \return The characteristic node adding parameter.
          */
-        inline double getOmega() const;
+        inline double getOmega() const noexcept;
 
         /**
          * \return The size of the element in the reference coordinate system.
          */
-        inline double getRefElementSize() const;
+        inline double getRefElementSize() const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \return true if the node is free, false otherwise.
          */
-        inline bool isNodeFree(IndexType nodeIndex) const;
+        inline bool isNodeFree(IndexType nodeIndex) const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \return true if the node is on the boundary, false otherwise.
          */
-        inline bool isNodeBound(IndexType nodeIndex) const;
+        inline bool isNodeBound(IndexType nodeIndex) const noexcept;
 
          /**
          * \param nodeIndex The index of the node in the nodes list.
          * \return true if the node is on a Dirichlet boundary, false otherwise.
          */
-        inline bool isNodeDirichlet(IndexType nodeIndex) const;
+        inline bool isNodeDirichlet(IndexType nodeIndex) const noexcept;
 
         /**
          * \param nodeIndex The index of the node in the nodes list.
          * \return true is the node is on the free surface, false otherwise.
          */
-        inline bool isNodeOnFreeSurface(IndexType nodeIndex) const;
+        inline bool isNodeOnFreeSurface(IndexType nodeIndex) const noexcept;
 
         /**
          * \brief Load the nodes from a file using gmsh.
@@ -199,7 +204,7 @@ class MESH_API Mesh
          * \param nodeIndex The index of the node in the internal nodes list;
          * \param isDirichlet true if the node is in a Dirichlet BC, false otherwise;
          */
-        inline void setNodeIsDirichlet(IndexType nodeIndex, bool isDirichlet);
+        inline void setNodeIsDirichlet(IndexType nodeIndex, bool isDirichlet) noexcept;
 
         /**
          * \brief Update the nodes position.
@@ -219,7 +224,7 @@ class MESH_API Mesh
          * \param stateIndex The index of the state.
          * \param state The new value of the state.
          */
-        inline void setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state);
+        inline void setNodeState(IndexType nodeIndex, unsigned short stateIndex, double state) noexcept;
 
         /**
          * \brief Set the number of states to be stored at node level.
@@ -254,31 +259,31 @@ class MESH_API Mesh
          * \brief Add nodes in element whose area is too big (A_tringle > omega*hchar^2.
          * \return true if at least one node was added, false otherwise).
          */
-        bool addNodes();
+        bool addNodes() noexcept;
 
         /**
          * \brief Check if a node is outside the bounding box and deletes it if so.
          * \return true if at least one node was deleted, false otherwise.
          */
-        bool checkBoundingBox();
+        bool checkBoundingBox() noexcept;
 
         /**
          * \brief Compute the determinant of the of the Jacobian matrix for gauss
          *        integration for each triangle.
          */
-        void computeElementsDetJ();
+        void computeElementsDetJ() noexcept;
 
         /**
          * \brief Compute the inverse Jacobian matrix for gauss integration for each
          *        triangle.
          */
-        void computeElementsInvJ();
+        void computeElementsInvJ() noexcept;
 
         /**
          * \brief Compute the inverse Jacobian matrix for gauss integration for each
          *        triangle.
          */
-        void computeElementsJ();
+        void computeElementsJ() noexcept;
 
 //        /**
 //         * \brief Compute the determinant of the of the Jacobian matrix for gauss
@@ -315,7 +320,7 @@ class MESH_API Mesh
          *       (d_nodes < gamma*hchar).
          * \return true if at least one node was deleted, false otherwise.
          */
-        bool removeNodes();
+        bool removeNodes() noexcept;
 };
 
 #include "Mesh.inl"

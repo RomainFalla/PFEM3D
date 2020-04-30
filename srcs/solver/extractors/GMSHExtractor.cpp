@@ -12,10 +12,7 @@ GMSHExtractor::GMSHExtractor(const Solver& solver, const std::string& outFileNam
 Extractor(solver, outFileName, timeBetweenWriting), m_whatCanBeWritten(std::move(whatCanBeWritten)), m_writeAs(std::move(writeAs))
 {
     if(!(m_writeAs == "Nodes" || m_writeAs == "Elements" || m_writeAs == "NodesElements"))
-    {
-        std::string errotText = std::string("unknown data type for results writing ") + m_writeAs;
-        throw std::runtime_error(errotText);
-    }
+        throw std::runtime_error("unknown data type for results writing " + m_writeAs);
 
     m_whatToWrite.resize(m_whatCanBeWritten.size());
 
@@ -32,10 +29,7 @@ Extractor(solver, outFileName, timeBetweenWriting), m_whatCanBeWritten(std::move
             }
         }
         if(!found)
-        {
-            std::string errorText = std::string("unknown quantity to write ") + whatToWrite[i];
-            throw std::runtime_error(errorText);
-        }
+            throw std::runtime_error("unknown quantity to write " + whatToWrite[i]);
     }
 
     gmsh::initialize();

@@ -32,15 +32,12 @@ struct Node
     unsigned short tag;                   /**< Identify to which BC this node belongs to*/
 };
 
-inline bool operator==(const Node& a, const Node& b)
+inline bool operator==(const Node& a, const Node& b) noexcept
 {
-    for(unsigned short i = 0 ; i < a.position.size() ; ++i)
-    {
-        if(a.position[i] != b.position[i])
-            return false;
-    }
-
-    return true;
+    if(std::equal(a.position.cbegin(), a.position.cend(), b.position.cbegin()))
+        return true;
+    else
+        return false;
 }
 
 #endif // NODE_HPP_INCLUDED

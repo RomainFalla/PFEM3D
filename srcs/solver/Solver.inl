@@ -1,8 +1,8 @@
 #include "Solver.hpp"
 
-inline Eigen::MatrixXd Solver::getB(IndexType elementIndex) const
+inline Eigen::MatrixXd Solver::getB(IndexType elementIndex) const noexcept
 {
-    assert(elementIndex < m_mesh.getElementsNumber() && "elementIndex should be between 0 and size - 1 !");
+    assert(elementIndex < m_mesh.getElementsNumber());
 
     Eigen::MatrixXd B;
     if(m_mesh.getDim() == 2)
@@ -38,23 +38,26 @@ inline Eigen::MatrixXd Solver::getB(IndexType elementIndex) const
     return B;
 }
 
-inline double Solver::getCurrentDT() const
+inline double Solver::getCurrentDT() const noexcept
 {
     return m_currentDT;
 }
 
-inline unsigned int Solver::getCurrentStep() const
+inline unsigned int Solver::getCurrentStep() const noexcept
 {
     return m_currentStep;
 }
 
-inline double Solver::getCurrentTime() const
+inline double Solver::getCurrentTime() const noexcept
 {
     return m_currentTime;
 }
 
-inline Eigen::VectorXd Solver::getElementState(IndexType elm, unsigned short state) const
+inline Eigen::VectorXd Solver::getElementState(IndexType elm, unsigned short state) const noexcept
 {
+    assert(elm < m_mesh.getElementsNumber());
+    assert(state < m_statesNumber);
+
     Eigen::VectorXd stateVec(m_mesh.getElement(elm).size());
 
     if(m_mesh.getDim() == 2)
@@ -74,22 +77,22 @@ inline Eigen::VectorXd Solver::getElementState(IndexType elm, unsigned short sta
     return stateVec;
 }
 
-inline double Solver::getEndTime() const
+inline double Solver::getEndTime() const noexcept
 {
     return m_endTime;
 }
 
-inline double Solver::getMaxDT() const
+inline double Solver::getMaxDT() const noexcept
 {
     return m_maxDT;
 }
 
-inline const Mesh& Solver::getMesh() const
+inline const Mesh& Solver::getMesh() const noexcept
 {
     return m_mesh;
 }
 
-inline std::vector<Eigen::MatrixXd> Solver::getN() const
+inline std::vector<Eigen::MatrixXd> Solver::getN() const noexcept
 {
     std::vector<Eigen::MatrixXd> Ns;
 
@@ -103,7 +106,7 @@ inline std::vector<Eigen::MatrixXd> Solver::getN() const
             N(0,1) = N(1,4) =  m_mesh.getGaussPoints(p, 0);
             N(0,2) = N(1,5) =  m_mesh.getGaussPoints(p, 1);
 
-            Ns.push_back(N);
+            Ns.push_back(std::move(N));
         }
         else
         {
@@ -114,15 +117,17 @@ inline std::vector<Eigen::MatrixXd> Solver::getN() const
             N(0,2) = N(1,6) = N(2,10) =  m_mesh.getGaussPoints(p, 1);
             N(0,3) = N(1,7) = N(2,11) =  m_mesh.getGaussPoints(p, 2);
 
-            Ns.push_back(N);
+            Ns.push_back(std::move(N));
         }
     }
 
     return Ns;
 }
 
-inline Eigen::VectorXd Solver::getQFromNodesStates(unsigned short beginState, unsigned short endState) const
+inline Eigen::VectorXd Solver::getQFromNodesStates(unsigned short beginState, unsigned short endState) const noexcept
 {
+    assert(beginState < m_statesNumber && endState < m_statesNumber);
+
     Eigen::VectorXd q((endState - beginState + 1)*m_mesh.getNodesNumber());
 
     #pragma omp parallel for default(shared)
@@ -135,17 +140,17 @@ inline Eigen::VectorXd Solver::getQFromNodesStates(unsigned short beginState, un
     return q;
 }
 
-inline SOLVER_TYPE Solver::getSolverType() const
+inline SOLVER_TYPE Solver::getSolverType() const noexcept
 {
     return m_solverType;
 }
 
-inline unsigned short Solver::getStatesNumber() const
+inline unsigned short Solver::getStatesNumber() const noexcept
 {
     return m_statesNumber;
 }
 
-inline bool Solver::isDTAdaptable() const
+inline bool Solver::isDTAdaptable() const noexcept
 {
     return m_adaptDT;
 }
@@ -161,9 +166,10 @@ inline void Solver::setCurrentDT(double dt)
     m_currentDT = dt;
 }
 
-inline void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState)
+inline void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState) noexcept
 {
-    assert (q.rows() == (endState - beginState + 1)*m_mesh.getNodesNumber());
+    assert(beginState < m_statesNumber && endState < m_statesNumber);
+    assert(q.rows() == (endState - beginState + 1)*m_mesh.getNodesNumber());
 
     #pragma omp parallel for default(shared)
     for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)

@@ -17,12 +17,7 @@ Mesh::Mesh(const nlohmann::json& j)
     m_boundingBox = j["Remeshing"]["boundingBox"].get<std::vector<double>>();
 }
 
-Mesh::~Mesh()
-{
-
-}
-
-bool Mesh::addNodes()
+bool Mesh::addNodes() noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
     assert(m_elementsDetJ.size() == m_elementsList.size() && "The determinant are not computed!");
@@ -34,7 +29,7 @@ bool Mesh::addNodes()
         //If an element is too big, we add a node at his center
         if(m_elementsDetJ[i]*getRefElementSize() > m_omega*std::pow(m_hchar, m_dim))
         {
-            Node newNode;
+            Node newNode = {};
             newNode.position.resize(m_dim);
 
             for(unsigned short k = 0 ; k < m_dim ; ++k)
@@ -81,7 +76,7 @@ bool Mesh::addNodes()
     return addedNodes;
 }
 
-bool Mesh::checkBoundingBox()
+bool Mesh::checkBoundingBox() noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
@@ -133,7 +128,7 @@ bool Mesh::checkBoundingBox()
     return outofBBNodes;
 }
 
-void Mesh::computeElementsDetJ()
+void Mesh::computeElementsDetJ() noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
     assert(!m_elementsJ.empty() && m_elementsJ.size() == m_elementsList.size());
@@ -161,7 +156,7 @@ void Mesh::computeElementsDetJ()
     }
 }
 
-void Mesh::computeElementsInvJ()
+void Mesh::computeElementsInvJ() noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
     assert(!m_elementsJ.empty() && m_elementsJ.size() == m_elementsList.size());
@@ -225,7 +220,7 @@ void Mesh::computeElementsInvJ()
     }
 }
 
-void Mesh::computeElementsJ()
+void Mesh::computeElementsJ() noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
 
@@ -372,7 +367,7 @@ void Mesh::loadFromFile(const std::string& fileName)
 
             for(std::size_t i = 0 ; i < dummyNodesTagsBoundary.size() ; ++i)
             {
-                Node node;
+                Node node = {};
                 node.position.resize(m_dim);
                 node.initialPosition.resize(m_dim);
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
@@ -415,7 +410,7 @@ void Mesh::loadFromFile(const std::string& fileName)
 
         for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
         {
-            Node node;
+            Node node = {};
             node.position.resize(m_dim);
             for(unsigned short d = 0 ; d < m_dim ; ++d)
                 node.position[d] = coord[3*i + d];
@@ -508,7 +503,7 @@ void Mesh::remesh()
     }
 }
 
-bool Mesh::removeNodes()
+bool Mesh::removeNodes() noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
@@ -628,7 +623,7 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
     if(deltaPos.size() != m_nodesList.size()*m_dim)
         throw std::runtime_error("invalid size of the deltaPos vector");
 
-    #pragma omp paralel for default(shared)
+    #pragma omp parallel for default(shared)
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         if(!m_nodesList[n].isDirichlet)
@@ -653,7 +648,7 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
     else if(deltaPos.size() != m_nodesListSave.size()*m_dim)
         throw std::runtime_error("invalid size of the deltaPos vector");
 
-    #pragma omp paralel for default(shared)
+    #pragma omp parallel for default(shared)
     for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
         if(!m_nodesList[n].isDirichlet)

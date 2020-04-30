@@ -87,7 +87,7 @@ void Mesh::triangulateAlphaShape2D()
         it != as.alpha_shape_edges_end() ; ++it)
     {
         // We compute the free surface nodes
-        const Alpha_shape_2::Edge edgeAS = *it;
+        const Alpha_shape_2::Edge edgeAS {*it};
         if(as.classify(edgeAS) == Alpha_shape_2::REGULAR)
         {
             const std::vector<IndexType> edge{edgeAS.first->vertex((edgeAS.second+1)%3)->info(),

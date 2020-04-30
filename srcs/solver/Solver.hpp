@@ -19,7 +19,7 @@
 
 #include "Solver_export.h"
 
-enum SOLVER_TYPE
+enum class SOLVER_TYPE
 {
     Undefined,
     Incompressible_PSPG,
@@ -33,67 +33,72 @@ enum SOLVER_TYPE
 class SOLVER_API Solver
 {
     public:
+        Solver()                                = delete;
         Solver(const nlohmann::json& j, const std::string& mshName);
-        ~Solver();
+        Solver(const Solver& solver)            = delete;
+        Solver& operator=(const Solver& solver) = delete;
+        Solver(Solver&& solver)                 = delete;
+        Solver& operator=(Solver&& solver)      = delete;
+        virtual ~Solver() noexcept              = default;
 
         /**
          * \return Return the current time increment of the simulation in seconds.
          */
-        inline double getCurrentDT() const;
+        inline double getCurrentDT() const noexcept;
 
         /**
          * \return Return the current step of the simulation.
          */
-        inline unsigned int getCurrentStep() const;
+        inline unsigned int getCurrentStep() const noexcept;
 
         /**
          * \return Return the current physical time of the simulation in seconds.
          */
-        inline double getCurrentTime() const;
+        inline double getCurrentTime() const noexcept;
 
         /**
          * \param elm The element index.
          * \param state The considered state.
          * \return Return a vector containing the state of a whole element.
          */
-        inline Eigen::VectorXd getElementState(IndexType elm, unsigned short state) const;
+        inline Eigen::VectorXd getElementState(IndexType elm, unsigned short state) const noexcept;
 
         /**
          * \return Return the maximum physical time at which the simulation will stop in seconds.
          */
-        inline double getEndTime() const;
+        inline double getEndTime() const noexcept;
 
         /**
          * \return Return the maximum time increment authorized in seconds.
          */
-        inline double getMaxDT() const;
+        inline double getMaxDT() const noexcept;
 
         /**
          * \return Return a constant reference to the mesh used by the solver.
          */
-        inline const Mesh& getMesh() const;
+        inline const Mesh& getMesh() const noexcept;
 
         /**
          * \return A Eigen vector containing the states of the node.
          * \param beginState The first state which will be contained in q.
          * \param endState The last state which will be contained in q.
          */
-        inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const;
+        inline Eigen::VectorXd getQFromNodesStates(unsigned short beginState, unsigned short endState) const noexcept;
 
         /**
         * \return What solver it is.
         */
-        inline SOLVER_TYPE getSolverType() const;
+        inline SOLVER_TYPE getSolverType() const noexcept;
 
         /**
         * \return Return the number of state the solver is using.
         */
-        inline unsigned short getStatesNumber() const;
+        inline unsigned short getStatesNumber() const noexcept;
 
         /**
          * \return Return if the current time step can be modified or not.
          */
-        inline bool isDTAdaptable() const;
+        inline bool isDTAdaptable() const noexcept;
 
         /**
          * \brief Update the time interval for the next time step (only if authorized).
@@ -107,7 +112,7 @@ class SOLVER_API Solver
          * \param beginState The first state contained in q.
          * \param endState The last state contained in q.
          */
-        inline void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState);
+        inline void setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short beginState, unsigned short endState) noexcept;
 
     protected:
         SOLVER_TYPE m_solverType;
@@ -143,13 +148,13 @@ class SOLVER_API Solver
          * \return The gradient shape function matrix for the element in the format:
          *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
          */
-        inline Eigen::MatrixXd getB(IndexType elementIndex) const;
+        inline Eigen::MatrixXd getB(IndexType elementIndex) const noexcept;
 
         /**
          * \return The gradient shape function matrix for each gauss point in the format:
          *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
          */
-        inline std::vector<Eigen::MatrixXd> getN() const;
+        inline std::vector<Eigen::MatrixXd> getN() const noexcept;
 
         /**
          * \brief Set the initial condition on u, v, p for the initial cloud of nodes.

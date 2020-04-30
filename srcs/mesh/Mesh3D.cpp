@@ -102,7 +102,7 @@ void Mesh::triangulateAlphaShape3D()
         it != as.alpha_shape_facets_end() ; ++it)
     {
         // We compute the free surface nodes
-        const Alpha_shape_3::Facet facetAS = *it;
+        const Alpha_shape_3::Facet facetAS {*it};
 
         if(as.classify(facetAS) == Alpha_shape_3::REGULAR)
         {

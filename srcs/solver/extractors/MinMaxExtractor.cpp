@@ -15,10 +15,7 @@ Extractor(solver, outFileName, timeBetweenWriting), m_coordinate(coordinate), m_
 
     m_outFile.open(m_outFileName);
     if(!m_outFile.is_open())
-    {
-        std::string errorText = std::string("cannot open file to write point extractor: ") + m_outFileName;
-        throw std::runtime_error(errorText);
-    }
+        throw std::runtime_error("cannot open file to write point extractor: " + m_outFileName);
 }
 
 MinMaxExtractor::~MinMaxExtractor()

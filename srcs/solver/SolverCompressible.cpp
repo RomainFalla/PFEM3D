@@ -19,7 +19,7 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
 {
-    m_solverType = WeaklyCompressible;
+    m_solverType = SOLVER_TYPE::WeaklyCompressible;
     unsigned short dim = m_mesh.getDim();
 
     m_statesNumber = 2*dim + 2;
@@ -137,10 +137,6 @@ Solver(j, mshName)
     setInitialCondition();
 }
 
-SolverCompressible::~SolverCompressible()
-{
-}
-
 void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invMrho, Eigen::VectorXd& Frho)
 {
     assert(m_mesh.getNodesNumber() != 0);
@@ -199,7 +195,7 @@ void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double
     }
 }
 
-void SolverCompressible::displaySolverParams() const
+void SolverCompressible::displaySolverParams() const noexcept
 {
     std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
     std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;

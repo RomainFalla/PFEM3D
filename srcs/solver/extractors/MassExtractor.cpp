@@ -8,10 +8,7 @@ Extractor(solver, outFileName, timeBetweenWriting)
 {
     m_outFile.open(m_outFileName);
     if(!m_outFile.is_open())
-    {
-        std::string errorText = std::string("cannot open file to write point extractor: ") + m_outFileName;
-        throw std::runtime_error(errorText);
-    }
+        throw std::runtime_error("cannot open file to write point extractor: " + m_outFileName);
 }
 
 MassExtractor::~MassExtractor()
@@ -23,18 +20,18 @@ void MassExtractor::update()
 {
     if(m_solver.getCurrentTime() >= m_nextWriteTrigger)
     {
-        const Mesh& mesh = m_solver.getMesh();
+        const Mesh& mesh {m_solver.getMesh()};
 
         double valueToWrite = 0;
 
-        if(m_solver.getSolverType() == Incompressible_PSPG)
+        if(m_solver.getSolverType() == SOLVER_TYPE::Incompressible_PSPG)
         {
             for(IndexType elm = 0 ; elm < mesh.getElementsNumber() ; ++elm)
             {
                 valueToWrite += mesh.getRefElementSize()*mesh.getElementDetJ(elm);
             }
         }
-        else if(m_solver.getSolverType() == WeaklyCompressible)
+        else if(m_solver.getSolverType() == SOLVER_TYPE::WeaklyCompressible)
         {
             for(IndexType elm = 0 ; elm < mesh.getElementsNumber() ; ++elm)
             {

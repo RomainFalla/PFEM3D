@@ -11,13 +11,17 @@
 class SOLVER_API SolverCompressible : public Solver
 {
     public:
+        SolverCompressible()                                                        = delete;
         SolverCompressible(const nlohmann::json& j, const std::string& mshName);
-        ~SolverCompressible();
+        SolverCompressible(const SolverCompressible& solverCompressible)            = delete;
+        SolverCompressible& operator=(const SolverCompressible& solverCompressible) = delete;
+        SolverCompressible(SolverCompressible&& solverCompressible)                 = delete;
+        SolverCompressible& operator=(SolverCompressible&& solverCompressible)      = delete;
 
         /**
          * \brief Display the parameters in SolverCompressibleParams structure.
          */
-        void displaySolverParams() const;
+        void displaySolverParams() const noexcept;
 
         /**
          * \brief Solve the Picard algorithm for one time step.

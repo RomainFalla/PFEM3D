@@ -9,8 +9,13 @@
 class SOLVER_NO_EXPORT MassExtractor : public Extractor
 {
     public:
+        MassExtractor()                                              = delete;
         MassExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting);
-        ~MassExtractor();
+        MassExtractor(const MassExtractor& massExtractor)            = delete;
+        MassExtractor& operator=(const MassExtractor& massExtractor) = delete;
+        MassExtractor(MassExtractor&& massExtractor)                 = delete;
+        MassExtractor& operator=(MassExtractor&& massExtractor)      = delete;
+        ~MassExtractor() override;
 
         void update() override;
 

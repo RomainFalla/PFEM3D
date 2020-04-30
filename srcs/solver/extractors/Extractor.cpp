@@ -9,10 +9,9 @@ m_solver(solver), m_outFileName(outFileName), m_timeBetweenWriting(timeBetweenWr
 
 Extractor::~Extractor()
 {
-
 }
 
 void Extractor::update()
 {
-
+    throw std::runtime_error("Extractor base class is useless ^^!");
 }

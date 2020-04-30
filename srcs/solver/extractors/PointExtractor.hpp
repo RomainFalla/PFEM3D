@@ -9,9 +9,14 @@
 class SOLVER_NO_EXPORT PointExtractor : public Extractor
 {
     public:
+        PointExtractor()                                                = delete;
         PointExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                        unsigned short stateToWrite, const std::vector<std::vector<double>>& points);
-        ~PointExtractor();
+        PointExtractor(const PointExtractor& pointExtractor)            = delete;
+        PointExtractor& operator=(const PointExtractor& pointExtractor) = delete;
+        PointExtractor(PointExtractor&& pointExtractor)                 = delete;
+        PointExtractor& operator=(PointExtractor&& pointExtractor)      = delete;
+        ~PointExtractor() override;
 
         void update() override;
 

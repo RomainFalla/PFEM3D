@@ -11,10 +11,8 @@ Extractor(solver, outFileName, timeBetweenWriting), m_stateToWrite(stateToWrite)
 {
     m_outFile.open(m_outFileName);
     if(!m_outFile.is_open())
-    {
-        std::string errorText = std::string("cannot open file to write point extractor: ") + m_outFileName;
-        throw std::runtime_error(errorText);
-    }
+        throw std::runtime_error("cannot open file to write point extractor: " + m_outFileName);
+
     if(stateToWrite > m_solver.getStatesNumber())
         throw std::runtime_error("unexpected state to write.");
 }

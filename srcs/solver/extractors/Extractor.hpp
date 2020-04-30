@@ -13,8 +13,13 @@ class Solver;
 class SOLVER_NO_EXPORT Extractor
 {
     public:
+        Extractor()                                      = delete;
         Extractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting);
-        ~Extractor();
+        Extractor(const Extractor& extractor)            = delete;
+        Extractor& operator=(const Extractor& extractor) = delete;
+        Extractor(Extractor&& extractor)                 = delete;
+        Extractor& operator=(Extractor&& extractor)      = delete;
+        virtual ~Extractor();
 
         virtual void update();
 

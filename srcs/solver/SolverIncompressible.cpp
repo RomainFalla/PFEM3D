@@ -19,7 +19,7 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
 {
-    m_solverType = Incompressible_PSPG;
+    m_solverType = SOLVER_TYPE::Incompressible_PSPG;
     unsigned short dim = m_mesh.getDim();
 
     m_statesNumber = dim + 1;
@@ -131,10 +131,6 @@ Solver(j, mshName)
     setInitialCondition();
 }
 
-SolverIncompressible::~SolverIncompressible()
-{
-}
-
 void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
 {
     assert(m_mesh.getNodesNumber() != 0);
@@ -191,7 +187,7 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
     A.prune(0, 0);
 }
 
-void SolverIncompressible::displaySolverParams() const
+void SolverIncompressible::displaySolverParams() const noexcept
 {
     std::cout << "Initial nodes number: " << m_mesh.getNodesNumber() << std::endl;
     std::cout << "Initial elements number: " << m_mesh.getElementsNumber() << std::endl;
@@ -234,9 +230,9 @@ void SolverIncompressible::solveProblem()
 
     std::cout << "----------------------------------------------------------------" << std::endl;
 
-    for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
+    for(auto& extractor : m_pExtractor)
     {
-        m_pExtractor[i]->update();
+        extractor->update();
     }
 
     while(m_currentTime < m_endTime)
@@ -259,9 +255,9 @@ void SolverIncompressible::solveProblem()
 
         if(solveCurrentTimeStep())
         {
-            for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
+            for(auto& extractor : m_pExtractor)
             {
-                m_pExtractor[i]->update();
+                extractor->update();
             }
 
             if(m_adaptDT)

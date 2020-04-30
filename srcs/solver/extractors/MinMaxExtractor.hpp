@@ -9,9 +9,14 @@
 class SOLVER_NO_EXPORT MinMaxExtractor : public Extractor
 {
     public:
+        MinMaxExtractor()                                                  = delete;
         MinMaxExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                         unsigned short coordinate, const std::string& minMax);
-        ~MinMaxExtractor();
+        MinMaxExtractor(const MinMaxExtractor& minmaxExtractor)            = delete;
+        MinMaxExtractor& operator=(const MinMaxExtractor& minmaxExtractor) = delete;
+        MinMaxExtractor(MinMaxExtractor&& minmaxExtractor)                 = delete;
+        MinMaxExtractor& operator=(MinMaxExtractor&& minmaxExtractor)      = delete;
+        ~MinMaxExtractor() override;
 
         void update() override;
 

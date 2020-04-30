@@ -7,11 +7,15 @@
 class SOLVER_NO_EXPORT GMSHExtractor : public Extractor
 {
     public:
+        GMSHExtractor()                                              = delete;
         GMSHExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                       const std::vector<std::string>& whatToWrite,
                       std::vector<std::string> whatCanBeWritten, std::string writeAs);
-
-        ~GMSHExtractor();
+        GMSHExtractor(const GMSHExtractor& gmshExtractor)            = delete;
+        GMSHExtractor& operator=(const GMSHExtractor& gmshExtractor) = delete;
+        GMSHExtractor(GMSHExtractor&& gmshExtractor)                 = delete;
+        GMSHExtractor& operator=(GMSHExtractor&& gmshExtractor)      = delete;
+        ~GMSHExtractor() override;
 
         void update() override;
 

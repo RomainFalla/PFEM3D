@@ -6,7 +6,7 @@
 Solver::Solver(const nlohmann::json& j, const std::string& mshName) :
 m_mesh(j)
 {
-    m_solverType = Undefined;
+    m_solverType = SOLVER_TYPE::Undefined;
     m_mesh.loadFromFile(mshName);
 
     m_lua.open_libraries(sol::lib::base, sol::lib::math);
@@ -71,11 +71,6 @@ m_mesh(j)
         m_bodyForces.resize(3);
         m_bodyForces << 0 , 0, -m_gravity;
     }
-}
-
-Solver::~Solver()
-{
-
 }
 
 void Solver::setInitialCondition()
