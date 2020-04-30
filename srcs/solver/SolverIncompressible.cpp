@@ -9,7 +9,7 @@
 using Clock = std::chrono::high_resolution_clock;
 using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-void displayDT(TimeType startTime, TimeType endTime, std::string text)
+static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 {
     auto ellapsedTimeMeasure = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     std::cout << text << static_cast<double>(ellapsedTimeMeasure.count())/1000.0 << " s" << std::endl;

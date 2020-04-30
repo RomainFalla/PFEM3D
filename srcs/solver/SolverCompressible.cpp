@@ -6,6 +6,15 @@
 
 #include "SolverCompressible.hpp"
 
+using Clock = std::chrono::high_resolution_clock;
+using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;
+
+static void displayDT(TimeType startTime, TimeType endTime, std::string text)
+{
+    auto ellapsedTimeMeasure = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    std::cout << text << static_cast<double>(ellapsedTimeMeasure.count())/1000.0 << " s" << std::endl;
+}
+
 
 SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
 Solver(j, mshName)
@@ -291,26 +300,38 @@ void SolverCompressible::solveProblem()
 
 bool SolverCompressible::solveCurrentTimeStep()
 {
-    auto startTime = std::chrono::high_resolution_clock::now();
+    TimeType startTime, endTime, startTimeMeasure, endTimeMeasure;
+    startTime = Clock::now();
 
     const unsigned short dim = m_mesh.getDim();
+
+    startTimeMeasure = Clock::now();
 
     Eigen::VectorXd qVPrev = getQFromNodesStates(0, dim - 1);           //The precedent speed.
     Eigen::VectorXd qAccPrev = getQFromNodesStates(dim + 2, 2*dim + 1);  //The precedent acceleration.
 
     Eigen::VectorXd Frho;                                 //The rhos of the continuity equation.
 
+    endTimeMeasure = Clock::now();
+    if(m_verboseOutput)
+        displayDT(startTimeMeasure, endTimeMeasure, "Prepared computation in ");
+
     if(m_strongContinuity)
         buildFrho(Frho);
 
     Eigen::VectorXd qV1half = qVPrev + 0.5*m_currentDT*qAccPrev;
 
+    startTimeMeasure = Clock::now();
     {
         setNodesStatesfromQ(qV1half, 0, dim - 1);
         Eigen::VectorXd deltaPos = qV1half*m_currentDT;
         m_mesh.updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
     }
+    endTimeMeasure = Clock::now();
+    if(m_verboseOutput)
+        displayDT(startTimeMeasure, endTimeMeasure, "Updated nodes position in ");
 
+    startTimeMeasure = Clock::now();
     {
         Eigen::DiagonalMatrix<double,Eigen::Dynamic> invMrho; //The mass matrix of the continuity.
         buildMatricesCont(invMrho, Frho);
@@ -324,7 +345,11 @@ bool SolverCompressible::solveCurrentTimeStep()
         setNodesStatesfromQ(qP, dim, dim);
         Frho.resize(0,0);
     }
+    endTimeMeasure = Clock::now();
+    if(m_verboseOutput)
+        displayDT(startTimeMeasure, endTimeMeasure, "Computed p and rho in ");
 
+    startTimeMeasure = Clock::now();
     {
         Eigen::DiagonalMatrix<double,Eigen::Dynamic> invM; //The mass matrix for momentum equation.
         Eigen::VectorXd F;                                  //The rhs of the momentum equation.
@@ -339,23 +364,22 @@ bool SolverCompressible::solveCurrentTimeStep()
         setNodesStatesfromQ(qVPrev, 0, dim - 1);
         setNodesStatesfromQ(qAccPrev, dim + 2, 2*dim + 1);
     }
+    endTimeMeasure = Clock::now();
+    if(m_verboseOutput)
+        displayDT(startTimeMeasure, endTimeMeasure, "Computed a and v in ");
 
     m_currentTime += m_currentDT;
     m_currentStep++;
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    endTime = Clock::now();
     if(m_verboseOutput)
-        std::cout << "Problem solved in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
+        displayDT(startTime, endTime, "Problem solved in ");
 
-    startTime = std::chrono::high_resolution_clock::now();
-
+    startTime = Clock::now();
     m_mesh.remesh();
-
-    endTime = std::chrono::high_resolution_clock::now();
-    ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    endTime = Clock::now();
     if(m_verboseOutput)
-        std::cout << "Remeshing done in " << static_cast<double>(ellapsedTime.count())/1000.0 << " s" << std::endl;
+        displayDT(startTime, endTime, "Remeshing done in ");
 
     return true;
 }

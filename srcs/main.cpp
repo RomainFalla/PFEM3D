@@ -5,6 +5,15 @@
 #include "solver/SolverIncompressible.hpp"
 #include "solver/SolverCompressible.hpp"
 
+using Clock = std::chrono::high_resolution_clock;
+using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;
+
+static void displayDT(TimeType startTime, TimeType endTime, std::string text)
+{
+    auto ellapsedTimeMeasure = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    std::cout << text << static_cast<double>(ellapsedTimeMeasure.count())/1000.0 << " s" << std::endl;
+}
+
 /**
  * \param  argv[1] .json file that contains the parameters.
  * \param  argv[2] .msh file that contains the initial set of nodes.
@@ -14,14 +23,13 @@ int main(int argc, char **argv)
     //Check that the file format is valid
     if (argc < 3)
     {
-        std::cerr   << "Usage: " << argv[0] << " params.json mesh.msh"
-                    <<  std::endl;
+        std::cerr   << "Usage: " << argv[0] << " params.json mesh.msh" <<  std::endl;
         return 1;
     }
 
     try
     {
-        std::string paramsFileName = std::string(argv[1]);
+        std::string paramsFileName {argv[1]};
         std::ifstream paramFile(paramsFileName);
         nlohmann::json j;
 
@@ -31,7 +39,7 @@ int main(int argc, char **argv)
         paramFile >> j;
         paramFile.close();
 
-        auto startTime = std::chrono::high_resolution_clock::now();
+        auto startTime {Clock::now()};
 
         if(j["ProblemType"] == "Incompressible")
         {
@@ -46,11 +54,8 @@ int main(int argc, char **argv)
         else
             throw std::runtime_error("Unsupported problem type!");
 
-        auto endTime = std::chrono::high_resolution_clock::now();
-        auto ellapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-        std::cout << "Ellapsed time for problem solving: "
-                  << static_cast<double>(ellapsedTime.count())/1000.0
-                  << " s" << std::endl;
+        auto endTime {Clock::now()};
+        displayDT(startTime, endTime, "Ellapsed time for problem solving: ");
     }
     catch(const std::bad_alloc& badAllocException)
     {
