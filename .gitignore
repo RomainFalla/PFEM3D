@@ -1,6 +1,7 @@
 build/
 results/
 eigen-*/
+sol3/
 gmsh-*/
 nlohmann/
 *.msh
