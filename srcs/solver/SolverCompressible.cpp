@@ -108,9 +108,9 @@ Solver(j, mshName)
     m_MrhoLumpedPrev.resize(dim + 1); m_MrhoLumpedPrev.setZero();
     for(unsigned short i = 0 ; i < m_MrhoPrev.rows() ; ++i)
     {
-        for(unsigned short j = 0 ; j < m_MrhoPrev.cols() ; ++j)
+        for(unsigned short k = 0 ; k < m_MrhoPrev.cols() ; ++k)
         {
-                m_MrhoLumpedPrev.diagonal()[i] += m_MrhoPrev(i, j);
+                m_MrhoLumpedPrev.diagonal()[i] += m_MrhoPrev(i, k);
         }
     }
 
@@ -159,7 +159,7 @@ void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<doubl
     }
 }
 
-void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F, const Eigen::VectorXd& qVPrev)
+void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
 {
     assert(m_mesh.getNodesNumber() != 0);
 
@@ -351,7 +351,7 @@ bool SolverCompressible::solveCurrentTimeStep()
         Eigen::VectorXd F;                                  //The rhs of the momentum equation.
 
         buildMatricesMom(invM, F);
-        applyBoundaryConditionsMom(invM, F, qVPrev);
+        applyBoundaryConditionsMom(invM, F);
 
         qAccPrev = invM*F;
 
