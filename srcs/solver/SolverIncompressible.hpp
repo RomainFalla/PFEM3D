@@ -50,12 +50,11 @@ class SOLVER_API SolverIncompressible : public Solver
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solverLU; /**< Eigen SparseLU solver. */
 
         /**
-         * \brief Apply boundary conditions to the matrix A.
-         * \param A the global sparse matrix
+         * \brief Apply boundary conditions to the vector b.
          * \param b the global rhs
          * \param qprev a vector containing the solution at the previous time step
          */
-        void applyBoundaryConditions(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qprev);
+        void applyBoundaryConditions(Eigen::VectorXd& b, const Eigen::VectorXd& qprev);
 
         /**
          * \brief Build the matrix A and the vector b of the Picard Algorithm.
@@ -68,10 +67,15 @@ class SOLVER_API SolverIncompressible : public Solver
          * \param tauPSPG a vector containing the value of tauPSPG for each element
          * \param qprev a vector containing the solution at the previous time step
          */
-        void buildPicardSystem(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b,
-                               Eigen::SparseMatrix<double>& M, Eigen::SparseMatrix<double>& K,
-                               Eigen::SparseMatrix<double>& D, Eigen::VectorXd& F, const std::vector<double>& tauPSPG,
-                               const Eigen::VectorXd& qprev);
+        void buildPicardSystem(Eigen::SparseMatrix<double>& A,
+                               Eigen::VectorXd& b,
+                               Eigen::SparseMatrix<double>& M,
+                               Eigen::SparseMatrix<double>& K,
+                               Eigen::SparseMatrix<double>& D,
+                               Eigen::SparseMatrix<double>& C,
+                               Eigen::VectorXd& F,
+                               Eigen::VectorXd& H,
+                               const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev);
 
         /**
          * \brief Build the coefficient tauPSPG for each element.

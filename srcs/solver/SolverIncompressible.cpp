@@ -131,7 +131,7 @@ Solver(j, mshName)
     setInitialCondition();
 }
 
-void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
+void SolverIncompressible::applyBoundaryConditions(Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
 {
     assert(m_mesh.getNodesNumber() != 0);
 
@@ -142,22 +142,16 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
     {
         if(m_mesh.isNodeFree(n))
         {
-            A.row(n + dim*m_mesh.getNodesNumber()) *= 0;
             b(n + dim*m_mesh.getNodesNumber()) = 0;
-            A.coeffRef(n + dim*m_mesh.getNodesNumber(), n + dim*m_mesh.getNodesNumber()) = 1;
 
             if(!m_mesh.isNodeBound(n))
             {
                 for(unsigned short d = 0 ; d < dim - 1 ; ++d)
                 {
-                    A.row(n + d*m_mesh.getNodesNumber()) *= 0;
                     b(n + d*m_mesh.getNodesNumber()) = qPrev(n + d*m_mesh.getNodesNumber());
-                    A.coeffRef(n + d*m_mesh.getNodesNumber(), n + d*m_mesh.getNodesNumber()) = 1;
                 }
 
-                A.row(n + (dim - 1)*m_mesh.getNodesNumber()) *= 0;
                 b(n + (dim - 1)*m_mesh.getNodesNumber()) = qPrev(n + (dim - 1)*m_mesh.getNodesNumber()) - m_currentDT*m_gravity;
-                A.coeffRef(n + (dim - 1)*m_mesh.getNodesNumber(), n + (dim - 1)*m_mesh.getNodesNumber()) = 1;
             }
         }
 
@@ -170,21 +164,15 @@ void SolverIncompressible::applyBoundaryConditions(Eigen::SparseMatrix<double>& 
 
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
-                A.row(n + d*m_mesh.getNodesNumber()) *= 0;
                 b(n + d*m_mesh.getNodesNumber()) = result[d];
-                A.coeffRef(n + d*m_mesh.getNodesNumber(), n + d*m_mesh.getNodesNumber()) = 1;
             }
         }
 
         if(m_strongPAtFS && m_mesh.isNodeOnFreeSurface(n))
         {
-            A.row(n + dim*m_mesh.getNodesNumber()) *= 0;
             b(n + dim*m_mesh.getNodesNumber()) = 0;
-            A.coeffRef(n + dim*m_mesh.getNodesNumber(), n + dim*m_mesh.getNodesNumber()) = 1;
         }
     }
-
-    A.prune(0, 0);
 }
 
 void SolverIncompressible::displaySolverParams() const noexcept
@@ -299,13 +287,22 @@ bool SolverIncompressible::solveCurrentTimeStep()
 
     Eigen::VectorXd qPrev = getQFromNodesStates(0, m_statesNumber - 1);    //The precedent solution
 
-    Eigen::SparseMatrix<double> A;    //The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L].
-    Eigen::VectorXd b;                //The vector b representing the problem: [M/dt*qPrev + F; H].
-    Eigen::SparseMatrix<double> M;    //The mass matrix.
-    Eigen::SparseMatrix<double> K;    //The viscosity matrix.
-    Eigen::SparseMatrix<double> D;    //The pressure matrix.
-    Eigen::VectorXd F;                //The volume force vector.
-    std::vector<double> tauPSPG;      //tau_PSPG parameters for each element.
+    Eigen::SparseMatrix<double> A((dim+1)*m_mesh.getNodesNumber(), (dim+1)*m_mesh.getNodesNumber());    //The matrix A representing the problem: [M/dt+K -D^T; C/dt-D L].
+    Eigen::VectorXd b(m_statesNumber*m_mesh.getNodesNumber());                                          //The vector b representing the problem: [M/dt*qPrev + F; H].
+    Eigen::SparseMatrix<double> M(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());            //The mass matrix.
+    Eigen::SparseMatrix<double> K;                                                                      //The viscosity matrix.
+    Eigen::SparseMatrix<double> D;                                                                      //The pressure matrix.
+    if(m_verboseOutput)
+    {
+        K.resize(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
+
+        D.resize(m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
+    }
+    Eigen::SparseMatrix<double> C(m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
+    Eigen::VectorXd F(dim*m_mesh.getNodesNumber());                                                     //The volume force vector.
+    Eigen::VectorXd H(m_mesh.getNodesNumber());
+
+    std::vector<double> tauPSPG(m_mesh.getElementsNumber());                                            //tau_PSPG parameters for each element.
 
     m_mesh.saveNodesList();
 
@@ -334,13 +331,13 @@ bool SolverIncompressible::solveCurrentTimeStep()
             displayDT(startTimeMeasure, endTimeMeasure, " * TauPSPG computed in ");
 
         startTimeMeasure = Clock::now();
-        buildPicardSystem(A, b, M, K, D, F, tauPSPG, qPrev);
+        buildPicardSystem(A, b, M, K, D, C, F, H, tauPSPG, qPrev);
         endTimeMeasure = Clock::now();
         if(m_verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * Ax = b built in ");
 
         startTimeMeasure = Clock::now();
-        applyBoundaryConditions(A, b, qPrev);
+        applyBoundaryConditions(b, qPrev);
         endTimeMeasure = Clock::now();
         if(m_verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * BC applied in ");
@@ -449,9 +446,14 @@ bool SolverIncompressible::solveCurrentTimeStep()
     return true;
 }
 
-void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b,
-                                             Eigen::SparseMatrix<double>& M, Eigen::SparseMatrix<double>& K,
-                                             Eigen::SparseMatrix<double>& D, Eigen::VectorXd& F,
+void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
+                                             Eigen::VectorXd& b,
+                                             Eigen::SparseMatrix<double>& M,
+                                             Eigen::SparseMatrix<double>& K,
+                                             Eigen::SparseMatrix<double>& D,
+                                             Eigen::SparseMatrix<double>& C,
+                                             Eigen::VectorXd& F,
+                                             Eigen::VectorXd& H,
                                              const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev)
 {
     assert(tauPSPG.size() == m_mesh.getElementsNumber());
@@ -466,14 +468,9 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
            matrices.H + (matrices.C*qPrev(1:2*Nn))/p.dt];
     */
 
-    A.resize((dim+1)*m_mesh.getNodesNumber(), (dim+1)*m_mesh.getNodesNumber());
     std::vector<Eigen::Triplet<double>> indexA;
     indexA.reserve((dim*noPerEl*noPerEl + dim*noPerEl*dim*noPerEl + 3*noPerEl*dim*noPerEl + noPerEl*noPerEl)*m_mesh.getElementsNumber());
 
-    b.resize(m_statesNumber*m_mesh.getNodesNumber());
-    b.setZero();
-
-    M.resize(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
     std::vector<Eigen::Triplet<double>> indexM;
     indexM.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
 
@@ -481,21 +478,15 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
     std::vector<Eigen::Triplet<double>> indexD;
     if(m_verboseOutput)
     {
-        K.resize(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
         indexK.reserve(dim*noPerEl*dim*noPerEl*m_mesh.getElementsNumber());
 
-        D.resize(m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
         indexD.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
     }
 
-    Eigen::SparseMatrix<double> C(m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
     std::vector<Eigen::Triplet<double>> indexC;
     indexC.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
 
-    F.resize(dim*m_mesh.getNodesNumber());
     F.setZero();
-
-    Eigen::VectorXd H(m_mesh.getNodesNumber());
     H.setZero();
 
     Eigen::MatrixXd MPrev = m_MPrev/m_currentDT;
@@ -574,9 +565,12 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
                                                             m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
                                                             Me[elm](i + d*noPerEl, j + d*noPerEl)));
 
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                            Me[elm](i + d*noPerEl, j + d*noPerEl)));
+                    if(!(m_mesh.isNodeBound(m_mesh.getElement(elm)[i]) || m_mesh.isNodeFree(m_mesh.getElement(elm)[i])))
+                    {
+                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
+                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                                Me[elm](i + d*noPerEl, j + d*noPerEl)));
+                    }
 
                     /********************************************************************
                                                   Build K
@@ -590,9 +584,12 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
                                                                     Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
                         }
 
-                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[j] + d2*m_mesh.getNodesNumber(),
-                                                                Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
+                        if(!(m_mesh.isNodeBound(m_mesh.getElement(elm)[i]) || m_mesh.isNodeFree(m_mesh.getElement(elm)[i])))
+                        {
+                            indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
+                                                                    m_mesh.getElement(elm)[j] + d2*m_mesh.getNodesNumber(),
+                                                                    Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
+                        }
                     }
 
                     /********************************************************************
@@ -605,15 +602,21 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
                                                                 De[elm](i, j + d*noPerEl)));
                     }
 
-                    //Part D of A
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                            De[elm](i, j + d*noPerEl)));
+                    if(!(m_mesh.isNodeFree(m_mesh.getElement(elm)[i]) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(m_mesh.getElement(elm)[i]))))
+                    {
+                        //Part D of A
+                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                                De[elm](i, j + d*noPerEl)));
+                    }
 
                     //Part -D^T of A
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                            -De[elm](i, j + d*noPerEl)));
+                    if(!(m_mesh.isNodeBound(m_mesh.getElement(elm)[j]) || m_mesh.isNodeFree(m_mesh.getElement(elm)[j])))
+                    {
+                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                                m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                                -De[elm](i, j + d*noPerEl)));
+                    }
 
                     /********************************************************************
                                                 Build C/dt
@@ -622,17 +625,23 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
                                                             m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
                                                             Ce[elm](i, j + d*noPerEl)));
 
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                            Ce[elm](i, j + d*noPerEl)));
+                    if(!(m_mesh.isNodeFree(m_mesh.getElement(elm)[i]) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(m_mesh.getElement(elm)[i]))))
+                    {
+                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
+                                                                Ce[elm](i, j + d*noPerEl)));
+                    }
                 }
 
                 /********************************************************************
                                             Build L
                 ********************************************************************/
-                indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                        m_mesh.getElement(elm)[j] + dim*m_mesh.getNodesNumber(),
-                                                        Le[elm](i,j)));
+                if(!(m_mesh.isNodeFree(m_mesh.getElement(elm)[i]) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(m_mesh.getElement(elm)[i]))))
+                {
+                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
+                                                            m_mesh.getElement(elm)[j] + dim*m_mesh.getNodesNumber(),
+                                                            Le[elm](i,j)));
+                }
             }
 
             /************************************************************************
@@ -645,6 +654,26 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
                                             Build h
             ************************************************************************/
             H(m_mesh.getElement(elm)[i]) += He[elm](i);
+        }
+    }
+
+    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    {
+        if(m_mesh.isNodeFree(n) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(n)))
+        {
+            indexA.push_back(Eigen::Triplet<double>(n + dim*m_mesh.getNodesNumber(),
+                                                    n + dim*m_mesh.getNodesNumber(),
+                                                    1));
+        }
+
+        if(m_mesh.isNodeBound(n) || m_mesh.isNodeFree(n))
+        {
+            for(unsigned short d = 0 ; d < dim ; ++d)
+            {
+                indexA.push_back(Eigen::Triplet<double>(n + d*m_mesh.getNodesNumber(),
+                                                        n + d*m_mesh.getNodesNumber(),
+                                                        1));
+            }
         }
     }
 
@@ -668,8 +697,6 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A, Eig
 
 void SolverIncompressible::computeTauPSPG(std::vector<double>& tauPSPG)
 {
-    tauPSPG.resize(m_mesh.getElementsNumber());
-
     #pragma omp parallel for default(shared)
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
