@@ -2,8 +2,6 @@
 #include <iomanip>
 #include <iostream>
 
-#include <gmsh.h>
-
 #include "SolverIncompressible.hpp"
 
 using Clock = std::chrono::high_resolution_clock;
@@ -456,11 +454,6 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                                              Eigen::VectorXd& H,
                                              const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev)
 {
-    assert(tauPSPG.size() == m_mesh.getElementsNumber());
-
-    const unsigned short dim = m_mesh.getDim();
-    const unsigned short noPerEl = dim + 1;
-
     /*A = [(matrices.M)/p.dt + matrices.K, -transpose(matrices.D);...
          (matrices.C)/p.dt - matrices.D, matrices.L];
 
@@ -468,40 +461,40 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
            matrices.H + (matrices.C*qPrev(1:2*Nn))/p.dt];
     */
 
-    std::vector<Eigen::Triplet<double>> indexA;
-    indexA.reserve((dim*noPerEl*noPerEl + dim*noPerEl*dim*noPerEl + 3*noPerEl*dim*noPerEl + noPerEl*noPerEl)*m_mesh.getElementsNumber());
+    assert(tauPSPG.size() == m_mesh.getElementsNumber());
 
-    std::vector<Eigen::Triplet<double>> indexM;
-    indexM.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
+    const unsigned short dim = m_mesh.getDim();
+    const unsigned short noPerEl = dim + 1;
+    const unsigned int tripletPerElm = (dim*noPerEl*noPerEl + dim*noPerEl*dim*noPerEl + 3*noPerEl*dim*noPerEl + noPerEl*noPerEl);
+    const IndexType nElm = m_mesh.getElementsNumber();
+    const IndexType nNodes = m_mesh.getNodesNumber();
+
+    std::vector<Eigen::Triplet<double>> indexA(tripletPerElm*nElm);
+
+    std::vector<Eigen::Triplet<double>> indexM(dim*noPerEl*noPerEl*nElm);
 
     std::vector<Eigen::Triplet<double>> indexK;
     std::vector<Eigen::Triplet<double>> indexD;
     if(m_verboseOutput)
     {
-        indexK.reserve(dim*noPerEl*dim*noPerEl*m_mesh.getElementsNumber());
+        indexK.resize(dim*noPerEl*dim*noPerEl*nElm);
 
-        indexD.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
+        indexD.resize(dim*noPerEl*noPerEl*nElm);
     }
 
-    std::vector<Eigen::Triplet<double>> indexC;
-    indexC.reserve(dim*noPerEl*noPerEl*m_mesh.getElementsNumber());
+    std::vector<Eigen::Triplet<double>> indexC(dim*noPerEl*noPerEl*nElm);
+
+    std::vector<std::pair<IndexType, double>> indexF(dim*(dim + 1)*nElm, std::make_pair(0, 0.0));
+    std::vector<std::pair<IndexType, double>> indexH((dim + 1)*nElm, std::make_pair(0, 0.0));
 
     F.setZero();
     H.setZero();
 
     Eigen::MatrixXd MPrev = m_MPrev/m_currentDT;
 
-    std::vector<Eigen::MatrixXd> Me(m_mesh.getElementsNumber());
-    std::vector<Eigen::MatrixXd> Ke(m_mesh.getElementsNumber());
-    std::vector<Eigen::MatrixXd> De(m_mesh.getElementsNumber());
-    std::vector<Eigen::MatrixXd> Ce(m_mesh.getElementsNumber());
-    std::vector<Eigen::MatrixXd> Le(m_mesh.getElementsNumber());
-    std::vector<Eigen::MatrixXd> Fe(m_mesh.getElementsNumber());
-    std::vector<Eigen::MatrixXd> He(m_mesh.getElementsNumber());
-
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
-    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
+    for(IndexType elm = 0 ; elm < nElm ; ++elm)
     {
         Eigen::MatrixXd Be = getB(elm);
         Eigen::MatrixXd Bep(dim, dim + 1);
@@ -511,47 +504,46 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
             Bep << Be.block(0, 0, 1, 4), Be.block(1, 4, 1, 4), Be.block(2, 8, 1, 4);
 
         //Me = S rho Nv^T Nv dV
-        Me[elm] = MPrev*m_mesh.getElementDetJ(elm);
+        Eigen::MatrixXd Me = MPrev*m_mesh.getElementDetJ(elm);
 
         //Ke = S Bv^T ddev Bv dV
-        Ke[elm] = m_mesh.getRefElementSize()*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
+        Eigen::MatrixXd Ke = m_mesh.getRefElementSize()*Be.transpose()*m_ddev*Be*m_mesh.getElementDetJ(elm); //same matrices for all gauss point ^^
 
         //De = S Np^T m Bv dV
-        De[elm].resize((dim+1),dim*(dim+1)); De[elm].setZero();
+        Eigen::MatrixXd De((dim+1),dim*(dim+1)); De.setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            De[elm] += (m_N[k].topLeftCorner(1, dim+1)).transpose()*m_m.transpose()*Be*m_mesh.getGaussWeight(k);
+            De += (m_N[k].topLeftCorner(1, dim+1)).transpose()*m_m.transpose()*Be*m_mesh.getGaussWeight(k);
 
 
-        De[elm] *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
+        De *= m_mesh.getRefElementSize()*m_mesh.getElementDetJ(elm);
 
         //Ce = tauPSPG S Bp^T Nv dV
-        Ce[elm].resize((dim+1),dim*(dim+1)); Ce[elm].setZero();
+        Eigen::MatrixXd Ce((dim+1),dim*(dim+1)); Ce.setZero();
 
         for (unsigned short k = 0 ; k < m_N.size() ; ++k)
-            Ce[elm] += Bep.transpose()*m_N[k]*m_mesh.getGaussWeight(k);
+            Ce += Bep.transpose()*m_N[k]*m_mesh.getGaussWeight(k);
 
-        Ce[elm] *= (m_mesh.getRefElementSize()*tauPSPG[elm]/m_currentDT)*m_mesh.getElementDetJ(elm);
+        Ce *= (m_mesh.getRefElementSize()*tauPSPG[elm]/m_currentDT)*m_mesh.getElementDetJ(elm);
 
         //Le = tauPSPG S Bp^T Bp dV
-        Le[elm] = m_mesh.getRefElementSize()*(tauPSPG[elm]/m_rho)
-                *Bep.transpose()*Bep
-                *m_mesh.getElementDetJ(elm);
+        Eigen::MatrixXd Le = m_mesh.getRefElementSize()*(tauPSPG[elm]/m_rho)*
+                             Bep.transpose()*Bep*m_mesh.getElementDetJ(elm);
 
         //Fe = S Nv^T bodyforce dV
-        Fe[elm].resize(dim*(dim+1),1); Fe[elm].setZero();
-
-        Fe[elm] = m_FPrev*m_mesh.getElementDetJ(elm);
+        Eigen::MatrixXd Fe = m_FPrev*m_mesh.getElementDetJ(elm);
 
         //He = tauPSPG S Bp^T bodyforce dV
-        He[elm] = m_mesh.getRefElementSize()*tauPSPG[elm]*Bep.transpose()
-                *m_bodyForces*m_mesh.getElementDetJ(elm);
-    }
-    Eigen::setNbThreads(m_numOMPThreads);
+        Eigen::MatrixXd He = m_mesh.getRefElementSize()*tauPSPG[elm]*Bep.transpose()*
+                             m_bodyForces*m_mesh.getElementDetJ(elm);
 
-    //Big push_back ^^
-    for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
-    {
+        std::size_t countA = 0;
+        std::size_t countM = 0;
+        std::size_t countCD = 0;
+        std::size_t countK = 0;
+        std::size_t countH = 0;
+        std::size_t countF = 0;
+
         for(unsigned short i = 0 ; i < (dim+1) ; ++i)
         {
             for(unsigned short j = 0 ; j < (dim+1) ; ++j)
@@ -561,16 +553,22 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                     /********************************************************************
                                                  Build M/dt
                     ********************************************************************/
-                    indexM.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                            Me[elm](i + d*noPerEl, j + d*noPerEl)));
+                    indexM[dim*noPerEl*noPerEl*elm + countM] =
+                        Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*nNodes,
+                                               m_mesh.getElement(elm)[j] + d*nNodes,
+                                               Me(i + d*noPerEl, j + d*noPerEl));
+
+                    countM++;
 
                     if(!(m_mesh.isNodeBound(m_mesh.getElement(elm)[i]) || m_mesh.isNodeFree(m_mesh.getElement(elm)[i])))
                     {
-                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                                Me[elm](i + d*noPerEl, j + d*noPerEl)));
+                        indexA[tripletPerElm*elm + countA] =
+                            Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*nNodes,
+                                                   m_mesh.getElement(elm)[j] + d*nNodes,
+                                                   Me(i + d*noPerEl, j + d*noPerEl));
                     }
+
+                    countA++;
 
                     /********************************************************************
                                                   Build K
@@ -579,17 +577,22 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                     {
                         if(m_verboseOutput)
                         {
-                            indexK.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
-                                                                    m_mesh.getElement(elm)[j] + d2*m_mesh.getNodesNumber(),
-                                                                    Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
+                            indexK[dim*noPerEl*dim*noPerEl*elm + countK] =
+                                Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*nNodes,
+                                                       m_mesh.getElement(elm)[j] + d2*nNodes,
+                                                       Ke(i + d*noPerEl, j + d2*noPerEl));
+
+                            countK++;
                         }
 
                         if(!(m_mesh.isNodeBound(m_mesh.getElement(elm)[i]) || m_mesh.isNodeFree(m_mesh.getElement(elm)[i])))
                         {
-                            indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber(),
-                                                                    m_mesh.getElement(elm)[j] + d2*m_mesh.getNodesNumber(),
-                                                                    Ke[elm](i + d*noPerEl, j + d2*noPerEl)));
+                            indexA[tripletPerElm*elm + countA] =
+                                Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*nNodes,
+                                                       m_mesh.getElement(elm)[j] + d2*nNodes,
+                                                       Ke(i + d*noPerEl, j + d2*noPerEl));
                         }
+                        countA++;
                     }
 
                     /********************************************************************
@@ -597,40 +600,55 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                     ********************************************************************/
                     if(m_verboseOutput)
                     {
-                        indexD.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                                De[elm](i, j + d*noPerEl)));
+                        indexD[noPerEl*dim*noPerEl*elm + countCD] =
+                            Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
+                                                   m_mesh.getElement(elm)[j] + d*nNodes,
+                                                   De(i, j + d*noPerEl));
+
+                        //Updated with C
                     }
 
                     if(!(m_mesh.isNodeFree(m_mesh.getElement(elm)[i]) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(m_mesh.getElement(elm)[i]))))
                     {
                         //Part D of A
-                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                                De[elm](i, j + d*noPerEl)));
+                        indexA[tripletPerElm*elm + countA] =
+                            Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*nNodes,
+                                                   m_mesh.getElement(elm)[j] + d*nNodes,
+                                                   De(i, j + d*noPerEl));
                     }
+
+                    countA++;
 
                     //Part -D^T of A
                     if(!(m_mesh.isNodeBound(m_mesh.getElement(elm)[j]) || m_mesh.isNodeFree(m_mesh.getElement(elm)[j])))
                     {
-                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                                -De[elm](i, j + d*noPerEl)));
+                        indexA[tripletPerElm*elm + countA] =
+                            Eigen::Triplet<double>(m_mesh.getElement(elm)[j] + d*nNodes,
+                                                   m_mesh.getElement(elm)[i] + dim*nNodes,
+                                                   -De(i, j + d*noPerEl));
                     }
+
+                    countA++;
 
                     /********************************************************************
                                                 Build C/dt
                     ********************************************************************/
-                    indexC.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
-                                                            m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                            Ce[elm](i, j + d*noPerEl)));
+                    indexC[noPerEl*dim*noPerEl*elm + countCD] =
+                        Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
+                                               m_mesh.getElement(elm)[j] + d*nNodes,
+                                               Ce(i, j + d*noPerEl));
+
+                    countCD++;
 
                     if(!(m_mesh.isNodeFree(m_mesh.getElement(elm)[i]) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(m_mesh.getElement(elm)[i]))))
                     {
-                        indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                                m_mesh.getElement(elm)[j] + d*m_mesh.getNodesNumber(),
-                                                                Ce[elm](i, j + d*noPerEl)));
+                        indexA[tripletPerElm*elm + countA] =
+                            Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*nNodes,
+                                                   m_mesh.getElement(elm)[j] + d*nNodes,
+                                                   Ce(i, j + d*noPerEl));
                     }
+
+                    countA++;
                 }
 
                 /********************************************************************
@@ -638,31 +656,46 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                 ********************************************************************/
                 if(!(m_mesh.isNodeFree(m_mesh.getElement(elm)[i]) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(m_mesh.getElement(elm)[i]))))
                 {
-                    indexA.push_back(Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*m_mesh.getNodesNumber(),
-                                                            m_mesh.getElement(elm)[j] + dim*m_mesh.getNodesNumber(),
-                                                            Le[elm](i,j)));
+                    indexA[tripletPerElm*elm + countA] =
+                        Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + dim*nNodes,
+                                               m_mesh.getElement(elm)[j] + dim*nNodes,
+                                               Le(i,j));
                 }
+
+                countA++;
             }
 
             /************************************************************************
                                               Build f
             ************************************************************************/
             for(unsigned short d = 0 ; d < dim ; ++d)
-                F(m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()) += Fe[elm](i + d*noPerEl);
+            {
+                indexF[dim*(dim + 1)*elm + countF] =
+                    std::make_pair(m_mesh.getElement(elm)[i] + d*nNodes, Fe(i + d*noPerEl));
+
+                countF++;
+            }
 
             /************************************************************************
                                             Build h
             ************************************************************************/
-            H(m_mesh.getElement(elm)[i]) += He[elm](i);
+            indexH[(dim + 1)*elm + countH] =
+                    std::make_pair(m_mesh.getElement(elm)[i], He(i));
+
+            countH++;
         }
     }
+    Eigen::setNbThreads(m_numOMPThreads);
 
-    for(IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
+    //Best would be to know the number of nodes in which case :/
+    //This can still be fasten using openmp but will never be as good as using []
+    //with preallocated memory
+    for(IndexType n = 0 ; n < nNodes ; ++n)
     {
         if(m_mesh.isNodeFree(n) || (m_strongPAtFS && m_mesh.isNodeOnFreeSurface(n)))
         {
-            indexA.push_back(Eigen::Triplet<double>(n + dim*m_mesh.getNodesNumber(),
-                                                    n + dim*m_mesh.getNodesNumber(),
+            indexA.push_back(Eigen::Triplet<double>(n + dim*nNodes,
+                                                    n + dim*nNodes,
                                                     1));
         }
 
@@ -670,11 +703,21 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
         {
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
-                indexA.push_back(Eigen::Triplet<double>(n + d*m_mesh.getNodesNumber(),
-                                                        n + d*m_mesh.getNodesNumber(),
+                indexA.push_back(Eigen::Triplet<double>(n + d*nNodes,
+                                                        n + d*nNodes,
                                                         1));
             }
         }
+    }
+
+    for(auto& doublet : indexF)
+    {
+        F[doublet.first] += doublet.second;
+    }
+
+    for(auto& doublet : indexH)
+    {
+        H[doublet.first] += doublet.second;
     }
 
     M.setFromTriplets(indexM.begin(), indexM.end());
@@ -692,9 +735,10 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
     ********************************************************************************/
     A.setFromTriplets(indexA.begin(), indexA.end());
 
-    b << F + M*qPrev.head(dim*m_mesh.getNodesNumber()), H + C*qPrev.head(dim*m_mesh.getNodesNumber());
+    b << F + M*qPrev.head(dim*nNodes), H + C*qPrev.head(dim*nNodes);
 }
 
+//Put this is build PicardSystem ?
 void SolverIncompressible::computeTauPSPG(std::vector<double>& tauPSPG)
 {
     #pragma omp parallel for default(shared)
