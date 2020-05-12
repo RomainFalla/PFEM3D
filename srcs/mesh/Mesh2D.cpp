@@ -42,7 +42,7 @@ void Mesh::triangulateAlphaShape2D()
     }
 
     const Alpha_shape_2 as(pointsList.begin(), pointsList.end(),
-                           FT(m_alpha*m_alpha*m_hchar*m_hchar),
+                           m_alpha*m_alpha*m_hchar*m_hchar,
                            Alpha_shape_2::GENERAL);
 
     // We check for each triangle which one will be kept (alpha shape), then we

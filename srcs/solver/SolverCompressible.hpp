@@ -60,9 +60,8 @@ class SOLVER_API SolverCompressible : public Solver
          * \brief Apply boundary conditions to the matrix invM and vector F
          * \param invM A reference to the inverse mass matrix.
          * \param F A reference to the vector F.
-         * \param qVPrev A reference to the precedent velocity of all nodes.
          */
-        void applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F, const Eigen::VectorXd& qVPrev);
+        void applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
 
         /**
          * \brief Build the rhs of the continuity equation.
