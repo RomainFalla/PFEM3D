@@ -6,7 +6,7 @@
 
 #include "Extractor.hpp"
 
-class SOLVER_NO_EXPORT PointExtractor : public Extractor
+class SOLVER_API PointExtractor : public Extractor
 {
     public:
         PointExtractor()                                                = delete;

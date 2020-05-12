@@ -4,7 +4,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <nlohmann/json.hpp>
+
 #ifndef SOL_ALL_SAFETIES_ON
     #define SOL_ALL_SAFETIES_ON 1
 #endif
@@ -26,6 +26,18 @@ enum class SOLVER_TYPE
     WeaklyCompressible
 };
 
+struct SolverCreateInfo
+{
+    MeshCreateInfo meshInfos = {};
+    double gravity = 0;
+    bool strongPAtFS = false;
+    bool adaptDT = true;
+    double initialDT = 0;
+    double endTime = 0;
+    double maxDT = 0;
+    std::string IBCfile = {};
+};
+
 /**
  * \class Solver
  * \brief Represents a solver.
@@ -34,12 +46,15 @@ class SOLVER_API Solver
 {
     public:
         Solver()                                = delete;
-        Solver(const nlohmann::json& j, const std::string& mshName);
+        Solver(const SolverCreateInfo& solverInfos);
         Solver(const Solver& solver)            = delete;
         Solver& operator=(const Solver& solver) = delete;
         Solver(Solver&& solver)                 = delete;
         Solver& operator=(Solver&& solver)      = delete;
         virtual ~Solver() noexcept              = default;
+
+        template <typename T, typename... Args>
+        void addExtractor(Args... args);
 
         /**
          * \return Return the current time increment of the simulation in seconds.
@@ -119,7 +134,6 @@ class SOLVER_API Solver
 
         sol::state m_lua;
 
-        bool m_verboseOutput;           /**< Should the output be verbose? */
         unsigned int m_numOMPThreads;   /**< Number of OpenMP threads used. */
 
         unsigned short m_statesNumber;

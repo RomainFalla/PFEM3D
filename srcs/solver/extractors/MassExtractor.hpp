@@ -6,7 +6,7 @@
 
 #include "Extractor.hpp"
 
-class SOLVER_NO_EXPORT MassExtractor : public Extractor
+class SOLVER_API MassExtractor : public Extractor
 {
     public:
         MassExtractor()                                              = delete;

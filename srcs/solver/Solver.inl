@@ -178,3 +178,42 @@ inline void Solver::setNodesStatesfromQ(const Eigen::VectorXd& q, unsigned short
             m_mesh.setNodeState(n, s, q((s - beginState)*m_mesh.getNodesNumber() + n));
     }
 }
+
+template <typename T, typename... Args>
+void Solver::addExtractor(Args... args)
+{
+    static unsigned short GMSHExtractorCount = 0;
+    if constexpr (std::is_same<T, PointExtractor>::value)
+    {
+        static_assert(sizeof...(Args) == 4, "PointExtractor needs two arguments!");
+        m_pExtractor.push_back(std::make_unique<PointExtractor>(*this,
+                                                                args...));
+    }
+    else if constexpr (std::is_same<T, MinMaxExtractor>::value)
+    {
+        static_assert(sizeof...(Args) == 4, "MinMaxExtractor needs two arguments ");
+        m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(*this,
+                                                                 args...));
+    }
+    else if constexpr (std::is_same<T, MassExtractor>::value)
+    {
+        static_assert(sizeof...(Args) == 2, "MassExtractor needs 0 arguments!");
+        m_pExtractor.push_back(std::make_unique<MassExtractor>(*this,
+                                                               args...));
+    }
+    else if constexpr (std::is_same<T, GMSHExtractor>::value)
+    {
+        static_assert(sizeof...(Args) == 4, "GMSHExtractor needs 4 arguments!");
+        if(GMSHExtractorCount == 0)
+        {
+            m_pExtractor.push_back(std::make_unique<GMSHExtractor>(*this,
+                                                                   args...));
+
+            GMSHExtractorCount ++;
+        }
+        else
+            throw std::runtime_error("cannot add more than one GMSHExtractor!");
+    }
+    else
+        static_assert(true, "Unknown extractor type ");
+}

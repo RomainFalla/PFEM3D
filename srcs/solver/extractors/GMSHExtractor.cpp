@@ -7,12 +7,27 @@
 
 
 GMSHExtractor::GMSHExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
-                             const std::vector<std::string>& whatToWrite,
-                             std::vector<std::string> whatCanBeWritten, std::string writeAs) :
-Extractor(solver, outFileName, timeBetweenWriting), m_whatCanBeWritten(std::move(whatCanBeWritten)), m_writeAs(std::move(writeAs))
+                             const std::vector<std::string>& whatToWrite, std::string writeAs) :
+Extractor(solver, outFileName, timeBetweenWriting), m_writeAs(std::move(writeAs))
 {
     if(!(m_writeAs == "Nodes" || m_writeAs == "Elements" || m_writeAs == "NodesElements"))
         throw std::runtime_error("unknown data type for results writing " + m_writeAs);
+
+    if(solver.getSolverType() == SOLVER_TYPE::Incompressible_PSPG)
+    {
+        if(solver.getMesh().getDim() == 2)
+            m_whatCanBeWritten = {"u", "v", "p", "ke", "velocity"};
+        else
+            m_whatCanBeWritten = {"u", "v", "w", "p", "ke", "velocity"};
+    }
+    else if(solver.getSolverType() == SOLVER_TYPE::WeaklyCompressible)
+    {
+        if(solver.getMesh().getDim() == 2)
+            m_whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
+        else
+            m_whatCanBeWritten = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "velocity"};
+    }
+    else throw std::runtime_error("unknown solver type!");
 
     m_whatToWrite.resize(m_whatCanBeWritten.size());
 

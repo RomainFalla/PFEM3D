@@ -4,13 +4,12 @@
 
 #include "Extractor.hpp"
 
-class SOLVER_NO_EXPORT GMSHExtractor : public Extractor
+class SOLVER_API GMSHExtractor : public Extractor
 {
     public:
         GMSHExtractor()                                              = delete;
         GMSHExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
-                      const std::vector<std::string>& whatToWrite,
-                      std::vector<std::string> whatCanBeWritten, std::string writeAs);
+                      const std::vector<std::string>& whatToWrite, std::string writeAs);
         GMSHExtractor(const GMSHExtractor& gmshExtractor)            = delete;
         GMSHExtractor& operator=(const GMSHExtractor& gmshExtractor) = delete;
         GMSHExtractor(GMSHExtractor&& gmshExtractor)                 = delete;

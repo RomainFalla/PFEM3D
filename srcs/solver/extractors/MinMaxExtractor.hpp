@@ -6,7 +6,7 @@
 
 #include "Extractor.hpp"
 
-class SOLVER_NO_EXPORT MinMaxExtractor : public Extractor
+class SOLVER_API MinMaxExtractor : public Extractor
 {
     public:
         MinMaxExtractor()                                                  = delete;

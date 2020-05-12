@@ -1,23 +1,19 @@
 #include "Mesh.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 
 #include <gmsh.h>
 
 
-Mesh::Mesh(const nlohmann::json& j)
+Mesh::Mesh(const MeshCreateInfo& meshInfos) :
+m_hchar(meshInfos.hchar), m_alpha(meshInfos.alpha), m_omega(meshInfos.omega), m_gamma(meshInfos.gamma), m_boundingBox(meshInfos.boundingBox)
 {
-    m_verboseOutput = j["verboseOutput"].get<bool>();
-
-    m_hchar       = j["Remeshing"]["hchar"].get<double>();
-    m_alpha       = j["Remeshing"]["alpha"].get<double>();
-    m_omega       = j["Remeshing"]["omega"].get<double>();
-    m_gamma       = j["Remeshing"]["gamma"].get<double>();
-    m_boundingBox = j["Remeshing"]["boundingBox"].get<std::vector<double>>();
+    loadFromFile(meshInfos.mshFile);
 }
 
-bool Mesh::addNodes() noexcept
+bool Mesh::addNodes(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
     assert(m_elementsDetJ.size() == m_elementsList.size() && "The determinant are not computed!");
@@ -55,7 +51,7 @@ bool Mesh::addNodes() noexcept
 
             m_nodesList.push_back(std::move(newNode));
 
-            if(m_verboseOutput)
+            if(verboseOutput)
             {
                 std::cout << "Adding node (" << "(";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
@@ -76,7 +72,7 @@ bool Mesh::addNodes() noexcept
     return addedNodes;
 }
 
-bool Mesh::checkBoundingBox() noexcept
+bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
@@ -101,11 +97,11 @@ bool Mesh::checkBoundingBox() noexcept
     }
 
     m_nodesList.erase(
-    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted](const Node& node)
+    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted, verboseOutput](const Node& node)
     {
        if(toBeDeleted[&node - &*std::begin(m_nodesList)])
        {
-           if(this->m_verboseOutput)
+           if(verboseOutput)
            {
                std::cout << "Removing out of bounding box node (";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
@@ -479,18 +475,18 @@ void Mesh::loadFromFile(const std::string& fileName)
     computeElementsInvJ();
 }
 
-void Mesh::remesh()
+void Mesh::remesh(bool verboseOutput)
 {
-    checkBoundingBox();
+    checkBoundingBox(verboseOutput);
     triangulateAlphaShape();
 
-    if(removeNodes())
+    if(removeNodes(verboseOutput))
         triangulateAlphaShape();
 
     computeElementsJ();
     computeElementsDetJ();
 
-    if(addNodes())
+    if(addNodes(verboseOutput))
     {
         triangulateAlphaShape();
         computeElementsJ();
@@ -503,7 +499,7 @@ void Mesh::remesh()
     }
 }
 
-bool Mesh::removeNodes() noexcept
+bool Mesh::removeNodes(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
@@ -560,11 +556,11 @@ bool Mesh::removeNodes() noexcept
     }
 
     m_nodesList.erase(
-    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted](const Node& node)
+    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted, verboseOutput](const Node& node)
     {
        if(toBeDeleted[&node - &*std::begin(m_nodesList)])
        {
-           if(this->m_verboseOutput)
+           if(verboseOutput)
            {
                 std::cout << "Removing node " << "(";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)

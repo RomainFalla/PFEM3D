@@ -14,8 +14,10 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 }
 
 
-SolverIncompressible::SolverIncompressible(const nlohmann::json& j, const std::string& mshName) :
-Solver(j, mshName)
+SolverIncompressible::SolverIncompressible(const SolverIncompCreateInfo& solverIncompInfos) :
+Solver(solverIncompInfos.solverInfos), m_rho(solverIncompInfos.rho), m_mu(solverIncompInfos.mu), m_picardRelTol(solverIncompInfos.picardRelTol),
+m_picardMaxIter(solverIncompInfos.picardMaxIter), m_coeffDTincrease(solverIncompInfos.coeffDTincrease),
+m_coeffDTdecrease(solverIncompInfos.coeffDTdecrease)
 {
     m_solverType = SOLVER_TYPE::Incompressible_PSPG;
     unsigned short dim = m_mesh.getDim();
@@ -23,71 +25,6 @@ Solver(j, mshName)
     m_statesNumber = dim + 1;
 
     m_mesh.setStatesNumber(m_statesNumber);
-
-    m_rho               = j["Solver"]["Fluid"]["rho"].get<double>();
-    m_mu                = j["Solver"]["Fluid"]["mu"].get<double>();
-
-    m_picardRelTol           = j["Solver"]["Picard"]["relTol"].get<double>();
-    m_picardMaxIter          = j["Solver"]["Picard"]["maxIter"].get<unsigned int>();
-
-    m_coeffDTincrease    = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
-    m_coeffDTdecrease    = j["Solver"]["Time"]["coeffDTdecrease"].get<double>();
-
-    std::vector<std::string> whatCanBeWritten;
-    if(dim == 2)
-        whatCanBeWritten = {"u", "v", "p", "ke", "velocity"};
-    else
-        whatCanBeWritten = {"u", "v", "w", "p", "ke", "velocity"};
-
-    auto extractors = j["Solver"]["Extractors"];
-    unsigned short GMSHExtractorCount = 0;
-    for(auto& extractor : extractors)
-    {
-        if(extractor["type"].get<std::string>() == "Point")
-        {
-            m_pExtractor.push_back(std::make_unique<PointExtractor>(*this,
-                                                                    extractor["outputFile"].get<std::string>(),
-                                                                    extractor["timeBetweenWriting"].get<double>(),
-                                                                    extractor["stateToWrite"].get<unsigned short>(),
-                                                                    extractor["points"].get<std::vector<std::vector<double>>>()));
-        }
-        else if(extractor["type"].get<std::string>() == "GMSH")
-        {
-            if(GMSHExtractorCount < 1)
-            {
-                m_pExtractor.push_back(std::make_unique<GMSHExtractor>(*this,
-                                                                       extractor["outputFile"].get<std::string>(),
-                                                                       extractor["timeBetweenWriting"].get<double>(),
-                                                                       extractor["whatToWrite"].get<std::vector<std::string>>(),
-                                                                       whatCanBeWritten,
-                                                                       extractor["writeAs"].get<std::string>()));
-                GMSHExtractorCount++;
-            }
-            else
-            {
-                std::cerr << "Cannot add more than one GMSH extractor!" << std::endl;
-            }
-        }
-        else if(extractor["type"].get<std::string>() == "MinMax")
-        {
-            m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(*this,
-                                                                     extractor["outputFile"].get<std::string>(),
-                                                                     extractor["timeBetweenWriting"].get<double>(),
-                                                                     extractor["coordinate"].get<unsigned short>(),
-                                                                     extractor["minMax"].get<std::string>()));
-        }
-        else if(extractor["type"].get<std::string>() == "Mass")
-        {
-            m_pExtractor.push_back(std::make_unique<MassExtractor>(*this,
-                                                                   extractor["outputFile"].get<std::string>(),
-                                                                   extractor["timeBetweenWriting"].get<double>()));
-        }
-        else
-        {
-            std::string errotText = std::string("unknown extractor type ") + extractor["Type"].get<std::string>();
-            throw std::runtime_error(errotText);
-        }
-    }
 
     m_lua["rho"] = m_rho;
     m_lua["mu"] = m_mu;
@@ -203,7 +140,7 @@ void SolverIncompressible::displaySolverParams() const noexcept
         std::cout << "Time step: " << m_maxDT << " s" << std::endl;
 }
 
-void SolverIncompressible::solveProblem()
+void SolverIncompressible::solveProblem(bool verboseOutput)
 {
     std::cout   << "================================================================"
                 << std::endl
@@ -223,7 +160,7 @@ void SolverIncompressible::solveProblem()
 
     while(m_currentTime < m_endTime)
     {
-        if(m_verboseOutput)
+        if(verboseOutput)
         {
             std::cout << "----------------------------------------------------------------" << std::endl;
             std::cout << "Solving time step: " << m_currentTime + m_currentDT
@@ -239,7 +176,7 @@ void SolverIncompressible::solveProblem()
             std::cout << m_currentDT << " s" << std::flush;
         }
 
-        if(solveCurrentTimeStep())
+        if(solveCurrentTimeStep(verboseOutput))
         {
             for(auto& extractor : m_pExtractor)
             {
@@ -257,7 +194,7 @@ void SolverIncompressible::solveProblem()
         {
             if(m_adaptDT)
             {
-                if(m_verboseOutput)
+                if(verboseOutput)
                 {
                     std::cout << "* The algorithm did not converge - Reducing the time step"
                               << std::endl;
@@ -275,7 +212,7 @@ void SolverIncompressible::solveProblem()
     std::cout << std::endl;
 }
 
-bool SolverIncompressible::solveCurrentTimeStep()
+bool SolverIncompressible::solveCurrentTimeStep(bool verboseOutput)
 {
     TimeType startTime, endTime, startTimeMeasure, endTimeMeasure;
     startTime = Clock::now();
@@ -290,7 +227,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
     Eigen::SparseMatrix<double> M(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());            //The mass matrix.
     Eigen::SparseMatrix<double> K;                                                                      //The viscosity matrix.
     Eigen::SparseMatrix<double> D;                                                                      //The pressure matrix.
-    if(m_verboseOutput)
+    if(verboseOutput)
     {
         K.resize(dim*m_mesh.getNodesNumber(), dim*m_mesh.getNodesNumber());
 
@@ -309,12 +246,12 @@ bool SolverIncompressible::solveCurrentTimeStep()
     Eigen::VectorXd qIterPrev(m_statesNumber*m_mesh.getNodesNumber()); qIterPrev.setZero();
     double res = std::numeric_limits<double>::max();
     endTimeMeasure = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, "Picard algorithm set up in ");
 
     while(res > m_picardRelTol)
     {
-        if(m_verboseOutput)
+        if(verboseOutput)
         {
             std::cout << "Picard algorithm (mesh position) - iteration ("
                       << m_picardCurrentNumIter << ")" << std::endl;
@@ -325,19 +262,19 @@ bool SolverIncompressible::solveCurrentTimeStep()
         startTimeMeasure = Clock::now();
         computeTauPSPG(tauPSPG);
         endTimeMeasure = Clock::now();
-        if(m_verboseOutput)
+        if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * TauPSPG computed in ");
 
         startTimeMeasure = Clock::now();
-        buildPicardSystem(A, b, M, K, D, C, F, H, tauPSPG, qPrev);
+        buildPicardSystem(A, b, M, K, D, C, F, H, tauPSPG, qPrev, verboseOutput);
         endTimeMeasure = Clock::now();
-        if(m_verboseOutput)
+        if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * Ax = b built in ");
 
         startTimeMeasure = Clock::now();
         applyBoundaryConditions(b, qPrev);
         endTimeMeasure = Clock::now();
-        if(m_verboseOutput)
+        if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * BC applied in ");
 
         startTimeMeasure = Clock::now();
@@ -352,7 +289,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
             return false;
         }
         endTimeMeasure = Clock::now();
-        if(m_verboseOutput)
+        if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * System solved in ");
 
 
@@ -362,7 +299,7 @@ bool SolverIncompressible::solveCurrentTimeStep()
         m_mesh.updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + dim*m_mesh.getNodesNumber()));
         m_picardCurrentNumIter++;
         endTimeMeasure = Clock::now();
-        if(m_verboseOutput)
+        if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * Solution updated in ");
 
         startTimeMeasure = Clock::now();
@@ -388,10 +325,10 @@ bool SolverIncompressible::solveCurrentTimeStep()
             res = std::sqrt(num/den);
         }
         endTimeMeasure = Clock::now();
-        if(m_verboseOutput)
+        if(verboseOutput)
             displayDT(startTimeMeasure, endTimeMeasure, " * Residual computed in ");
 
-        if(m_verboseOutput)
+        if(verboseOutput)
         {
             startTimeMeasure = Clock::now();
             std::cout << " * Relative 2-norm of q: " << res << " vs "
@@ -432,13 +369,13 @@ bool SolverIncompressible::solveCurrentTimeStep()
     m_currentStep++;
 
     endTime = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTime, endTime, "Picard algorithm solved in ");
 
     startTime = Clock::now();
-    m_mesh.remesh();
+    m_mesh.remesh(verboseOutput);
     endTime = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTime, endTime, "Remeshing done in ");
 
     return true;
@@ -452,7 +389,8 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                                              Eigen::SparseMatrix<double>& C,
                                              Eigen::VectorXd& F,
                                              Eigen::VectorXd& H,
-                                             const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev)
+                                             const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev,
+                                             bool verboseOutput)
 {
     /*A = [(matrices.M)/p.dt + matrices.K, -transpose(matrices.D);...
          (matrices.C)/p.dt - matrices.D, matrices.L];
@@ -475,7 +413,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
 
     std::vector<Eigen::Triplet<double>> indexK;
     std::vector<Eigen::Triplet<double>> indexD;
-    if(m_verboseOutput)
+    if(verboseOutput)
     {
         indexK.resize(dim*noPerEl*dim*noPerEl*nElm);
 
@@ -575,7 +513,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                     ********************************************************************/
                     for(unsigned short d2 = 0 ; d2 < dim ; ++d2)
                     {
-                        if(m_verboseOutput)
+                        if(verboseOutput)
                         {
                             indexK[dim*noPerEl*dim*noPerEl*elm + countK] =
                                 Eigen::Triplet<double>(m_mesh.getElement(elm)[i] + d*nNodes,
@@ -598,7 +536,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
                     /********************************************************************
                                                   Build D
                     ********************************************************************/
-                    if(m_verboseOutput)
+                    if(verboseOutput)
                     {
                         indexD[noPerEl*dim*noPerEl*elm + countCD] =
                             Eigen::Triplet<double>(m_mesh.getElement(elm)[i],
@@ -722,7 +660,7 @@ void SolverIncompressible::buildPicardSystem(Eigen::SparseMatrix<double>& A,
 
     M.setFromTriplets(indexM.begin(), indexM.end());
 
-    if(m_verboseOutput)
+    if(verboseOutput)
     {
         K.setFromTriplets(indexK.begin(), indexK.end());
         D.setFromTriplets(indexD.begin(), indexD.end());

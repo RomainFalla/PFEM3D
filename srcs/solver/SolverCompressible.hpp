@@ -4,6 +4,18 @@
 
 #include "Solver.hpp"
 
+struct SolverCompCreateInfo
+{
+    double rho0 = 0;
+    double mu = 0;
+    double K0 = 0;
+    double K0prime = 0;
+    double pInfty = 0;
+    double securityCoeff = 0;
+    bool strongContinuity = true;
+    SolverCreateInfo solverInfos = {};
+};
+
 /**
  * \class SolverCompressible
  * \brief Represents a solver for an compressible Newtonian fluid.
@@ -12,7 +24,7 @@ class SOLVER_API SolverCompressible : public Solver
 {
     public:
         SolverCompressible()                                                        = delete;
-        SolverCompressible(const nlohmann::json& j, const std::string& mshName);
+        SolverCompressible(const SolverCompCreateInfo& solverCompInfos);
         SolverCompressible(const SolverCompressible& solverCompressible)            = delete;
         SolverCompressible& operator=(const SolverCompressible& solverCompressible) = delete;
         SolverCompressible(SolverCompressible&& solverCompressible)                 = delete;
@@ -27,12 +39,12 @@ class SOLVER_API SolverCompressible : public Solver
          * \brief Solve the Picard algorithm for one time step.
          * \return true if the algorithm converged, false otherwise.
          */
-        bool solveCurrentTimeStep();
+        bool solveCurrentTimeStep(bool verboseOutput);
 
         /**
          * \brief Solve the problem for a certain set of parameters.
          */
-        void solveProblem();
+        void solveProblem(bool verboseOutput);
 
     private:
         double m_rho0; /**< The fluid density (kg/m^3). */

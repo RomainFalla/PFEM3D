@@ -2,11 +2,21 @@
 #ifndef MESH_HPP_INCLUDED
 #define MESH_HPP_INCLUDED
 
-#include <nlohmann/json.hpp>
+#include <string>
 
 #include "Node.hpp"
 
 #include "Mesh_export.h"
+
+struct MeshCreateInfo
+{
+    double hchar = 0;
+    double alpha = 1;
+    double gamma = 0;
+    double omega = 1e16;
+    std::vector<double> boundingBox = {};
+    std::string mshFile = {};
+};
 
 /**
  * \class Mesh
@@ -16,7 +26,7 @@ class MESH_API Mesh
 {
     public:
         Mesh()                              = delete;
-        Mesh(const nlohmann::json& j);
+        Mesh(const MeshCreateInfo& meshInfos);
         Mesh(const Mesh& mesh)              = delete;
         Mesh& operator=(const Mesh& mesh)   = delete;
         Mesh(Mesh&& mesh)                   = delete;
@@ -179,15 +189,9 @@ class MESH_API Mesh
         inline bool isNodeOnFreeSurface(IndexType nodeIndex) const noexcept;
 
         /**
-         * \brief Load the nodes from a file using gmsh.
-         * \param fileName The name of the .msh file.
-         */
-        void loadFromFile(const std::string& fileName);
-
-        /**
          * \brief Perform remeshing on the mesh.
          */
-        void remesh();
+        void remesh(bool verboseOutput);
 
         /**
          * \brief Restore the current nodes list from the list saved in saveNodesList.
@@ -259,13 +263,13 @@ class MESH_API Mesh
          * \brief Add nodes in element whose area is too big (A_tringle > omega*hchar^2.
          * \return true if at least one node was added, false otherwise).
          */
-        bool addNodes() noexcept;
+        bool addNodes(bool verboseOutput) noexcept;
 
         /**
          * \brief Check if a node is outside the bounding box and deletes it if so.
          * \return true if at least one node was deleted, false otherwise.
          */
-        bool checkBoundingBox() noexcept;
+        bool checkBoundingBox(bool verboseOutput) noexcept;
 
         /**
          * \brief Compute the determinant of the of the Jacobian matrix for gauss
@@ -298,6 +302,12 @@ class MESH_API Mesh
         void computeMeshDim();
 
         /**
+         * \brief Load the nodes from a file using gmsh.
+         * \param fileName The name of the .msh file.
+         */
+        void loadFromFile(const std::string& fileName);
+
+        /**
          * \brief Remesh the nodes in nodesList using CGAL (Delaunay triangulation
          *        and alpha-shape).
          */
@@ -320,7 +330,7 @@ class MESH_API Mesh
          *       (d_nodes < gamma*hchar).
          * \return true if at least one node was deleted, false otherwise.
          */
-        bool removeNodes() noexcept;
+        bool removeNodes(bool verboseOutput) noexcept;
 };
 
 #include "Mesh.inl"

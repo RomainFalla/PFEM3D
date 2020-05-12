@@ -33,7 +33,6 @@ GENERATE_EXPORT_HEADER(Solver
 TARGET_INCLUDE_DIRECTORIES(Solver SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${GMSH_INCLUDE_DIRS}
-                           PUBLIC ${JSON_INCLUDE_DIRS}
                            PUBLIC ${EIGEN_INCLUDE_DIRS}
                            PUBLIC ${LUA_INCLUDE_DIR}
                            PUBLIC ${SOL3_INCLUDE_DIRS})

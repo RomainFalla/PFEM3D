@@ -16,8 +16,10 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 }
 
 
-SolverCompressible::SolverCompressible(const nlohmann::json& j, const std::string& mshName) :
-Solver(j, mshName)
+SolverCompressible::SolverCompressible(const SolverCompCreateInfo& solverCompInfos) :
+Solver(solverCompInfos.solverInfos), m_rho0(solverCompInfos.rho0), m_mu(solverCompInfos.mu), m_K0(solverCompInfos.K0),
+m_K0prime(solverCompInfos.K0prime), m_pInfty(solverCompInfos.pInfty), m_securityCoeff(solverCompInfos.securityCoeff),
+m_strongContinuity(solverCompInfos.strongContinuity)
 {
     m_solverType = SOLVER_TYPE::WeaklyCompressible;
     unsigned short dim = m_mesh.getDim();
@@ -25,72 +27,6 @@ Solver(j, mshName)
     m_statesNumber = 2*dim + 2;
 
     m_mesh.setStatesNumber(m_statesNumber);
-
-    m_strongContinuity        = j["Solver"]["strongContinuity"].get<bool>();
-
-    m_rho0              = j["Solver"]["Fluid"]["rho0"].get<double>();
-    m_mu                = j["Solver"]["Fluid"]["mu"].get<double>();
-    m_K0                = j["Solver"]["Fluid"]["K0"].get<double>();
-    m_K0prime           = j["Solver"]["Fluid"]["K0prime"].get<double>();
-    m_pInfty            = j["Solver"]["Fluid"]["pInfty"].get<double>();
-
-    m_securityCoeff      = j["Solver"]["Time"]["securityCoeff"].get<double>();
-
-    std::vector<std::string> whatCanBeWritten;
-    if(dim == 2)
-        whatCanBeWritten = {"u", "v", "p", "rho", "ax", "ay", "ke", "velocity"};
-    else
-        whatCanBeWritten = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "velocity"};
-
-    auto extractors = j["Solver"]["Extractors"];
-    unsigned short GMSHExtractorCount = 0;
-    for(auto& extractor : extractors)
-    {
-        if(extractor["type"].get<std::string>() == "Point")
-        {
-            m_pExtractor.push_back(std::make_unique<PointExtractor>(*this,
-                                                                    extractor["outputFile"].get<std::string>(),
-                                                                    extractor["timeBetweenWriting"].get<double>(),
-                                                                    extractor["stateToWrite"].get<unsigned short>(),
-                                                                    extractor["points"].get<std::vector<std::vector<double>>>()));
-        }
-        else if(extractor["type"].get<std::string>() == "GMSH")
-        {
-            if(GMSHExtractorCount < 1)
-            {
-                m_pExtractor.push_back(std::make_unique<GMSHExtractor>(*this,
-                                                                       extractor["outputFile"].get<std::string>(),
-                                                                       extractor["timeBetweenWriting"].get<double>(),
-                                                                       extractor["whatToWrite"].get<std::vector<std::string>>(),
-                                                                       whatCanBeWritten,
-                                                                       extractor["writeAs"].get<std::string>()));
-                GMSHExtractorCount++;
-            }
-            else
-            {
-                std::cerr << "Cannot add more than one GMSH extractor!" << std::endl;
-            }
-        }
-        else if(extractor["type"].get<std::string>() == "MinMax")
-        {
-            m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(*this,
-                                                                     extractor["outputFile"].get<std::string>(),
-                                                                     extractor["timeBetweenWriting"].get<double>(),
-                                                                     extractor["coordinate"].get<unsigned short>(),
-                                                                     extractor["minMax"].get<std::string>()));
-        }
-        else if(extractor["type"].get<std::string>() == "Mass")
-        {
-            m_pExtractor.push_back(std::make_unique<MassExtractor>(*this,
-                                                                   extractor["outputFile"].get<std::string>(),
-                                                                   extractor["timeBetweenWriting"].get<double>()));
-        }
-        else
-        {
-            std::string errotText = std::string("unknown extractor type ") + extractor["Type"].get<std::string>();
-            throw std::runtime_error(errotText);
-        }
-    }
 
     m_lua["rho0"] = m_rho0;
     m_lua["K0"] = m_K0;
@@ -224,7 +160,7 @@ void SolverCompressible::displaySolverParams() const noexcept
         std::cout << "Time step: " << m_maxDT << " s" << std::endl;
 }
 
-void SolverCompressible::solveProblem()
+void SolverCompressible::solveProblem(bool verboseOutput)
 {
     std::cout   << "================================================================"
                 << std::endl
@@ -244,7 +180,7 @@ void SolverCompressible::solveProblem()
 
     while(m_currentTime < m_endTime)
     {
-        if(m_verboseOutput)
+        if(verboseOutput)
         {
             std::cout << "----------------------------------------------------------------" << std::endl;
             std::cout << "Solving time step: " << m_currentTime + m_currentDT
@@ -260,7 +196,7 @@ void SolverCompressible::solveProblem()
             std::cout << m_currentDT << " s" << std::flush;
         }
 
-        solveCurrentTimeStep();
+        solveCurrentTimeStep(verboseOutput);
 
         for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
         {
@@ -294,7 +230,7 @@ void SolverCompressible::solveProblem()
     std::cout << std::endl;
 }
 
-bool SolverCompressible::solveCurrentTimeStep()
+bool SolverCompressible::solveCurrentTimeStep(bool verboseOutput)
 {
     TimeType startTime, endTime, startTimeMeasure, endTimeMeasure;
     startTime = Clock::now();
@@ -309,7 +245,7 @@ bool SolverCompressible::solveCurrentTimeStep()
     Eigen::VectorXd Frho;                                 //The rhos of the continuity equation.
 
     endTimeMeasure = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTimeMeasure, endTimeMeasure, "Prepared computation in ");
 
     if(m_strongContinuity)
@@ -324,7 +260,7 @@ bool SolverCompressible::solveCurrentTimeStep()
         m_mesh.updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
     }
     endTimeMeasure = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTimeMeasure, endTimeMeasure, "Updated nodes position in ");
 
     startTimeMeasure = Clock::now();
@@ -342,7 +278,7 @@ bool SolverCompressible::solveCurrentTimeStep()
         Frho.resize(0,0);
     }
     endTimeMeasure = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTimeMeasure, endTimeMeasure, "Computed p and rho in ");
 
     startTimeMeasure = Clock::now();
@@ -361,20 +297,20 @@ bool SolverCompressible::solveCurrentTimeStep()
         setNodesStatesfromQ(qAccPrev, dim + 2, 2*dim + 1);
     }
     endTimeMeasure = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTimeMeasure, endTimeMeasure, "Computed a and v in ");
 
     m_currentTime += m_currentDT;
     m_currentStep++;
 
     endTime = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTime, endTime, "Problem solved in ");
 
     startTime = Clock::now();
-    m_mesh.remesh();
+    m_mesh.remesh(verboseOutput);
     endTime = Clock::now();
-    if(m_verboseOutput)
+    if(verboseOutput)
         displayDT(startTime, endTime, "Remeshing done in ");
 
     return true;

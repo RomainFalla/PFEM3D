@@ -10,7 +10,7 @@
 
 class Solver;
 
-class SOLVER_NO_EXPORT Extractor
+class SOLVER_API Extractor
 {
     public:
         Extractor()                                      = delete;

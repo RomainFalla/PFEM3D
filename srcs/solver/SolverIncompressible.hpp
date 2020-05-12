@@ -4,6 +4,17 @@
 
 #include "Solver.hpp"
 
+struct SolverIncompCreateInfo
+{
+    double rho = 0;
+    double mu = 0;
+    double picardRelTol = 0;
+    unsigned int picardMaxIter = 0;
+    double coeffDTincrease = 1;
+    double coeffDTdecrease = 1;
+    SolverCreateInfo solverInfos = {};
+};
+
 /**
  * \class SolverIncompressible
  * \brief Represents a solver for an incompressible Newtonian fluid.
@@ -12,7 +23,7 @@ class SOLVER_API SolverIncompressible : public Solver
 {
     public:
         SolverIncompressible()                                                            = delete;
-        SolverIncompressible(const nlohmann::json& j, const std::string& mshName);
+        SolverIncompressible(const SolverIncompCreateInfo& solverIncompInfoss);
         SolverIncompressible(const SolverIncompressible& solverIncompressible)            = delete;
         SolverIncompressible& operator=(const SolverIncompressible& solverIncompressible) = delete;
         SolverIncompressible(SolverIncompressible&& solverIncompressible)                 = delete;
@@ -27,12 +38,12 @@ class SOLVER_API SolverIncompressible : public Solver
          * \brief Solve the Picard algorithm for one time step.
          * \return true if the algorithm converged, false otherwise.
          */
-        bool solveCurrentTimeStep();
+        bool solveCurrentTimeStep(bool verboseOutput);
 
         /**
          * \brief Solve the problem for a certain set of parameters.
          */
-        void solveProblem();
+        void solveProblem(bool verboseOutput);
 
     private:
         double m_rho; /**< The fluid density (kg/m^3). */
@@ -75,7 +86,8 @@ class SOLVER_API SolverIncompressible : public Solver
                                Eigen::SparseMatrix<double>& C,
                                Eigen::VectorXd& F,
                                Eigen::VectorXd& H,
-                               const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev);
+                               const std::vector<double>& tauPSPG, const Eigen::VectorXd& qPrev,
+                               bool verboseOutput);
 
         /**
          * \brief Build the coefficient tauPSPG for each element.

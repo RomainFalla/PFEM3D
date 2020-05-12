@@ -1,5 +1,7 @@
 #include "Mesh.hpp"
 
+#include <array>
+#include <cassert>
 #include <iostream>
 
 inline double Mesh::getAlpha() const noexcept

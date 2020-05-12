@@ -11,7 +11,7 @@
 #Please lauch buildCGAL.sh once to build CGAL 5.0 as shared lib
 
 export CGAL_DIR=/c/tools/CGAL-5.0.2
-export GMSHSDK=/c/tools/gmsh-4.5.4-Windows64-sdk #put gmsh sdk here
+export GMSHSDK=/c/tools/gmsh-4.5.6-Windows64-sdk #put gmsh sdk here
 export EIGENSDK=/c/tools/msys64/mingw64/include/eigen3
 export SOL3SDK=/c/tools/
 

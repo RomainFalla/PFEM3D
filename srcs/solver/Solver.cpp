@@ -1,17 +1,17 @@
 #include "Solver.hpp"
 
 #include <iostream>
+#include <type_traits>
 
 
-Solver::Solver(const nlohmann::json& j, const std::string& mshName) :
-m_mesh(j)
+Solver::Solver(const SolverCreateInfo& solverInfos) :
+m_gravity(solverInfos.gravity), m_strongPAtFS(solverInfos.strongPAtFS), m_adaptDT(solverInfos.adaptDT),
+m_currentDT(solverInfos.initialDT), m_currentStep(0), m_currentTime(0), m_endTime(solverInfos.endTime),
+m_maxDT(solverInfos.maxDT), m_mesh(solverInfos.meshInfos)
 {
     m_solverType = SOLVER_TYPE::Undefined;
-    m_mesh.loadFromFile(mshName);
 
     m_lua.open_libraries(sol::lib::base, sol::lib::math);
-
-    m_verboseOutput             = j["verboseOutput"].get<bool>();
 
     // set the desired number of OpenMP threads
 #if defined(_OPENMP)
@@ -28,29 +28,19 @@ m_mesh(j)
      m_numOMPThreads = 1;
 #endif
 
-    m_gravity                   = j["Solver"]["gravity"].get<double>();
-    m_strongPAtFS               = j["Solver"]["strongPAtFS"].get<bool>();
-
-    m_adaptDT                   = j["Solver"]["Time"]["adaptDT"].get<bool>();
-    m_currentDT                 = j["Solver"]["Time"]["initialDT"].get<double>();
-
     if(m_currentDT <= 0)
         throw std::runtime_error("the initial time step should be strictly greater than 0!");
-
-    m_currentStep               = 0;
-    m_currentTime               = 0;
-    m_endTime                   = j["Solver"]["Time"]["endTime"].get<double>();
 
     if(m_endTime <= 0)
         throw std::runtime_error("the total time to simulate should be strictly greater than 0!");
 
-    m_maxDT                     = j["Solver"]["Time"]["maxDT"].get<double>();
-
     if(m_maxDT <= 0)
         throw std::runtime_error("the maximum time interval should be strictly greater than 0!");
 
-    std::string IBConditions = j["Solver"]["IBCs"].get<std::string>();
-    m_lua.script_file(IBConditions);
+    if(solverInfos.IBCfile.empty())
+        throw std::runtime_error("no IBC lua file provided!");
+
+    m_lua.script_file(solverInfos.IBCfile);
     m_lua["g"] = m_gravity;
 
     m_N = getN();
