@@ -118,7 +118,7 @@ int main(int argc, char **argv)
         else if(j["ProblemType"] == "Compressible")
         {
             SolverCompCreateInfo solverCompInfos;
-            solverCompInfos.strongContinuity = j["Solver"]["strongContinuity"].get<double>();
+            solverCompInfos.strongContinuity = j["Solver"]["strongContinuity"].get<bool>();
             solverCompInfos.securityCoeff = j["Solver"]["Time"]["securityCoeff"].get<double>();
             solverCompInfos.rho0 = j["Solver"]["Fluid"]["rho0"].get<double>();
             solverCompInfos.mu = j["Solver"]["Fluid"]["mu"].get<double>();
