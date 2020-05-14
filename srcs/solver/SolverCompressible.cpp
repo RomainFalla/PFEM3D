@@ -77,6 +77,8 @@ void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<doubl
 {
     assert(m_mesh.getNodesNumber() != 0);
 
+    auto& invMrhoDiag = invMrho.diagonal();
+
     //Do not parallelize this
     for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
@@ -84,13 +86,13 @@ void SolverCompressible::applyBoundaryConditionsCont(Eigen::DiagonalMatrix<doubl
         {
             Frho(n) = m_rho0;
 
-            invMrho.diagonal()[n] = 1;
+            invMrhoDiag[n] = 1;
         }
         else if(m_strongPAtFS && m_mesh.isNodeOnFreeSurface(n))
         {
             Frho(n) = m_rho0;
 
-            invMrho.diagonal()[n] = 1;
+            invMrhoDiag[n] = 1;
         }
     }
 }
@@ -101,6 +103,8 @@ void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double
 
     const unsigned short dim = m_mesh.getDim();
 
+    auto& invMDiag = invM.diagonal();
+
     //Do not parallelize this
     for (IndexType n = 0 ; n < m_mesh.getNodesNumber() ; ++n)
     {
@@ -109,11 +113,11 @@ void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double
             for(unsigned short d = 0 ; d < dim - 1 ; ++d)
             {
                 F(n + d*m_mesh.getNodesNumber()) = 0;
-                invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
+                invMDiag[n + d*m_mesh.getNodesNumber()] = 1;
             }
 
              F(n + (dim - 1)*m_mesh.getNodesNumber()) = - m_gravity;
-             invM.diagonal()[n + (dim - 1)*m_mesh.getNodesNumber()] = 1;
+             invMDiag[n + (dim - 1)*m_mesh.getNodesNumber()] = 1;
         }
         else if(m_mesh.isNodeBound(n))
         {
@@ -125,7 +129,7 @@ void SolverCompressible::applyBoundaryConditionsMom(Eigen::DiagonalMatrix<double
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
                 F(n + d*m_mesh.getNodesNumber()) = result[d];
-                invM.diagonal()[n + d*m_mesh.getNodesNumber()] = 1;
+                invMDiag[n + d*m_mesh.getNodesNumber()] = 1;
             }
         }
     }
@@ -189,11 +193,15 @@ void SolverCompressible::solveProblem(bool verboseOutput)
         }
         else
         {
-            std::cout << std::fixed << std::setprecision(3);
-            std::cout << "\r" << "Solving time step: " << m_currentTime + m_currentDT
-                      << "/" << m_endTime << " s, dt = ";
-            std::cout << std::scientific;
-            std::cout << m_currentDT << " s" << std::flush;
+            if(m_currentStep%1000 == 0 || m_currentTime + m_currentDT >= m_endTime)
+            {
+                std::cout << std::fixed << std::setprecision(3);
+                std::cout << "\r" << "Solving time step: " << m_currentTime + m_currentDT
+                          << "/" << m_endTime << " s, dt = ";
+                std::cout << std::scientific;
+                std::cout << m_currentDT << " s" << std::flush;
+            }
+
         }
 
         solveCurrentTimeStep(verboseOutput);
@@ -395,11 +403,13 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
         }
     }
 
+    auto& invMrhoDiag = invMrho.diagonal();
+
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
         {
-            invMrho.diagonal()[m_mesh.getElement(elm)[i]] += MrhoeLumped[elm].diagonal()[i];
+            invMrhoDiag[m_mesh.getElement(elm)[i]] += MrhoeLumped[elm].diagonal()[i];
 
             if(!m_strongContinuity)
             {
@@ -410,7 +420,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
 
     #pragma omp parallel for default(shared)
     for(IndexType i = 0 ; i < invMrho.rows() ; ++i)
-         invMrho.diagonal()[i] = 1/invMrho.diagonal()[i];
+         invMrhoDiag[i] = 1/invMrhoDiag[i];
 }
 
 void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
@@ -492,6 +502,8 @@ void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dy
         FTote[elm] = -Ke*V + De.transpose()*P + Fe;
     }
 
+    auto& invMDiag = invM.diagonal();
+
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
         for(unsigned short i = 0 ; i < dim + 1 ; ++i)
@@ -501,7 +513,7 @@ void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dy
                 /********************************************************************
                                              Build M
                 ********************************************************************/
-                invM.diagonal()[m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()] += Me[elm](i + d*(dim + 1), i + d*(dim + 1));
+                invMDiag[m_mesh.getElement(elm)[i] + d*m_mesh.getNodesNumber()] += Me[elm](i + d*(dim + 1), i + d*(dim + 1));
 
                 /************************************************************************
                                                 Build f
@@ -513,5 +525,5 @@ void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dy
 
     #pragma omp parallel for default(shared)
     for(IndexType i = 0 ; i < dim*m_mesh.getNodesNumber() ; ++i)
-        invM.diagonal()[i] = 1/invM.diagonal()[i];
+        invMDiag[i] = 1/invMDiag[i];
 }
