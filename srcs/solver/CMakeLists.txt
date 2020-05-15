@@ -26,41 +26,44 @@ SET(LIBSOLVERSRCS
 ./SolverCompressible.cpp
 ./SolverCompressible.hpp ./SolverCompressible.inl)
 
-ADD_LIBRARY(Solver SHARED ${LIBSOLVERSRCS})
-GENERATE_EXPORT_HEADER(Solver
+ADD_LIBRARY(pfemSolver SHARED ${LIBSOLVERSRCS})
+GENERATE_EXPORT_HEADER(pfemSolver
                        EXPORT_MACRO_NAME SOLVER_API
 					   EXPORT_FILE_NAME Solver_export.h)
-TARGET_INCLUDE_DIRECTORIES(Solver SYSTEM
+TARGET_INCLUDE_DIRECTORIES(pfemSolver SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${GMSH_INCLUDE_DIRS}
                            PUBLIC ${EIGEN_INCLUDE_DIRS}
                            PUBLIC ${LUA_INCLUDE_DIR}
                            PUBLIC ${SOL3_INCLUDE_DIRS})
-TARGET_LINK_LIBRARIES(Solver
+TARGET_LINK_LIBRARIES(pfemSolver
                       PRIVATE ${GMSH_LIBRARIES}
-                      PUBLIC ${LUA_LIBRARIES} Mesh)
+                      PUBLIC ${LUA_LIBRARIES} pfemMesh)
+SET_TARGET_PROPERTIES(pfemSolver PROPERTIES COMPILE_FLAGS "-Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow")
 
-# FIND_PACKAGE(Python 3 REQUIRED COMPONENTS Interpreter Development)
-# MESSAGE(STATUS "Found python: " ${Python_INCLUDE_DIRS})
-# MESSAGE(STATUS "Found python: " ${Python_LIBRARY_DIRS})
-# MESSAGE(STATUS "Found python: " ${Python_RUNTIME_LIBRARY_DIRS})
-# cmake_policy(SET CMP0078 NEW)
-# cmake_policy(SET CMP0086 NEW)
-# FIND_PACKAGE(SWIG 4.0 REQUIRED)
-# INCLUDE(${SWIG_USE_FILE})
-
-# IF(PYTHONLIBS_VERSION_STRING MATCHES "^2.*$" )
-    # set(CMAKE_SWIG_FLAGS -classic)
-# ELSE()
-    # set(CMAKE_SWIG_FLAGS -py3)
-# ENDIF()
-
-# SET_PROPERTY(SOURCE ./Solver.i PROPERTY CPLUSPLUS ON)
-# SWIG_ADD_LIBRARY(Solverw
-				 # TYPE SHARED
-				 # LANGUAGE python
-				 # SOURCES ./Solver.i)
-# TARGET_INCLUDE_DIRECTORIES(Solverw PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-# TARGET_INCLUDE_DIRECTORIES(Solverw PUBLIC ${Python_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-# SWIG_LINK_LIBRARIES(Solverw
-                    # Solver ${Python_LIBRARIES})
+#FIND_PACKAGE(Python 3 REQUIRED COMPONENTS Interpreter Development)
+#MESSAGE(STATUS "Found python: " ${Python_INCLUDE_DIRS})
+#MESSAGE(STATUS "Found python: " ${Python_LIBRARY_DIRS})
+#MESSAGE(STATUS "Found python: " ${Python_RUNTIME_LIBRARY_DIRS})
+#cmake_policy(SET CMP0078 NEW)
+#cmake_policy(SET CMP0086 NEW)
+#FIND_PACKAGE(SWIG 4.0 REQUIRED)
+#INCLUDE(${SWIG_USE_FILE})
+#
+#IF(PYTHONLIBS_VERSION_STRING MATCHES "^2.*$" )
+#    set(CMAKE_SWIG_FLAGS -classic)
+#ELSE()
+#    set(CMAKE_SWIG_FLAGS -py3)
+#ENDIF()
+#
+#SET(CMAKE_SWIG_OUTDIR ${PROJECT_BINARY_DIR}/bin/ CACHE PATH "")
+#
+#SET_PROPERTY(SOURCE ./Solver.i PROPERTY CPLUSPLUS ON)
+#SWIG_ADD_LIBRARY(pfemSolverw
+#				 TYPE SHARED
+#				 LANGUAGE python
+#				 SOURCES ./Solver.i)
+#TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+#TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${Python_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
+#SWIG_LINK_LIBRARIES(pfemSolverw
+#                    pfemSolver ${Python_LIBRARIES})

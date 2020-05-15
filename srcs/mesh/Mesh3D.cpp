@@ -106,18 +106,17 @@ void Mesh::triangulateAlphaShape3D()
 
         if(as.classify(facetAS) == Alpha_shape_3::REGULAR)
         {
-            const std::vector<IndexType> edge{facetAS.first->vertex((facetAS.second+1)%3)->info(),
-                                            facetAS.first->vertex((facetAS.second+2)%3)->info(),
-                                            facetAS.first->vertex((facetAS.second+3)%3)->info()};
+            const std::vector<IndexType> edge{facetAS.first->vertex((facetAS.second+1)%4)->info(),
+                                              facetAS.first->vertex((facetAS.second+2)%4)->info(),
+                                              facetAS.first->vertex((facetAS.second+3)%4)->info()};
 
+            if(m_nodesList[edge[0]].isBound && m_nodesList[edge[1]].isBound && m_nodesList[edge[2]].isBound)
+                continue;
 
-            if(!(m_nodesList[edge[0]].isBound && m_nodesList[edge[1]].isBound && m_nodesList[edge[2]].isBound))
-            {
-                m_nodesList[edge[0]].isOnFreeSurface = true;
-                m_nodesList[edge[1]].isOnFreeSurface = true;
-                m_nodesList[edge[2]].isOnFreeSurface = true;
+            m_nodesList[edge[0]].isOnFreeSurface = true;
+            m_nodesList[edge[1]].isOnFreeSurface = true;
+            m_nodesList[edge[2]].isOnFreeSurface = true;
                 //m_freeSurfaceEdgesList.push_back(edge);
-            }
         }
     }
 

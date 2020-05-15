@@ -38,8 +38,6 @@ SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow")
-
 # compiler options
 IF(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS)

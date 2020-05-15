@@ -331,6 +331,7 @@ void SolverCompressible::buildFrho(Eigen::VectorXd& Frho)
 
     std::vector<Eigen::VectorXd> Frhoe(m_mesh.getElementsNumber());
 
+    Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
@@ -340,6 +341,7 @@ void SolverCompressible::buildFrho(Eigen::VectorXd& Frho)
 
         Frhoe[elm] = Mrhoe*Rho;
     }
+    Eigen::setNbThreads(m_numOMPThreads);
 
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
@@ -363,6 +365,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
         Frhoe.resize((m_mesh.getElementsNumber()));
     }
 
+    Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
@@ -401,6 +404,7 @@ void SolverCompressible::buildMatricesCont(Eigen::DiagonalMatrix<double,Eigen::D
             Frhoe[elm] = m_mesh.getElementDetJ(elm)*m_MrhoPrev*Rho - m_currentDT*Drhoe*V;
         }
     }
+    Eigen::setNbThreads(m_numOMPThreads);
 
     auto& invMrhoDiag = invMrho.diagonal();
 
@@ -432,6 +436,7 @@ void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dy
     F.resize(dim*m_mesh.getNodesNumber()); F.setZero();
     std::vector<Eigen::VectorXd> FTote(m_mesh.getElementsNumber());
 
+    Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(IndexType elm = 0 ; elm < m_mesh.getElementsNumber() ; ++elm)
     {
@@ -500,6 +505,7 @@ void SolverCompressible::buildMatricesMom(Eigen::DiagonalMatrix<double,Eigen::Dy
 
         FTote[elm] = -Ke*V + De.transpose()*P + Fe;
     }
+    Eigen::setNbThreads(m_numOMPThreads);
 
     auto& invMDiag = invM.diagonal();
 
