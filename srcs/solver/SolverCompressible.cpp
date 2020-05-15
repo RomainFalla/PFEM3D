@@ -19,7 +19,7 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 SolverCompressible::SolverCompressible(const SolverCompCreateInfo& solverCompInfos) :
 Solver(solverCompInfos.solverInfos), m_rho0(solverCompInfos.rho0), m_mu(solverCompInfos.mu), m_K0(solverCompInfos.K0),
 m_K0prime(solverCompInfos.K0prime), m_pInfty(solverCompInfos.pInfty), m_securityCoeff(solverCompInfos.securityCoeff),
-m_strongContinuity(solverCompInfos.strongContinuity)
+m_strongContinuity(solverCompInfos.strongContinuity), m_nextTimeToRemesh(solverCompInfos.solverInfos.maxDT)
 {
     m_solverType = SOLVER_TYPE::WeaklyCompressible;
     unsigned short dim = m_mesh.getDim();
@@ -314,11 +314,16 @@ bool SolverCompressible::solveCurrentTimeStep(bool verboseOutput)
     if(verboseOutput)
         displayDT(startTime, endTime, "Problem solved in ");
 
-    startTime = Clock::now();
-    m_mesh.remesh(verboseOutput);
-    endTime = Clock::now();
-    if(verboseOutput)
-        displayDT(startTime, endTime, "Remeshing done in ");
+    if(m_currentTime > m_nextTimeToRemesh)
+    {
+        startTime = Clock::now();
+        m_mesh.remesh(verboseOutput);
+        endTime = Clock::now();
+        if(verboseOutput)
+            displayDT(startTime, endTime, "Remeshing done in ");
+
+        m_nextTimeToRemesh += m_maxDT;
+    }
 
     return true;
 }

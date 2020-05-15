@@ -61,6 +61,8 @@ class SOLVER_API SolverCompressible : public Solver
         Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_MrhoLumpedPrev;
         Eigen::MatrixXd m_ddev;
 
+        double m_nextTimeToRemesh;
+
         /**
          * \brief Apply boundary conditions to the matrix Mrho and vector Frho
          * \param invMrho A reference to the inverse mass matrix.
