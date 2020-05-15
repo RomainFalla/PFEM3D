@@ -283,7 +283,6 @@ bool SolverCompressible::solveCurrentTimeStep(bool verboseOutput)
         Eigen::VectorXd qP = getPFromRhoTaitMurnagham(qRho);
 
         setNodesStatesfromQ(qP, dim, dim);
-        Frho.resize(0,0);
     }
     endTimeMeasure = Clock::now();
     if(verboseOutput)
