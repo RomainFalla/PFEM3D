@@ -7,7 +7,7 @@
 Solver::Solver(const SolverCreateInfo& solverInfos) :
 m_gravity(solverInfos.gravity), m_strongPAtFS(solverInfos.strongPAtFS), m_adaptDT(solverInfos.adaptDT),
 m_currentDT(solverInfos.initialDT), m_currentStep(0), m_currentTime(0), m_endTime(solverInfos.endTime),
-m_maxDT(solverInfos.maxDT), m_mesh(solverInfos.meshInfos)
+m_maxDT(solverInfos.maxDT), m_mesh(solverInfos.meshInfos), m_hasGMSHExtractor(false)
 {
     m_solverType = SOLVER_TYPE::Undefined;
 
@@ -80,4 +80,49 @@ void Solver::setInitialCondition()
         }
 
     }
+}
+
+void Solver::addPointExtractor(const std::string& outFileName, double timeBetweenWriting,
+                               unsigned short stateToWrite, const std::vector<std::vector<double>>& points)
+{
+    m_pExtractor.push_back(std::make_unique<PointExtractor>(*this,
+                                                            outFileName,
+                                                            timeBetweenWriting,
+                                                            stateToWrite,
+                                                            points));
+}
+
+void Solver::addMinMaxExtractor(const std::string& outFileName, double timeBetweenWriting,
+                                unsigned short coordinate, const std::string& minMax)
+{
+    m_pExtractor.push_back(std::make_unique<MinMaxExtractor>(*this,
+                                                             outFileName,
+                                                             timeBetweenWriting,
+                                                             coordinate,
+                                                             minMax));
+}
+
+void Solver::addMassExtractor(const std::string& outFileName, double timeBetweenWriting)
+{
+    m_pExtractor.push_back(std::make_unique<MassExtractor>(*this,
+                                                           outFileName,
+                                                           timeBetweenWriting));
+}
+
+void Solver::addGMSHExtractor(const std::string& outFileName, double timeBetweenWriting,
+                              const std::vector<std::string>& whatToWrite, std::string writeAs)
+{
+    if(m_hasGMSHExtractor)
+    {
+        std::cerr << "There is already a GMSH extractor set" << std::endl;
+        return;
+    }
+
+    m_pExtractor.push_back(std::make_unique<GMSHExtractor>(*this,
+                                                           outFileName,
+                                                           timeBetweenWriting,
+                                                           whatToWrite,
+                                                           writeAs));
+
+    m_hasGMSHExtractor = true;
 }

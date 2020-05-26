@@ -23,29 +23,29 @@ static void addExctractors(Solver& solver, nlohmann::json j)
     {
         if(extractor["type"].get<std::string>() == "Point")
         {
-            solver.addExtractor<PointExtractor>(extractor["outputFile"].get<std::string>(),
-                                                extractor["timeBetweenWriting"].get<double>(),
-                                                extractor["stateToWrite"].get<unsigned short>(),
-                                                extractor["points"].get<std::vector<std::vector<double>>>());
+            solver.addPointExtractor(extractor["outputFile"].get<std::string>(),
+                                     extractor["timeBetweenWriting"].get<double>(),
+                                     extractor["stateToWrite"].get<unsigned short>(),
+                                     extractor["points"].get<std::vector<std::vector<double>>>());
         }
         else if(extractor["type"].get<std::string>() == "GMSH")
         {
-            solver.addExtractor<GMSHExtractor>(extractor["outputFile"].get<std::string>(),
-                                               extractor["timeBetweenWriting"].get<double>(),
-                                               extractor["whatToWrite"].get<std::vector<std::string>>(),
-                                               extractor["writeAs"].get<std::string>());
+            solver.addGMSHExtractor(extractor["outputFile"].get<std::string>(),
+                                    extractor["timeBetweenWriting"].get<double>(),
+                                    extractor["whatToWrite"].get<std::vector<std::string>>(),
+                                    extractor["writeAs"].get<std::string>());
         }
         else if(extractor["type"].get<std::string>() == "MinMax")
         {
-            solver.addExtractor<MinMaxExtractor>(extractor["outputFile"].get<std::string>(),
-                                                 extractor["timeBetweenWriting"].get<double>(),
-                                                 extractor["coordinate"].get<unsigned short>(),
-                                                 extractor["minMax"].get<std::string>());
+            solver.addMinMaxExtractor(extractor["outputFile"].get<std::string>(),
+                                      extractor["timeBetweenWriting"].get<double>(),
+                                      extractor["coordinate"].get<unsigned short>(),
+                                      extractor["minMax"].get<std::string>());
         }
         else if(extractor["type"].get<std::string>() == "Mass")
         {
-            solver.addExtractor<MassExtractor>(extractor["outputFile"].get<std::string>(),
-                                               extractor["timeBetweenWriting"].get<double>());
+            solver.addMassExtractor(extractor["outputFile"].get<std::string>(),
+                                    extractor["timeBetweenWriting"].get<double>());
         }
         else
         {

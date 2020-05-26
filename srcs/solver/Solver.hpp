@@ -53,8 +53,16 @@ class SOLVER_API Solver
         Solver& operator=(Solver&& solver)      = delete;
         virtual ~Solver() noexcept              = default;
 
-        template <typename T, typename... Args>
-        void addExtractor(Args... args);
+        void addPointExtractor(const std::string& outFileName, double timeBetweenWriting,
+                               unsigned short stateToWrite, const std::vector<std::vector<double>>& points);
+
+        void addMinMaxExtractor(const std::string& outFileName, double timeBetweenWriting,
+                                unsigned short coordinate, const std::string& minMax);
+
+        void addMassExtractor(const std::string& outFileName, double timeBetweenWriting);
+
+        void addGMSHExtractor(const std::string& outFileName, double timeBetweenWriting,
+                              const std::vector<std::string>& whatToWrite, std::string writeAs);
 
         /**
          * \return Return the current time increment of the simulation in seconds.
@@ -156,6 +164,7 @@ class SOLVER_API Solver
         Eigen::VectorXd m_bodyForces;
 
         std::vector<std::unique_ptr<Extractor>> m_pExtractor;
+        bool m_hasGMSHExtractor;
 
         /**
          * \param elementIndex The index of the element in the element list.

@@ -41,29 +41,29 @@ TARGET_LINK_LIBRARIES(pfemSolver
                       PUBLIC ${LUA_LIBRARIES} pfemMesh)
 SET_TARGET_PROPERTIES(pfemSolver PROPERTIES COMPILE_FLAGS "-Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow")
 
-#FIND_PACKAGE(Python 3 REQUIRED COMPONENTS Interpreter Development)
-#MESSAGE(STATUS "Found python: " ${Python_INCLUDE_DIRS})
-#MESSAGE(STATUS "Found python: " ${Python_LIBRARY_DIRS})
-#MESSAGE(STATUS "Found python: " ${Python_RUNTIME_LIBRARY_DIRS})
-#cmake_policy(SET CMP0078 NEW)
-#cmake_policy(SET CMP0086 NEW)
-#FIND_PACKAGE(SWIG 4.0 REQUIRED)
-#INCLUDE(${SWIG_USE_FILE})
-#
-#IF(PYTHONLIBS_VERSION_STRING MATCHES "^2.*$" )
-#    set(CMAKE_SWIG_FLAGS -classic)
-#ELSE()
-#    set(CMAKE_SWIG_FLAGS -py3)
-#ENDIF()
-#
-#SET(CMAKE_SWIG_OUTDIR ${PROJECT_BINARY_DIR}/bin/ CACHE PATH "")
-#
-#SET_PROPERTY(SOURCE ./Solver.i PROPERTY CPLUSPLUS ON)
-#SWIG_ADD_LIBRARY(pfemSolverw
-#				 TYPE SHARED
-#				 LANGUAGE python
-#				 SOURCES ./Solver.i)
-#TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-#TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${Python_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-#SWIG_LINK_LIBRARIES(pfemSolverw
-#                    pfemSolver ${Python_LIBRARIES})
+FIND_PACKAGE(Python 3 REQUIRED COMPONENTS Interpreter Development)
+MESSAGE(STATUS "Found python: " ${Python_INCLUDE_DIRS})
+MESSAGE(STATUS "Found python: " ${Python_LIBRARY_DIRS})
+MESSAGE(STATUS "Found python: " ${Python_RUNTIME_LIBRARY_DIRS})
+cmake_policy(SET CMP0078 NEW)
+cmake_policy(SET CMP0086 NEW)
+FIND_PACKAGE(SWIG 4.0 REQUIRED)
+INCLUDE(${SWIG_USE_FILE})
+
+IF(PYTHONLIBS_VERSION_STRING MATCHES "^2.*$" )
+   set(CMAKE_SWIG_FLAGS -classic)
+ELSE()
+   set(CMAKE_SWIG_FLAGS -py3)
+ENDIF()
+
+SET(CMAKE_SWIG_OUTDIR ${PROJECT_BINARY_DIR}/bin/ CACHE PATH "")
+
+SET_PROPERTY(SOURCE ./Solver.i PROPERTY CPLUSPLUS ON)
+SWIG_ADD_LIBRARY(pfemSolverw
+				 TYPE SHARED
+				 LANGUAGE python
+				 SOURCES ./Solver.i)
+TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${Python_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
+SWIG_LINK_LIBRARIES(pfemSolverw
+                   pfemSolver ${Python_LIBRARIES})

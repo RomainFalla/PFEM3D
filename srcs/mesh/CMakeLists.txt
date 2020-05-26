@@ -15,3 +15,4 @@ TARGET_INCLUDE_DIRECTORIES(pfemMesh SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${GMSH_INCLUDE_DIRS})
 TARGET_LINK_LIBRARIES(pfemMesh PRIVATE CGAL::CGAL ${GMSH_LIBRARIES})
+SET_TARGET_PROPERTIES(pfemMesh PROPERTIES COMPILE_FLAGS "-Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow")
