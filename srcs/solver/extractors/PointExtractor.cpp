@@ -118,8 +118,10 @@ void PointExtractor::update()
 
                 valueToWrite += sol(mesh.getDim());
             }
-
-            m_outFile << "," << std::to_string(point[0]) << "," << std::to_string(point[1]) << "," << std::to_string(valueToWrite);
+            if(mesh.getDim() == 2)
+                m_outFile << "," << std::to_string(point[0]) << "," << std::to_string(point[1]) << "," << std::to_string(valueToWrite);
+            else
+                m_outFile << "," << std::to_string(point[0]) << "," << std::to_string(point[1]) << "," << std::to_string(point[2]) << "," << std::to_string(valueToWrite);
         }
 
         m_outFile << std::endl;
