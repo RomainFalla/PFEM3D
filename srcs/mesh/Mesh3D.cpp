@@ -122,40 +122,40 @@ void Mesh::triangulateAlphaShape3D()
 
     // If an element is only composed of boundary nodes and the neighbour nodes of
     // each of the four are only boundary nodes, this is a spurious tetrahedron, we delete it
-//    m_elementsList.erase(
-//    std::remove_if(m_elementsList.begin(),  m_elementsList.end(),  [this](const std::vector<IndexType>& element)
-//    {
-//        if(this->m_nodesList[element[0]].isBound && this->m_nodesList[element[1]].isBound &&
-//           this->m_nodesList[element[2]].isBound && this->m_nodesList[element[3]].isBound)
-//        {
-//            for(unsigned short n = 0 ; n < element.size() ; ++n)
-//            {
-//                for(unsigned int i = 0 ; i < this->m_nodesList[element[n]].neighbourNodes.size() ; ++i)
-//                {
-//                    if(!this->m_nodesList[this->m_nodesList[element[n]].neighbourNodes[i]].isBound)
-//                    {
-//                        return false;
-//                    }
-//                }
-//            }
-//
-//            this->m_nodesList[element[0]].isFree = true;
-//            this->m_nodesList[element[1]].isFree = true;
-//            this->m_nodesList[element[2]].isFree = true;
-//            this->m_nodesList[element[3]].isFree = true;
-//
-//            return true;
-//        }
-//        else
-//            return false;
-//
-//    }), m_elementsList.end());
+    m_elementsList.erase(
+    std::remove_if(m_elementsList.begin(),  m_elementsList.end(),  [this](const std::vector<IndexType>& element)
+    {
+        if(this->m_nodesList[element[0]].isBound && this->m_nodesList[element[1]].isBound &&
+           this->m_nodesList[element[2]].isBound && this->m_nodesList[element[3]].isBound)
+        {
+            for(unsigned short n = 0 ; n < element.size() ; ++n)
+            {
+                for(unsigned int i = 0 ; i < this->m_nodesList[element[n]].neighbourNodes.size() ; ++i)
+                {
+                    if(!this->m_nodesList[this->m_nodesList[element[n]].neighbourNodes[i]].isBound)
+                    {
+                        return false;
+                    }
+                }
+            }
 
-//    for(auto element : m_elementsList)
-//    {
-//        for(unsigned short n = 0 ; n < element.size() ; ++n)
-//            m_nodesList[element[n]].isFree = false;
-//    }
+            this->m_nodesList[element[0]].isFree = true;
+            this->m_nodesList[element[1]].isFree = true;
+            this->m_nodesList[element[2]].isFree = true;
+            this->m_nodesList[element[3]].isFree = true;
+
+            return true;
+        }
+        else
+            return false;
+
+    }), m_elementsList.end());
+
+    for(auto element : m_elementsList)
+    {
+        for(unsigned short n = 0 ; n < element.size() ; ++n)
+            m_nodesList[element[n]].isFree = false;
+    }
 
     if(m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
