@@ -193,7 +193,7 @@ void SolverCompressible::solveProblem(bool verboseOutput)
         }
         else
         {
-            if(m_currentStep%1000 == 0 || m_currentTime + m_currentDT >= m_endTime)
+            if(m_currentStep%100 == 0 || m_currentTime + m_currentDT >= m_endTime)
             {
                 std::cout << std::fixed << std::setprecision(3);
                 std::cout << "\r" << "Solving time step: " << m_currentTime + m_currentDT
