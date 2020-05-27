@@ -8,9 +8,6 @@
 #SBATCH --mem-per-cpu=2625 # megabytes
 #SBATCH --partition=defq
 #
-#SBATCH --mail-user=simon.fevrier@student.uliege.be
-#SBATCH --mail-type=ALL
-#
 #SBATCH --comment=PFEM
 #
 #SBATCH --output=PFEMTestOut.txt
