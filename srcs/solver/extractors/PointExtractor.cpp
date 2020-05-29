@@ -228,7 +228,7 @@ bool PointExtractor::findElementIndex(const Mesh& mesh, IndexType& elementIndex,
 
                 vPointToVertex[0] = point[0] - mesh.getNodePosition(mesh.getElement(elm)[i], 0);
                 vPointToVertex[1] = point[1] - mesh.getNodePosition(mesh.getElement(elm)[i], 1);
-                vPointToVertex[1] = point[2] - mesh.getNodePosition(mesh.getElement(elm)[i], 2);
+                vPointToVertex[2] = point[2] - mesh.getNodePosition(mesh.getElement(elm)[i], 2);
 
                 if((normal[0]*vPointToVertex[0] + normal[1]*vPointToVertex[1] + normal[2]*vPointToVertex[2]) > 0)
                     break;
