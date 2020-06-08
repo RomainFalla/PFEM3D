@@ -1,8 +1,8 @@
 {
-	"ProblemType": "Incompressible",
+	"ProblemType": "Compressible",
 	"Remeshing": {
 		"hchar": 0.02,
-		"alpha": 1.4,
+		"alpha": 1.2,
 		"omega": 0.7,
 		"gamma": 0.7,
 		"boundingBox": [-2, -1, 12, 100]
@@ -12,17 +12,17 @@
 		"strongPAtFS": true,
 		"strongContinuity": true,
 		"Time": {
-			"adaptDT": false,
-    		"securityCoeff": 0.1,
-    		"maxDT": 0.01,
-			"initialDT": 0.01,
-    		"endTime": 1,
+			"adaptDT": true,
+    		"securityCoeff": 1,
+    		"maxDT": 0.1,
+			"initialDT": 1e-8,
+    		"endTime": 4
 		},
 		"Fluid": {
 			"rho0": 1,
-			"K0": 2200000,
+			"K0": 22000000,
 			"K0prime": 7.6,
-			"mu": 0.01	,
+			"mu": 0.01,
 			"pInfty": 0
 		},
 		"IBCs": "../../examples/2D/sloshing/IBC_Comp.lua",
@@ -30,7 +30,7 @@
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.2,
+                "timeBetweenWriting": 0.05,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			},

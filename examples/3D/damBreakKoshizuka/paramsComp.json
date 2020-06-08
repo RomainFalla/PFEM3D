@@ -1,10 +1,10 @@
 {
 	"ProblemType": "Compressible",
 	"Remeshing": {
-		"hchar": 0.0292,
+		"hchar": 0.0146,
 		"alpha": 1.2,
 		"omega": 0.7,
-		"gamma": 0.7,
+		"gamma": 0.5,
 		"boundingBox": [-1, -1, -1, 1.584, 1.175, 100]
 	},
 	"Solver": {
@@ -14,9 +14,9 @@
 		"Time": {
 			"adaptDT": true,
     		"securityCoeff": 0.1,
-    		"maxDT": 0.001,
+    		"maxDT": 0.008,
 			"initialDT": 1e-8,
-    		"endTime": 1,
+    		"endTime": 1
 		},
 		"Fluid": {
 			"rho0": 1000,
@@ -30,11 +30,23 @@
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.2,
+                "timeBetweenWriting": 0.05,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
+			},
+			{
+				"type": "Mass",
+				"outputFile": "mass.txt",
+                "timeBetweenWriting": 0.01
+			},
+			{
+				"type": "Point",
+				"outputFile": "pressure000.txt",
+                "timeBetweenWriting": 0.01,
+				"stateToWrite": 3,
+				"points": [[0.000001, 0.000001, 0.000001]]
 			}
 		]
 	},
-	"verboseOutput": true
+	"verboseOutput": false
 }
