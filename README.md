@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/ImperatorS79/PFEM.svg?branch=master)]((https://travis-ci.org/ImperatorS79/PFEM) 
+[![Build Status](https://travis-ci.org/ImperatorS79/PFEM.svg?branch=master)](https://travis-ci.org/ImperatorS79/PFEM) [![Maintenance](https://img.shields.io/badge/Version-1.0.0-e67e22.svg)](https://github.com/ImperatorS79/PFEM/releases/tag/1.0.0)
 
 # Particular Finite Element Method
 This is an implementation of the PFEM method for incompressible and weakly compressible newtonian flow in C++. It uses notably [CGAL](https://www.cgal.org/) for the remeshing, [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) for linear algebra operations and [gmsh](https://www.gmsh.info/) for mesh reading and post-processing.
