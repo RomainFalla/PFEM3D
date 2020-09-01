@@ -1,5 +1,6 @@
 build/
 results/
+dependencies/
 eigen-*/
 sol3/
 gmsh-*/

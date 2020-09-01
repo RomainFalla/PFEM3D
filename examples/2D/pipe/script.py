@@ -26,8 +26,8 @@ solverInfos.strongPatFS = True
 solverInfos.adaptDT = True
 solverInfos.maxDT = 0.01
 solverInfos.initialDT = 0.01
-solverInfos.endTime = 2
-solverInfos.IBCfile = "../../examples/2D/pipe/IBC_incomp.lua"
+solverInfos.endTime = 6
+solverInfos.IBCfile = "../../examples/2D/pipe/IBC_Incomp.lua"
 solverInfos.meshInfos = meshInfos
 
 solverIncompInfos = SolverIncompCreateInfo()
