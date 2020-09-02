@@ -18,13 +18,13 @@ Then run the file `genCBproject.sh` in the directory `run/linux/` to generate a 
 The compilation of the project on windows is only supported through MinGW-w64 compiler. It is highly recommanded to use [MSYS2](https://www.msys2.org/) for managing dependencies. You can install the following packages from a MinGW64 shell:
 
 ```
-pacman -S mingw-w64-x86_64-cmake mingw-w64-x86_64-toolchain mingw-w64-x86_64-boost mingw-w64-x86_64-mpfr mingw-w64-x86_64-gmp mingw-w64-x86_64-nlohmann-json mingw-w64-x86_64-eigen3 mingw-w64-x86_64-lua mingw-w64-x86_64-swig
+pacman -S mingw-w64-x86_64-cmake mingw-w64-x86_64-toolchain mingw-w64-x86_64-boost mingw-w64-x86_64-mpfr mingw-w64-x86_64-gmp mingw-w64-x86_64-nlohmann-json mingw-w64-x86_64-eigen3 mingw-w64-x86_64-lua mingw-w64-x86_64-swig unzip
 ```
 
-Then run the file `genCBprojectMSYS2.sh` in the directory `run/windows/` (inside the MinGW64 shell) to generate a Code::Blocks project as well as a mingw makefile. 
+Then run the file `genCBprojectMSYS2.sh` in the directory `run/windows/` (inside the MinGW64 shell) to generate a Code::Blocks project as well as a mingw makefile (N.B. the `genCBprojectMSYS2.sh` expect that you install msys2 in `/c/tools/msys64`, you can change this behaviour easily). 
 
 ### MacOS
-The compilation of the project on macos is only supported through homebrew's clang (as it needs openmp). You can install the following packages from homebrew:
+The compilation of the project on macos is only supported through [homebrew](https://brew.sh/)'s clang (as it needs openmp). You can install the following packages from homebrew:
 
 ```
 brew update && brew upgrade cmake && brew install wget gnu-tar llvm libomp unzip swig cgal lua python@3.7 nlohmann-json eigen;
