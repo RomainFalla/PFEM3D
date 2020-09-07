@@ -39,6 +39,7 @@ void Mesh::triangulateAlphaShape2D()
         m_nodesList[i].isFree = true;
         m_nodesList[i].isOnFreeSurface = false;
         m_nodesList[i].neighbourNodes.clear();
+        m_nodesList[i].belongingElements.clear();
     }
 
     const Alpha_shape_2 as(pointsList.begin(), pointsList.end(),
@@ -55,32 +56,41 @@ void Mesh::triangulateAlphaShape2D()
         {
             const Alpha_shape_2::Face_handle face{fit};
 
-            const std::vector<IndexType> element{face->vertex(0)->info(),
-                                                 face->vertex(1)->info(),
-                                                 face->vertex(2)->info()};
+            Element element = {};
+
+            IndexType in0 = face->vertex(0)->info();
+            IndexType in1 = face->vertex(1)->info();
+            IndexType in2 = face->vertex(2)->info();
+
+            element.nodesIndexes = {in0, in1, in2};
 
             // Those nodes are not free (flying nodes and not wetted boundary nodes)
-            m_nodesList[element[0]].isFree = false;
-            m_nodesList[element[1]].isFree = false;
-            m_nodesList[element[2]].isFree = false;
+            m_nodesList[in0].isFree = false;
+            m_nodesList[in1].isFree = false;
+            m_nodesList[in2].isFree = false;
 
-            m_nodesList[element[0]].neighbourNodes.push_back(element[1]);
-            m_nodesList[element[0]].neighbourNodes.push_back(element[2]);
+            m_nodesList[in0].neighbourNodes.push_back(in1);
+            m_nodesList[in0].neighbourNodes.push_back(in2);
 
-            m_nodesList[element[1]].neighbourNodes.push_back(element[0]);
-            m_nodesList[element[1]].neighbourNodes.push_back(element[2]);
+            m_nodesList[in1].neighbourNodes.push_back(in0);
+            m_nodesList[in1].neighbourNodes.push_back(in2);
 
-            m_nodesList[element[2]].neighbourNodes.push_back(element[0]);
-            m_nodesList[element[2]].neighbourNodes.push_back(element[1]);
+            m_nodesList[in2].neighbourNodes.push_back(in0);
+            m_nodesList[in2].neighbourNodes.push_back(in1);
 
-            m_elementsList.push_back(element);
+            m_elementsList.push_back(std::move(element));
+
+            m_nodesList[in0].belongingElements.push_back(m_elementsList.size() - 1);
+            m_nodesList[in1].belongingElements.push_back(m_elementsList.size() - 1);
+            m_nodesList[in2].belongingElements.push_back(m_elementsList.size() - 1);
         }
     }
 
-    for(auto& node : m_nodesList)
+    #pragma omp parallel for default(shared)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
-        std::sort(node.neighbourNodes.begin(), node.neighbourNodes.end());
-        node.neighbourNodes.erase(std::unique(node.neighbourNodes.begin(), node.neighbourNodes.end()), node.neighbourNodes.end());
+        std::sort(m_nodesList[n].neighbourNodes.begin(), m_nodesList[n].neighbourNodes.end());
+        m_nodesList[n].neighbourNodes.erase(std::unique(m_nodesList[n].neighbourNodes.begin(), m_nodesList[n].neighbourNodes.end()), m_nodesList[n].neighbourNodes.end());
     }
 
     for(Alpha_shape_2::Alpha_shape_edges_iterator it = as.alpha_shape_edges_begin() ;
@@ -106,15 +116,16 @@ void Mesh::triangulateAlphaShape2D()
     // If an element is only composed of boundary nodes and the neighBournodes of
     // each of the three is equal to 2, this is a spurious triangle, we delete it
     m_elementsList.erase(
-    std::remove_if(m_elementsList.begin(),  m_elementsList.end(), [this](const std::vector<IndexType>& element)
+    std::remove_if(m_elementsList.begin(),  m_elementsList.end(), [this](const Element& element)
     {
-        if(this->m_nodesList[element[0]].isBound && this->m_nodesList[element[1]].isBound &&
-           this->m_nodesList[element[2]].isBound && this->m_nodesList[element[0]].neighbourNodes.size() == 2 &&
-           this->m_nodesList[element[1]].neighbourNodes.size() == 2 && this->m_nodesList[element[2]].neighbourNodes.size() == 2)
+        auto& nodesIndexes = element.nodesIndexes;
+        if(this->m_nodesList[nodesIndexes[0]].isBound && this->m_nodesList[nodesIndexes[1]].isBound &&
+           this->m_nodesList[nodesIndexes[2]].isBound && this->m_nodesList[nodesIndexes[0]].neighbourNodes.size() == 2 &&
+           this->m_nodesList[nodesIndexes[1]].neighbourNodes.size() == 2 && this->m_nodesList[nodesIndexes[2]].neighbourNodes.size() == 2)
         {
-            this->m_nodesList[element[0]].isFree = true;
-            this->m_nodesList[element[1]].isFree = true;
-            this->m_nodesList[element[2]].isFree = true;
+            this->m_nodesList[nodesIndexes[0]].isFree = true;
+            this->m_nodesList[nodesIndexes[1]].isFree = true;
+            this->m_nodesList[nodesIndexes[2]].isFree = true;
 
             return true;
         }
@@ -122,6 +133,14 @@ void Mesh::triangulateAlphaShape2D()
             return false;
 
     }), m_elementsList.end());
+
+    #pragma omp parallel for default(shared)
+    for(IndexType elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        computeElementJ(m_elementsList[elm]);
+        computeElementDetJ(m_elementsList[elm]);
+        computeElementInvJ(m_elementsList[elm]);
+    }
 
     if(m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");

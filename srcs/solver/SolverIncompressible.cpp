@@ -15,8 +15,12 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 
 
 SolverIncompressible::SolverIncompressible(const SolverIncompCreateInfo& solverIncompInfos) :
-Solver(solverIncompInfos.solverInfos), m_rho(solverIncompInfos.rho), m_mu(solverIncompInfos.mu), m_picardRelTol(solverIncompInfos.picardRelTol),
-m_picardMaxIter(solverIncompInfos.picardMaxIter), m_coeffDTincrease(solverIncompInfos.coeffDTincrease),
+Solver(solverIncompInfos.solverInfos),
+m_rho(solverIncompInfos.rho),
+m_mu(solverIncompInfos.mu),
+m_picardRelTol(solverIncompInfos.picardRelTol),
+m_picardMaxIter(solverIncompInfos.picardMaxIter),
+m_coeffDTincrease(solverIncompInfos.coeffDTincrease),
 m_coeffDTdecrease(solverIncompInfos.coeffDTdecrease)
 {
     m_solverType = SOLVER_TYPE::Incompressible_PSPG;

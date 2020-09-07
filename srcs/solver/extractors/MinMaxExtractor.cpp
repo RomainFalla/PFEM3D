@@ -5,7 +5,9 @@
 
 MinMaxExtractor::MinMaxExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                                  unsigned short coordinate, const std::string& minMax) :
-Extractor(solver, outFileName, timeBetweenWriting), m_coordinate(coordinate), m_minMax(minMax)
+Extractor(solver, outFileName, timeBetweenWriting),
+m_coordinate(coordinate),
+m_minMax(minMax)
 {
     if(m_coordinate > m_solver.getMesh().getDim() - 1)
         throw std::runtime_error("bad coordinate to write!");

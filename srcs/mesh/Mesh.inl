@@ -18,24 +18,22 @@ inline std::vector<IndexType> Mesh::getElement(IndexType elm) const noexcept
 {
     assert(elm < m_elementsList.size());
 
-    return m_elementsList[elm];
+    return m_elementsList[elm].nodesIndexes;
 }
 
 inline double Mesh::getElementDetJ(IndexType elm) const noexcept
 {
     assert(elm < m_elementsList.size());
-    assert(!m_elementsDetJ.empty());
 
-    return m_elementsDetJ[elm];
+    return m_elementsList[elm].detJ;
 }
 
 inline double Mesh::getElementInvJ(IndexType elm, unsigned short i, unsigned short j) const noexcept
 {
     assert(elm < m_elementsList.size());
-    assert(!m_elementsInvJ.empty());
     assert(i < m_dim + 1 && j < m_dim + 1);
 
-    return m_elementsInvJ[elm][i][j];
+    return m_elementsList[elm].invJ[i][j];
 }
 
 inline IndexType Mesh::getElementsNumber() const noexcept

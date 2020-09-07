@@ -7,7 +7,9 @@
 
 PointExtractor::PointExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                                unsigned short stateToWrite, const std::vector<std::vector<double>>& points) :
-Extractor(solver, outFileName, timeBetweenWriting), m_stateToWrite(stateToWrite), m_points(points)
+Extractor(solver, outFileName, timeBetweenWriting),
+m_stateToWrite(stateToWrite),
+m_points(points)
 {
     m_outFile.open(m_outFileName);
     if(!m_outFile.is_open())

@@ -17,9 +17,15 @@ static void displayDT(TimeType startTime, TimeType endTime, std::string text)
 
 
 SolverCompressible::SolverCompressible(const SolverCompCreateInfo& solverCompInfos) :
-Solver(solverCompInfos.solverInfos), m_rho0(solverCompInfos.rho0), m_mu(solverCompInfos.mu), m_K0(solverCompInfos.K0),
-m_K0prime(solverCompInfos.K0prime), m_pInfty(solverCompInfos.pInfty), m_securityCoeff(solverCompInfos.securityCoeff),
-m_strongContinuity(solverCompInfos.strongContinuity), m_nextTimeToRemesh(solverCompInfos.solverInfos.maxDT)
+Solver(solverCompInfos.solverInfos),
+m_rho0(solverCompInfos.rho0),
+m_mu(solverCompInfos.mu),
+m_K0(solverCompInfos.K0),
+m_K0prime(solverCompInfos.K0prime),
+m_pInfty(solverCompInfos.pInfty),
+m_securityCoeff(solverCompInfos.securityCoeff),
+m_strongContinuity(solverCompInfos.strongContinuity),
+m_nextTimeToRemesh(solverCompInfos.solverInfos.maxDT)
 {
     m_solverType = SOLVER_TYPE::WeaklyCompressible;
     unsigned short dim = m_mesh.getDim();
@@ -177,9 +183,9 @@ void SolverCompressible::solveProblem(bool verboseOutput)
 
     std::cout << "----------------------------------------------------------------" << std::endl;
 
-    for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
+    for(auto& extractor : m_pExtractor)
     {
-        m_pExtractor[i]->update();
+        extractor->update();
     }
 
     while(m_currentTime < m_endTime)
@@ -206,9 +212,9 @@ void SolverCompressible::solveProblem(bool verboseOutput)
 
         solveCurrentTimeStep(verboseOutput);
 
-        for(unsigned short i = 0 ; i < m_pExtractor.size() ; ++i)
+        for(auto& extractor : m_pExtractor)
         {
-            m_pExtractor[i]->update();
+            extractor->update();
         }
 
         if(m_adaptDT)

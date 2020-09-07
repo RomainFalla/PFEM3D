@@ -23,7 +23,7 @@ class SOLVER_API SolverIncompressible : public Solver
 {
     public:
         SolverIncompressible()                                                            = delete;
-        SolverIncompressible(const SolverIncompCreateInfo& solverIncompInfoss);
+        SolverIncompressible(const SolverIncompCreateInfo& solverIncompInfos);
         SolverIncompressible(const SolverIncompressible& solverIncompressible)            = delete;
         SolverIncompressible& operator=(const SolverIncompressible& solverIncompressible) = delete;
         SolverIncompressible(SolverIncompressible&& solverIncompressible)                 = delete;

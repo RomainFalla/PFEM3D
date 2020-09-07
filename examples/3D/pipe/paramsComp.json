@@ -37,7 +37,7 @@
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.025,
+                "timeBetweenWriting": 0.05,
                 "whatToWrite": ["u", "p"],
 				"writeAs": "NodesElements"
 			}

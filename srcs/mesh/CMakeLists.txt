@@ -5,7 +5,7 @@ ENDIF()
 
 SET(LIBMESHSRCS
 ./Mesh.cpp ./Mesh2D.cpp ./Mesh3D.cpp
-./Mesh.hpp ./Mesh.inl ./Node.hpp)
+./Mesh.hpp ./Mesh.inl ./Node.hpp Element.hpp)
 
 ADD_LIBRARY(pfemMesh SHARED ${LIBMESHSRCS})
 GENERATE_EXPORT_HEADER(pfemMesh

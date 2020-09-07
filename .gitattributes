@@ -1,7 +1,9 @@
 * text=auto
 *.cpp text eol=lf
 *.hpp text eol=lf
+*.inl text eol=lf
 *.m text eol=lf
 *.dat text eol=lf
 *.txt text eol=lf
 *.sh text eol=lf
+*.geo text eol=lf

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "Node.hpp"
+#include "Element.hpp"
 
 #include "Mesh_export.h"
 
@@ -237,8 +238,6 @@ class MESH_API Mesh
         inline void setStatesNumber(unsigned short statesNumber);
 
     private:
-        bool m_verboseOutput;   /**< Should the output be verbose? */
-
         double m_hchar; /**< Characteristic size of an element (same as in .geo file). */
         double m_alpha; /**< Alpha parameter of the alpha-shape algorithm (triangles are discared if  r_circumcircle > alpha*hchar). */
         double m_omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
@@ -249,15 +248,9 @@ class MESH_API Mesh
 
         std::vector<Node> m_nodesList;      /**< List of nodes of the mesh. */
         std::vector<Node> m_nodesListSave;  /**< A copy of the nodes list (usefull for non-linear algorithm). */
-        std::vector<std::vector<IndexType>> m_elementsList;    /**< The list of element (triplet of index in the nodesList. */
-        //std::vector<std::vector<IndexType>> m_freeSurfaceEdgesList;   /**< The list of free surface edges (doublet of index in the nodesList. */
+        std::vector<Element> m_elementsList;    /**< The list of elements. */
 
-        std::vector<std::string> m_tagNames; /**< The name of the tag of the nodes */
-
-        std::vector<double> m_elementsDetJ;         /**< The Jacobian matrix determinant of each element. */
-        std::vector<std::vector<std::vector<double>>> m_elementsInvJ;   /**< The inverse Jacobian matrix of each element. */
-        std::vector<std::vector<std::vector<double>>> m_elementsJ;   /**< The Jacobian matrix of each element. */
-        std::vector<double> m_freeSurfaceEdgeDetJ;         /**< The Jacobian matrix determinant of each free surface edge. */
+        std::vector<std::string> m_tagNames; /**< The name of the tag of the nodes. */
 
         /**
          * \brief Add nodes in element whose area is too big (A_tringle > omega*hchar^2.
@@ -275,19 +268,19 @@ class MESH_API Mesh
          * \brief Compute the determinant of the of the Jacobian matrix for gauss
          *        integration for each triangle.
          */
-        void computeElementsDetJ() noexcept;
+        void computeElementDetJ(Element& element) noexcept;
 
         /**
          * \brief Compute the inverse Jacobian matrix for gauss integration for each
          *        triangle.
          */
-        void computeElementsInvJ() noexcept;
+        void computeElementInvJ(Element& element) noexcept;
 
         /**
          * \brief Compute the inverse Jacobian matrix for gauss integration for each
          *        triangle.
          */
-        void computeElementsJ() noexcept;
+        void computeElementJ(Element& element) noexcept;
 
 //        /**
 //         * \brief Compute the determinant of the of the Jacobian matrix for gauss

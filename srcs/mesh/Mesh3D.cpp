@@ -39,6 +39,7 @@ void Mesh::triangulateAlphaShape3D()
         m_nodesList[i].isFree = true;
         m_nodesList[i].isOnFreeSurface = false;
         m_nodesList[i].neighbourNodes.clear();
+        m_nodesList[i].belongingElements.clear();
     }
 
     const Alpha_shape_3 as(pointsList.begin(), pointsList.end(),
@@ -54,47 +55,60 @@ void Mesh::triangulateAlphaShape3D()
         {
             const Alpha_shape_3::Cell_handle cell{fit};
 
-            const std::vector<IndexType> element{cell->vertex(0)->info(),
-                                                 cell->vertex(1)->info(),
-                                                 cell->vertex(2)->info(),
-                                                 cell->vertex(3)->info()};
+            Element element = {};
 
-            Tetrahedron_3 tetrahedron(pointsList[element[0]].first, pointsList[element[1]].first, pointsList[element[2]].first, pointsList[element[3]].first);
+            IndexType in0 = cell->vertex(0)->info();
+            IndexType in1 = cell->vertex(1)->info();
+            IndexType in2 = cell->vertex(2)->info();
+            IndexType in3 = cell->vertex(3)->info();
+
+            element.nodesIndexes = {in0, in1, in2, in3};
+
+            Tetrahedron_3 tetrahedron(pointsList[in0].first,
+                                      pointsList[in1].first,
+                                      pointsList[in2].first,
+                                      pointsList[in3].first);
 
             if(tetrahedron.volume() > 1e-4*m_hchar*m_hchar*m_hchar)
             {
                 // Those nodes are not free (flying nodes and not wetted boundary nodes)
-                m_nodesList[element[0]].isFree = false;
-                m_nodesList[element[1]].isFree = false;
-                m_nodesList[element[2]].isFree = false;
-                m_nodesList[element[3]].isFree = false;
+                m_nodesList[in0].isFree = false;
+                m_nodesList[in1].isFree = false;
+                m_nodesList[in2].isFree = false;
+                m_nodesList[in3].isFree = false;
 
                 // We compute the neighbour nodes of each nodes
-                m_nodesList[element[0]].neighbourNodes.push_back(element[1]);
-                m_nodesList[element[0]].neighbourNodes.push_back(element[2]);
-                m_nodesList[element[0]].neighbourNodes.push_back(element[3]);
+                m_nodesList[in0].neighbourNodes.push_back(in1);
+                m_nodesList[in0].neighbourNodes.push_back(in2);
+                m_nodesList[in0].neighbourNodes.push_back(in3);
 
-                m_nodesList[element[1]].neighbourNodes.push_back(element[0]);
-                m_nodesList[element[1]].neighbourNodes.push_back(element[2]);
-                m_nodesList[element[1]].neighbourNodes.push_back(element[3]);
+                m_nodesList[in1].neighbourNodes.push_back(in0);
+                m_nodesList[in1].neighbourNodes.push_back(in2);
+                m_nodesList[in1].neighbourNodes.push_back(in3);
 
-                m_nodesList[element[2]].neighbourNodes.push_back(element[0]);
-                m_nodesList[element[2]].neighbourNodes.push_back(element[1]);
-                m_nodesList[element[2]].neighbourNodes.push_back(element[3]);
+                m_nodesList[in2].neighbourNodes.push_back(in0);
+                m_nodesList[in2].neighbourNodes.push_back(in1);
+                m_nodesList[in2].neighbourNodes.push_back(in3);
 
-                m_nodesList[element[3]].neighbourNodes.push_back(element[0]);
-                m_nodesList[element[3]].neighbourNodes.push_back(element[1]);
-                m_nodesList[element[3]].neighbourNodes.push_back(element[2]);
+                m_nodesList[in3].neighbourNodes.push_back(in0);
+                m_nodesList[in3].neighbourNodes.push_back(in1);
+                m_nodesList[in3].neighbourNodes.push_back(in2);
 
-                m_elementsList.push_back(element);
+                m_elementsList.push_back(std::move(element));
+
+                m_nodesList[in0].belongingElements.push_back(m_elementsList.size() - 1);
+                m_nodesList[in1].belongingElements.push_back(m_elementsList.size() - 1);
+                m_nodesList[in2].belongingElements.push_back(m_elementsList.size() - 1);
+                m_nodesList[in3].belongingElements.push_back(m_elementsList.size() - 1);
             }
         }
     }
 
-    for(auto& node : m_nodesList)
+    #pragma omp parallel for default(shared)
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
     {
-        std::sort(node.neighbourNodes.begin(), node.neighbourNodes.end());
-        node.neighbourNodes.erase(std::unique(node.neighbourNodes.begin(), node.neighbourNodes.end()), node.neighbourNodes.end());
+        std::sort(m_nodesList[n].neighbourNodes.begin(), m_nodesList[n].neighbourNodes.end());
+        m_nodesList[n].neighbourNodes.erase(std::unique(m_nodesList[n].neighbourNodes.begin(), m_nodesList[n].neighbourNodes.end()), m_nodesList[n].neighbourNodes.end());
     }
 
     //This could take edges from bad elements-> construct tetrahedron from nodes edges to check
@@ -123,26 +137,26 @@ void Mesh::triangulateAlphaShape3D()
     // If an element is only composed of boundary nodes and the neighbour nodes of
     // each of the four are only boundary nodes, this is a spurious tetrahedron, we delete it
     m_elementsList.erase(
-    std::remove_if(m_elementsList.begin(),  m_elementsList.end(),  [this](const std::vector<IndexType>& element)
+    std::remove_if(m_elementsList.begin(),  m_elementsList.end(),  [this](const Element& element)
     {
-        if(this->m_nodesList[element[0]].isBound && this->m_nodesList[element[1]].isBound &&
-           this->m_nodesList[element[2]].isBound && this->m_nodesList[element[3]].isBound)
+        if(this->m_nodesList[element.nodesIndexes[0]].isBound && this->m_nodesList[element.nodesIndexes[1]].isBound &&
+           this->m_nodesList[element.nodesIndexes[2]].isBound && this->m_nodesList[element.nodesIndexes[3]].isBound)
         {
-            for(unsigned short n = 0 ; n < element.size() ; ++n)
+            for(unsigned short n = 0 ; n < element.nodesIndexes.size() ; ++n)
             {
-                for(unsigned int i = 0 ; i < this->m_nodesList[element[n]].neighbourNodes.size() ; ++i)
+                for(unsigned int i = 0 ; i < this->m_nodesList[element.nodesIndexes[n]].neighbourNodes.size() ; ++i)
                 {
-                    if(!this->m_nodesList[this->m_nodesList[element[n]].neighbourNodes[i]].isBound)
+                    if(!this->m_nodesList[this->m_nodesList[element.nodesIndexes[n]].neighbourNodes[i]].isBound)
                     {
                         return false;
                     }
                 }
             }
 
-            this->m_nodesList[element[0]].isFree = true;
-            this->m_nodesList[element[1]].isFree = true;
-            this->m_nodesList[element[2]].isFree = true;
-            this->m_nodesList[element[3]].isFree = true;
+            this->m_nodesList[element.nodesIndexes[0]].isFree = true;
+            this->m_nodesList[element.nodesIndexes[1]].isFree = true;
+            this->m_nodesList[element.nodesIndexes[2]].isFree = true;
+            this->m_nodesList[element.nodesIndexes[3]].isFree = true;
 
             return true;
         }
@@ -153,8 +167,16 @@ void Mesh::triangulateAlphaShape3D()
 
     for(auto element : m_elementsList)
     {
-        for(unsigned short n = 0 ; n < element.size() ; ++n)
-            m_nodesList[element[n]].isFree = false;
+        for(unsigned short n = 0 ; n < element.nodesIndexes.size() ; ++n)
+            m_nodesList[element.nodesIndexes[n]].isFree = false;
+    }
+
+    #pragma omp parallel for default(shared)
+    for(IndexType elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        computeElementJ(m_elementsList[elm]);
+        computeElementDetJ(m_elementsList[elm]);
+        computeElementInvJ(m_elementsList[elm]);
     }
 
     if(m_elementsList.empty())

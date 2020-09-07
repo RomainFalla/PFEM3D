@@ -8,7 +8,8 @@
 
 GMSHExtractor::GMSHExtractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting,
                              const std::vector<std::string>& whatToWrite, std::string writeAs) :
-Extractor(solver, outFileName, timeBetweenWriting), m_writeAs(std::move(writeAs))
+Extractor(solver, outFileName, timeBetweenWriting),
+m_writeAs(std::move(writeAs))
 {
     if(!(m_writeAs == "Nodes" || m_writeAs == "Elements" || m_writeAs == "NodesElements"))
         throw std::runtime_error("unknown data type for results writing " + m_writeAs);

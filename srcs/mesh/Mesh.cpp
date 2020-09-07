@@ -8,7 +8,11 @@
 
 
 Mesh::Mesh(const MeshCreateInfo& meshInfos) :
-m_hchar(meshInfos.hchar), m_alpha(meshInfos.alpha), m_omega(meshInfos.omega), m_gamma(meshInfos.gamma), m_boundingBox(meshInfos.boundingBox)
+m_hchar(meshInfos.hchar),
+m_alpha(meshInfos.alpha),
+m_omega(meshInfos.omega),
+m_gamma(meshInfos.gamma),
+m_boundingBox(meshInfos.boundingBox)
 {
     loadFromFile(meshInfos.mshFile);
 }
@@ -16,14 +20,19 @@ m_hchar(meshInfos.hchar), m_alpha(meshInfos.alpha), m_omega(meshInfos.omega), m_
 bool Mesh::addNodes(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
-    assert(m_elementsDetJ.size() == m_elementsList.size() && "The determinant are not computed!");
 
     bool addedNodes = false;
 
-    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
+    std::vector<bool> toBeDeleted(m_elementsList.size(), false);
+
+    double limitSize =  m_omega*std::pow(m_hchar, m_dim);
+
+    std::size_t elementCount = m_elementsList.size(); //avoid problems because the follwinĝ for loop will increase the element number
+
+    for(IndexType elm = 0 ; elm < elementCount ; ++elm)
     {
         //If an element is too big, we add a node at his center
-        if(m_elementsDetJ[i]*getRefElementSize() > m_omega*std::pow(m_hchar, m_dim))
+        if(m_elementsList[elm].detJ*getRefElementSize() > limitSize)
         {
             Node newNode = {};
             newNode.position.resize(m_dim);
@@ -33,7 +42,8 @@ bool Mesh::addNodes(bool verboseOutput) noexcept
                 newNode.position[k] = 0;
                 for(unsigned short d = 0 ; d <= m_dim ; ++d)
                 {
-                    newNode.position[k] += m_nodesList[m_elementsList[i][d]].position[k];
+                    assert(m_elementsList[elm].nodesIndexes[d] < (m_nodesList.size() - 1)) ;
+                    newNode.position[k] += m_nodesList[m_elementsList[elm].nodesIndexes[d]].position[k];
                 }
                 newNode.position[k] /= (m_dim + 1);
             }
@@ -44,12 +54,63 @@ bool Mesh::addNodes(bool verboseOutput) noexcept
                 newNode.states[k] = 0;
                 for(unsigned short d = 0 ; d <= m_dim ; ++d)
                 {
-                    newNode.states[k] += m_nodesList[m_elementsList[i][d]].states[k];
+                    newNode.states[k] += m_nodesList[m_elementsList[elm].nodesIndexes[d]].states[k];
                 }
                 newNode.states[k] /= (m_dim + 1);
             }
 
             m_nodesList.push_back(std::move(newNode));
+
+            for(unsigned short d = 0 ; d <= m_dim ; ++d)
+            {
+                Element element = {};
+                switch(m_dim)
+                {
+                    case 2:
+                        if(d == m_dim)
+                        {
+                            element.nodesIndexes = {m_elementsList[elm].nodesIndexes[d],
+                                                    m_elementsList[elm].nodesIndexes[0],
+                                                    static_cast<IndexType>(m_nodesList.size() - 1)};
+                        }
+                        else
+                        {
+                            element.nodesIndexes = {m_elementsList[elm].nodesIndexes[d],
+                                                    m_elementsList[elm].nodesIndexes[d + 1],
+                                                    static_cast<IndexType>(m_nodesList.size() - 1)};
+                        }
+                        break;
+
+                    default:
+                        if(d == m_dim)
+                        {
+                            element.nodesIndexes = {m_elementsList[elm].nodesIndexes[d],
+                                                    m_elementsList[elm].nodesIndexes[0],
+                                                    m_elementsList[elm].nodesIndexes[1],
+                                                    static_cast<IndexType>(m_nodesList.size() - 1)};
+                        }
+                        else if (d == m_dim - 1)
+                        {
+                            element.nodesIndexes = {m_elementsList[elm].nodesIndexes[d],
+                                                    m_elementsList[elm].nodesIndexes[d + 1],
+                                                    m_elementsList[elm].nodesIndexes[0],
+                                                    static_cast<IndexType>(m_nodesList.size() - 1)};
+                        }
+                        else
+                        {
+                            element.nodesIndexes = {m_elementsList[elm].nodesIndexes[d],
+                                                    m_elementsList[elm].nodesIndexes[d + 1],
+                                                    m_elementsList[elm].nodesIndexes[d + 2],
+                                                    static_cast<IndexType>(m_nodesList.size() - 1)};
+                        }
+                        break;
+                }
+
+                //No recompute of J, detJ and ivJ, everything is recomputed in triangulateAndAlphaShape
+                m_elementsList.push_back(std::move(element));
+            }
+
+            toBeDeleted[elm] = true;
 
             if(verboseOutput)
             {
@@ -69,6 +130,13 @@ bool Mesh::addNodes(bool verboseOutput) noexcept
         }
     }
 
+    m_elementsList.erase(std::remove_if(m_elementsList.begin(), m_elementsList.end(), [this, &toBeDeleted](const Element& element){
+        if(toBeDeleted[&element - &*std::begin(m_elementsList)])
+            return true;
+        else
+            return false;
+    }), m_elementsList.end());
+
     return addedNodes;
 }
 
@@ -76,34 +144,92 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
-    std::vector<bool> toBeDeleted(m_nodesList.size(), false);   //Should the node be deleted
+    std::vector<bool> toBeDeletedElement(m_elementsList.size(), false);   //Should the element be deleted
+    std::vector<bool> toBeDeletedNodes(m_nodesList.size(), false);   //Should the node be deleted
+
+    std::vector<IndexType> nodesIndexesDeleted = {};
+    std::vector<IndexType> elementIndexesDeleted = {};
 
     bool outofBBNodes = false;
 
-    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
-    {
-        //If the node is out of the bounding box, we delete it.
-        // Bounding box fromat: [xmin, ymin, zmin, xmax, ymax, zmax]
+    auto isNodeOutOfBB = [this](const Node& node) -> bool {
         for(unsigned short d = 0 ; d < m_dim ; ++d)
         {
-            if(m_nodesList[n].position[d] < m_boundingBox[d] ||
-               m_nodesList[n].position[d] > m_boundingBox[d + m_dim])
+            if(node.position[d] < m_boundingBox[d] ||
+               node.position[d] > m_boundingBox[d + m_dim])
             {
-                toBeDeleted[n] = true;
-                outofBBNodes = true;
-                break;
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    //If the whole element is out of the bounding box, we delete it.
+    // Bounding box fromat: [xmin, ymin, zmin, xmax, ymax, zmax]
+    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
+    {
+        if(isNodeOutOfBB(m_nodesList[n]))
+        {
+            toBeDeletedNodes[n] = true;
+
+            if(!m_nodesList[n].isFree)
+            {
+                //There are elements to delete
+                for(IndexType i = 0 ; i < m_nodesList[n].belongingElements.size() ; ++i)
+                {
+                    toBeDeletedElement[m_nodesList[n].belongingElements[i]] = true;
+                }
             }
         }
     }
 
+    for(IndexType n = 0 ; n < toBeDeletedNodes.size() ; ++n)
+        if(toBeDeletedNodes[n]) nodesIndexesDeleted.push_back(n);
+
+    for(IndexType elm = 0 ; elm < toBeDeletedElement.size() ; ++elm)
+        if(toBeDeletedElement[elm]) elementIndexesDeleted.push_back(elm);
+
+    m_elementsList.erase(
+    std::remove_if(m_elementsList.begin(), m_elementsList.end(), [this, &toBeDeletedElement, verboseOutput](const Element& element){
+        if(toBeDeletedElement[&element - &*std::begin(m_elementsList)])
+        {
+            if(verboseOutput)
+            {
+                std::cout << "Removing out of bounding box element: [";
+                for(unsigned short n= 0 ; n < m_dim + 1 ; ++n)
+                {
+                    std::cout << "(";
+                    for(unsigned short d = 0 ; d < m_dim ; ++d)
+                    {
+                        std::cout << this->m_nodesList[element.nodesIndexes[n]].position[d];
+                        if(d == m_dim - 1)
+                            std::cout << ")";
+                        else
+                            std::cout << ", ";
+                    }
+                    if(n == m_dim)
+                            std::cout << "]";
+                    else
+                        std::cout << ", ";
+                }
+                std::cout << std::endl;
+            }
+
+            return true;
+        }
+        else
+            return false;
+    }), m_elementsList.end());
+
     m_nodesList.erase(
-    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted, verboseOutput](const Node& node)
+    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeletedNodes, verboseOutput](const Node& node)
     {
-       if(toBeDeleted[&node - &*std::begin(m_nodesList)])
-       {
-           if(verboseOutput)
-           {
-               std::cout << "Removing out of bounding box node (";
+        if(toBeDeletedNodes[&node - &*std::begin(m_nodesList)])
+        {
+            if(verboseOutput)
+            {
+                std::cout << "Removing out of bounding box node (";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
                 {
                     std::cout << node.position[d];
@@ -113,167 +239,193 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
                         std::cout << ", ";
                 }
                 std::cout << std::endl;
-           }
+            }
 
-           return true;
-       }
-       else
+            return true;
+        }
+        else
            return false;
     }), m_nodesList.end());
+
+    for(IndexType i = 0 ; i < nodesIndexesDeleted.size() ; ++i)
+    {
+        for(Element& element : m_elementsList)
+        {
+            for(IndexType& n : element.nodesIndexes)
+            {
+                if(n > nodesIndexesDeleted[i])
+                    n--;
+            }
+        }
+
+        for(Node& node : m_nodesList)
+        {
+            for(IndexType& n : node.neighbourNodes)
+            {
+                if(n > nodesIndexesDeleted[i])
+                    n--;
+            }
+        }
+
+        for(IndexType j = i + 1 ; j < nodesIndexesDeleted.size() ; ++j)
+            nodesIndexesDeleted[j]--;
+    }
+
+    for(IndexType i = 0 ; i < elementIndexesDeleted.size() ; ++i)
+    {
+        for(Node& node : m_nodesList)
+        {
+            for(IndexType& elm : node.belongingElements)
+            {
+                if(elm > elementIndexesDeleted[i])
+                    elm--;
+            }
+        }
+
+        for(IndexType j = i + 1 ; j < elementIndexesDeleted.size() ; ++j)
+            elementIndexesDeleted[j]--;
+    }
 
     return outofBBNodes;
 }
 
-void Mesh::computeElementsDetJ() noexcept
+void Mesh::computeElementDetJ(Element& element) noexcept
 {
-    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
-    assert(!m_elementsJ.empty() && m_elementsJ.size() == m_elementsList.size());
+    assert(!element.J.empty());
 
-    m_elementsDetJ.clear();
-    m_elementsDetJ.resize(m_elementsList.size());
-
-    #pragma omp parallel for default(shared)
-    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
+    if(m_dim == 2)
     {
-        if(m_dim == 2)
-        {
-            m_elementsDetJ[i] = m_elementsJ[i][0][0]*m_elementsJ[i][1][1]
-                              - m_elementsJ[i][1][0]*m_elementsJ[i][0][1];
-        }
-        else
-        {
-            m_elementsDetJ[i] = m_elementsJ[i][0][0]*m_elementsJ[i][1][1]*m_elementsJ[i][2][2]
-                              + m_elementsJ[i][0][1]*m_elementsJ[i][1][2]*m_elementsJ[i][2][0]
-                              + m_elementsJ[i][0][2]*m_elementsJ[i][1][0]*m_elementsJ[i][2][1]
-                              - m_elementsJ[i][2][0]*m_elementsJ[i][1][1]*m_elementsJ[i][0][2]
-                              - m_elementsJ[i][2][1]*m_elementsJ[i][1][2]*m_elementsJ[i][0][0]
-                              - m_elementsJ[i][2][2]*m_elementsJ[i][1][0]*m_elementsJ[i][0][1];
-        }
+        assert(element.J.size() == 2 && element.J[0].size() == 2 && element.J[1].size() == 2);
+
+        element.detJ = element.J[0][0]*element.J[1][1]
+                     - element.J[1][0]*element.J[0][1];
+    }
+    else
+    {
+        assert(element.J.size() == 3 && element.J[0].size() == 3 &&
+               element.J[1].size() == 3 && element.J[2].size() == 3);
+
+        element.detJ = element.J[0][0]*element.J[1][1]*element.J[2][2]
+                     + element.J[0][1]*element.J[1][2]*element.J[2][0]
+                     + element.J[0][2]*element.J[1][0]*element.J[2][1]
+                     - element.J[2][0]*element.J[1][1]*element.J[0][2]
+                     - element.J[2][1]*element.J[1][2]*element.J[0][0]
+                     - element.J[2][2]*element.J[1][0]*element.J[0][1];
     }
 }
 
-void Mesh::computeElementsInvJ() noexcept
+void Mesh::computeElementInvJ(Element& element) noexcept
 {
-    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
-    assert(!m_elementsJ.empty() && m_elementsJ.size() == m_elementsList.size());
-    assert(m_elementsDetJ.size() == m_elementsList.size() && "The determinant are not computed!");
+    assert(!element.J.empty());
 
-    m_elementsInvJ.clear();
-    m_elementsInvJ.resize(m_elementsList.size());
-
-    #pragma omp parallel for default(shared)
-    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
+    if(m_dim == 2)
     {
-        if(m_dim == 2)
-        {
-            m_elementsInvJ[i].resize(2);
-            m_elementsInvJ[i][0].resize(2);
-            m_elementsInvJ[i][1].resize(2);
+        assert(element.J.size() == 2 && element.J[0].size() == 2 && element.J[1].size() == 2);
 
-            m_elementsInvJ[i][0][0] = m_elementsJ[i][1][1]/m_elementsDetJ[i];
+        std::vector<std::vector<double>> invJ = {{0, 0},
+                                                 {0, 0}};
 
-            m_elementsInvJ[i][0][1] = - m_elementsJ[i][0][1]/m_elementsDetJ[i];
+        invJ[0][0] = element.J[1][1]/element.detJ;
 
-            m_elementsInvJ[i][1][0] = - m_elementsJ[i][1][0]/m_elementsDetJ[i];
+        invJ[0][1] = - element.J[0][1]/element.detJ;
 
-            m_elementsInvJ[i][1][1] = m_elementsJ[i][0][0]/m_elementsDetJ[i];
-        }
-        else
-        {
-            m_elementsInvJ[i].resize(3);
-            m_elementsInvJ[i][0].resize(3);
-            m_elementsInvJ[i][1].resize(3);
-            m_elementsInvJ[i][2].resize(3);
+        invJ[1][0] = - element.J[1][0]/element.detJ;
 
-            m_elementsInvJ[i][0][0] = (m_elementsJ[i][1][1]*m_elementsJ[i][2][2]
-                                    - m_elementsJ[i][1][2]*m_elementsJ[i][2][1])/m_elementsDetJ[i];
+        invJ[1][1] = element.J[0][0]/element.detJ;
 
-            m_elementsInvJ[i][0][1] = (m_elementsJ[i][2][1]*m_elementsJ[i][0][2]
-                                    - m_elementsJ[i][2][2]*m_elementsJ[i][0][1])/m_elementsDetJ[i];
+        element.invJ = std::move(invJ);
+    }
+    else
+    {
+        assert(element.J.size() == 3 && element.J[0].size() == 3 &&
+               element.J[1].size() == 3 && element.J[2].size() == 3);
 
-            m_elementsInvJ[i][0][2] = (m_elementsJ[i][0][1]*m_elementsJ[i][1][2]
-                                    - m_elementsJ[i][0][2]*m_elementsJ[i][1][1])/m_elementsDetJ[i];
+        std::vector<std::vector<double>> invJ = {{0, 0, 0},
+                                                 {0, 0, 0},
+                                                 {0, 0, 0}};
 
-            m_elementsInvJ[i][1][0] = (m_elementsJ[i][2][0]*m_elementsJ[i][1][2]
-                                    - m_elementsJ[i][1][0]*m_elementsJ[i][2][2])/m_elementsDetJ[i];
+        invJ[0][0] = (element.J[1][1]*element.J[2][2]
+                   - element.J[1][2]*element.J[2][1])/element.detJ;
 
-            m_elementsInvJ[i][1][1] = (m_elementsJ[i][0][0]*m_elementsJ[i][2][2]
-                                    - m_elementsJ[i][2][0]*m_elementsJ[i][0][2])/m_elementsDetJ[i];
+        invJ[0][1] = (element.J[2][1]*element.J[0][2]
+                   - element.J[2][2]*element.J[0][1])/element.detJ;
 
-            m_elementsInvJ[i][1][2] = (m_elementsJ[i][1][0]*m_elementsJ[i][0][2]
-                                    - m_elementsJ[i][0][0]*m_elementsJ[i][1][2])/m_elementsDetJ[i];
+        invJ[0][2] = (element.J[0][1]*element.J[1][2]
+                   - element.J[0][2]*element.J[1][1])/element.detJ;
 
-            m_elementsInvJ[i][2][0] = (m_elementsJ[i][1][0]*m_elementsJ[i][2][1]
-                                    - m_elementsJ[i][2][0]*m_elementsJ[i][1][1])/m_elementsDetJ[i];
+        invJ[1][0] = (element.J[2][0]*element.J[1][2]
+                   - element.J[1][0]*element.J[2][2])/element.detJ;
 
-            m_elementsInvJ[i][2][1] = (m_elementsJ[i][2][0]*m_elementsJ[i][0][1]
-                                    - m_elementsJ[i][0][0]*m_elementsJ[i][2][1])/m_elementsDetJ[i];
+        invJ[1][1] = (element.J[0][0]*element.J[2][2]
+                   - element.J[2][0]*element.J[0][2])/element.detJ;
 
-            m_elementsInvJ[i][2][2] = (m_elementsJ[i][0][0]*m_elementsJ[i][1][1]
-                                    - m_elementsJ[i][1][0]*m_elementsJ[i][0][1])/m_elementsDetJ[i];
-        }
+        invJ[1][2] = (element.J[1][0]*element.J[0][2]
+                   - element.J[0][0]*element.J[1][2])/element.detJ;
 
+        invJ[2][0] = (element.J[1][0]*element.J[2][1]
+                   - element.J[2][0]*element.J[1][1])/element.detJ;
+
+        invJ[2][1] = (element.J[2][0]*element.J[0][1]
+                   - element.J[0][0]*element.J[2][1])/element.detJ;
+
+        invJ[2][2] = (element.J[0][0]*element.J[1][1]
+                   - element.J[1][0]*element.J[0][1])/element.detJ;
+
+        element.invJ = std::move(invJ);
     }
 }
 
-void Mesh::computeElementsJ() noexcept
+void Mesh::computeElementJ(Element& element) noexcept
 {
-    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
-
-    m_elementsJ.clear();
-    m_elementsJ.resize(m_elementsList.size());
-
-    #pragma omp parallel for default(shared)
-    for(IndexType i = 0 ; i < m_elementsList.size() ; ++i)
+    if(m_dim == 2)
     {
-        if(m_dim == 2)
-        {
-            m_elementsJ[i].resize(2);
-            m_elementsJ[i][0].resize(2);
-            m_elementsJ[i][1].resize(2);
+        double x0 = m_nodesList[element.nodesIndexes[0]].position[0];
+        double x1 = m_nodesList[element.nodesIndexes[1]].position[0];
+        double x2 = m_nodesList[element.nodesIndexes[2]].position[0];
+        double y0 = m_nodesList[element.nodesIndexes[0]].position[1];
+        double y1 = m_nodesList[element.nodesIndexes[1]].position[1];
+        double y2 = m_nodesList[element.nodesIndexes[2]].position[1];
 
-            double x0 = m_nodesList[m_elementsList[i][0]].position[0];
-            double x1 = m_nodesList[m_elementsList[i][1]].position[0];
-            double x2 = m_nodesList[m_elementsList[i][2]].position[0];
-            double y0 = m_nodesList[m_elementsList[i][0]].position[1];
-            double y1 = m_nodesList[m_elementsList[i][1]].position[1];
-            double y2 = m_nodesList[m_elementsList[i][2]].position[1];
+        std::vector<std::vector<double>> J = {{0, 0},
+                                              {0, 0}};
 
-            m_elementsJ[i][0][0] = x1 - x0;
-            m_elementsJ[i][0][1] = x2 - x0;
-            m_elementsJ[i][1][0] = y1 - y0;
-            m_elementsJ[i][1][1] = y2 - y0;
-        }
-        else
-        {
-            m_elementsJ[i].resize(3);
-            m_elementsJ[i][0].resize(3);
-            m_elementsJ[i][1].resize(3);
-            m_elementsJ[i][2].resize(3);
+        J[0][0] = x1 - x0;
+        J[0][1] = x2 - x0;
+        J[1][0] = y1 - y0;
+        J[1][1] = y2 - y0;
 
-            double x0 = m_nodesList[m_elementsList[i][0]].position[0];
-            double x1 = m_nodesList[m_elementsList[i][1]].position[0];
-            double x2 = m_nodesList[m_elementsList[i][2]].position[0];
-            double x3 = m_nodesList[m_elementsList[i][3]].position[0];
-            double y0 = m_nodesList[m_elementsList[i][0]].position[1];
-            double y1 = m_nodesList[m_elementsList[i][1]].position[1];
-            double y2 = m_nodesList[m_elementsList[i][2]].position[1];
-            double y3 = m_nodesList[m_elementsList[i][3]].position[1];
-            double z0 = m_nodesList[m_elementsList[i][0]].position[2];
-            double z1 = m_nodesList[m_elementsList[i][1]].position[2];
-            double z2 = m_nodesList[m_elementsList[i][2]].position[2];
-            double z3 = m_nodesList[m_elementsList[i][3]].position[2];
+        element.J = std::move(J);
+    }
+    else
+    {
+        double x0 = m_nodesList[element.nodesIndexes[0]].position[0];
+        double x1 = m_nodesList[element.nodesIndexes[1]].position[0];
+        double x2 = m_nodesList[element.nodesIndexes[2]].position[0];
+        double x3 = m_nodesList[element.nodesIndexes[3]].position[0];
+        double y0 = m_nodesList[element.nodesIndexes[0]].position[1];
+        double y1 = m_nodesList[element.nodesIndexes[1]].position[1];
+        double y2 = m_nodesList[element.nodesIndexes[2]].position[1];
+        double y3 = m_nodesList[element.nodesIndexes[3]].position[1];
+        double z0 = m_nodesList[element.nodesIndexes[0]].position[2];
+        double z1 = m_nodesList[element.nodesIndexes[1]].position[2];
+        double z2 = m_nodesList[element.nodesIndexes[2]].position[2];
+        double z3 = m_nodesList[element.nodesIndexes[3]].position[2];
 
-            m_elementsJ[i][0][0] = x1 - x0;
-            m_elementsJ[i][0][1] = x2 - x0;
-            m_elementsJ[i][0][2] = x3 - x0;
-            m_elementsJ[i][1][0] = y1 - y0;
-            m_elementsJ[i][1][1] = y2 - y0;
-            m_elementsJ[i][1][2] = y3 - y0;
-            m_elementsJ[i][2][0] = z1 - z0;
-            m_elementsJ[i][2][1] = z2 - z0;
-            m_elementsJ[i][2][2] = z3 - z0;
-        }
+        std::vector<std::vector<double>> J = {{0, 0, 0},
+                                              {0, 0, 0},
+                                              {0, 0, 0}};
+
+        J[0][0] = x1 - x0;
+        J[0][1] = x2 - x0;
+        J[0][2] = x3 - x0;
+        J[1][0] = y1 - y0;
+        J[1][1] = y2 - y0;
+        J[1][2] = y3 - y0;
+        J[2][0] = z1 - z0;
+        J[2][1] = z2 - z0;
+        J[2][2] = z3 - z0;
+
+        element.J = std::move(J);
     }
 }
 
@@ -469,34 +621,14 @@ void Mesh::loadFromFile(const std::string& fileName)
     gmsh::finalize();
 
     triangulateAlphaShape();
-    //computeFreeSurfaceEdgeDetJ();
-    computeElementsJ();
-    computeElementsDetJ();
-    computeElementsInvJ();
 }
 
 void Mesh::remesh(bool verboseOutput)
 {
     checkBoundingBox(verboseOutput);
+    addNodes(verboseOutput);
+    removeNodes(verboseOutput);
     triangulateAlphaShape();
-
-    if(removeNodes(verboseOutput))
-        triangulateAlphaShape();
-
-    computeElementsJ();
-    computeElementsDetJ();
-
-    if(addNodes(verboseOutput))
-    {
-        triangulateAlphaShape();
-        computeElementsJ();
-        computeElementsDetJ();
-        computeElementsInvJ();
-    }
-    else
-    {
-        computeElementsInvJ();
-    }
 }
 
 bool Mesh::removeNodes(bool verboseOutput) noexcept
@@ -507,6 +639,8 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
     std::vector<bool> toBeDeleted(m_nodesList.size(), false);   //Should the node be deleted
 
     bool removeNodes = false;
+
+    double limitLength = m_gamma*m_hchar;
 
     for(IndexType i = 0 ; i < m_nodesList.size() ; ++i)
     {
@@ -527,7 +661,7 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
             d = std::sqrt(d);
 
             //Two nodes are too close.
-            if(d <= m_gamma*m_hchar)
+            if(d <= limitLength)
             {
                 //If the neighbour nodes is touched, we delete the current nodes
                 if(touched[m_nodesList[i].neighbourNodes[j]])
@@ -592,10 +726,13 @@ void Mesh::restoreNodesList()
 
     m_nodesListSave.clear();
 
-    //computeFreeSurfaceEdgeDetJ();
-    computeElementsJ();
-    computeElementsDetJ();
-    computeElementsInvJ();
+    #pragma omp parallel for default(shared)
+    for(IndexType elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        computeElementJ(m_elementsList[elm]);
+        computeElementDetJ(m_elementsList[elm]);
+        computeElementInvJ(m_elementsList[elm]);
+    }
 }
 
 void Mesh::saveNodesList()
@@ -631,10 +768,13 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
         }
     }
 
-    //computeFreeSurfaceEdgeDetJ();
-    computeElementsJ();
-    computeElementsDetJ();
-    computeElementsInvJ();
+    #pragma omp parallel for default(shared)
+    for(IndexType elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        computeElementJ(m_elementsList[elm]);
+        computeElementDetJ(m_elementsList[elm]);
+        computeElementInvJ(m_elementsList[elm]);
+    }
 }
 
 void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
@@ -656,8 +796,11 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
         }
     }
 
-    //computeFreeSurfaceEdgeDetJ();
-    computeElementsJ();
-    computeElementsDetJ();
-    computeElementsInvJ();
+    #pragma omp parallel for default(shared)
+    for(IndexType elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        computeElementJ(m_elementsList[elm]);
+        computeElementDetJ(m_elementsList[elm]);
+        computeElementInvJ(m_elementsList[elm]);
+    }
 }

@@ -17,6 +17,7 @@ if [ ! -d "sol3" ]; then
   wget https://github.com/ThePhD/sol2/releases/download/v3.0.3/forward.hpp
   cd ../
 fi
+
 if [ ! -d "gmsh-4.6.0-MacOSX-sdk.tgz" ]; then
   wget http://gmsh.info/bin/MacOSX/gmsh-4.6.0-MacOSX-sdk.tgz
   gtar -xf gmsh-4.6.0-MacOSX-sdk.tgz 
@@ -42,5 +43,7 @@ mkdir build
 cd build
 
 LDFLAGS="-L/usr/local/opt/llvm/lib" CPPFLAGS="-I/usr/local/opt/llvm/include" cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++  -G "CodeBlocks - Unix Makefiles"
+
+cp ../run/macos/run.sh bin/
 
 cd ../

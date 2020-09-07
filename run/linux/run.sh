@@ -2,11 +2,10 @@
 #Example of usage of PFEM
 #Please take care of the lib location !
 
-
-export GMSHSDK=../../../gmsh-4.5.2-Linux64-sdk/
+export GMSHSDK=../../dependencies/gmsh-4.6.0-Linux64-sdk/
 
 export OMP_NUM_THREADS=2
 
 export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:"${PATH}"
 
-./main params.json square.msh results.msh
+./pfem ../../examples/2D/pipe/paramsIncomp.json ../../examples/2D/pipe/geometry.msh

@@ -7,6 +7,7 @@
 #include "solver/SolverIncompressible.hpp"
 #include "solver/SolverCompressible.hpp"
 
+
 using Clock = std::chrono::high_resolution_clock;
 using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
@@ -98,6 +99,8 @@ int main(int argc, char **argv)
         solverInfos.IBCfile = j["Solver"]["IBCs"].get<std::string>();
         solverInfos.meshInfos = std::move(meshInfos);
 
+        bool verboseOutput = j["verboseOutput"].get<bool>();
+
         auto startTime {Clock::now()};
 
         if(j["ProblemType"] == "Incompressible")
@@ -111,9 +114,10 @@ int main(int argc, char **argv)
             solverIncompInfos.coeffDTincrease = j["Solver"]["Time"]["coeffDTincrease"].get<double>();
             solverIncompInfos.solverInfos = std::move(solverInfos);
 
-            SolverIncompressible solver(solverIncompInfos);
+            SolverIncompressible solver(std::move(solverIncompInfos));
             addExctractors(solver, j);
-            solver.solveProblem(j["verboseOutput"].get<bool>());
+            j.clear();
+            solver.solveProblem(verboseOutput);
         }
         else if(j["ProblemType"] == "Compressible")
         {
@@ -127,9 +131,10 @@ int main(int argc, char **argv)
             solverCompInfos.pInfty = j["Solver"]["Fluid"]["pInfty"].get<double>();
             solverCompInfos.solverInfos = std::move(solverInfos);
 
-            SolverCompressible solver(solverCompInfos);
+            SolverCompressible solver(std::move(solverCompInfos));
             addExctractors(solver, j);
-            solver.solveProblem(j["verboseOutput"].get<bool>());
+            j.clear();
+            solver.solveProblem(verboseOutput);
         }
         else
             throw std::runtime_error("Unsupported problem type!");
