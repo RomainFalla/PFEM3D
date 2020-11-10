@@ -61,10 +61,10 @@ if [ ! -d "sol3" ]; then
   cd ../
 fi
 
-if [ ! -d "gmsh-4.6.0-Windows64-sdk" ]; then
-  wget http://gmsh.info/bin/Windows/gmsh-4.6.0-Windows64-sdk.zip
-  unzip gmsh-4.6.0-Windows64-sdk.zip 
-  rm -rf gmsh-4.6.0-Windows64-sdk.zip
+if [ ! -d "gmsh-4.7.0-Windows64-sdk" ]; then
+  wget http://gmsh.info/bin/Windows/gmsh-4.7.0-Windows64-sdk.zip
+  unzip gmsh-4.7.0-Windows64-sdk.zip 
+  rm -rf gmsh-4.7.0-Windows64-sdk.zip
 fi
 
 if [ "$IsShared" = "shared" ]; then 
@@ -72,7 +72,7 @@ if [ "$IsShared" = "shared" ]; then
 else
 	export CGAL_DIR=/c/tools/CGAL-5.1
 fi
-export GMSHSDK=/c/tools/gmsh-4.6.0-Windows64-sdk #put gmsh sdk here
+export GMSHSDK=/c/tools/gmsh-4.7.0-Windows64-sdk #put gmsh sdk here
 export EIGENSDK=/c/tools/msys64/mingw64/include/eigen3
 export SOL3SDK=/c/tools/
 
@@ -94,7 +94,7 @@ else
 	cmake -G "CodeBlocks - MinGW Makefiles" -DCGAL_HEADER_ONLY=ON -DUSE_MARCH=0 -DCMAKE_SH=SH-NOTFOUND  ..
 fi
 
-cp -r ${GMSHSDK}/lib/gmsh-4.6.dll bin
+cp -r ${GMSHSDK}/lib/gmsh-4.7.dll bin
 cp -r ../run/windows/start.bat bin
 cp -r /c/tools/msys64/mingw64/bin/libgcc_s_seh-1.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libgmp-10.dll bin

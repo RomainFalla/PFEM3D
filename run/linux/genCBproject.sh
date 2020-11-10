@@ -18,13 +18,13 @@ if [ ! -d "sol3" ]; then
   cd ../
 fi
 
-if [ ! -d "gmsh-4.6.0-Linux64-sdk" ]; then
-  wget http://gmsh.info/bin/Linux/gmsh-4.6.0-Linux64-sdk.tgz
-  tar -xf gmsh-4.6.0-Linux64-sdk.tgz 
-  rm -rf gmsh-4.6.0-Linux64-sdk.tgz 
+if [ ! -d "gmsh-4.7.0-Linux64-sdk" ]; then
+  wget http://gmsh.info/bin/Linux/gmsh-4.7.0-Linux64-sdk.tgz
+  tar -xf gmsh-4.7.0-Linux64-sdk.tgz 
+  rm -rf gmsh-4.7.0-Linux64-sdk.tgz 
 fi
 
-export GMSHSDK=${PWD}/gmsh-4.6.0-Linux64-sdk/
+export GMSHSDK=${PWD}/gmsh-4.7.0-Linux64-sdk/
 export EIGENSDK=/usr/include/eigen3/
 export SOLSDK=${PWD}/
 

@@ -18,13 +18,13 @@ if [ ! -d "sol3" ]; then
   cd ../
 fi
 
-if [ ! -d "gmsh-4.6.0-MacOSX-sdk.tgz" ]; then
-  wget http://gmsh.info/bin/MacOSX/gmsh-4.6.0-MacOSX-sdk.tgz
-  gtar -xf gmsh-4.6.0-MacOSX-sdk.tgz 
-  rm -rf gmsh-4.6.0-MacOSX-sdk.tgz 
+if [ ! -d "gmsh-4.7.0-MacOSX-sdk.tgz" ]; then
+  wget http://gmsh.info/bin/MacOSX/gmsh-4.7.0-MacOSX-sdk.tgz
+  gtar -xf gmsh-4.7.0-MacOSX-sdk.tgz 
+  rm -rf gmsh-4.7.0-MacOSX-sdk.tgz 
 fi
 
-export GMSHSDK=${PWD}/gmsh-4.6.0-MacOSX-sdk/
+export GMSHSDK=${PWD}/gmsh-4.7.0-MacOSX-sdk/
 export SOLSDK=${PWD}/
 export EIGENSDK=/usr/local/include/eigen3/
 
