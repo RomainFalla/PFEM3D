@@ -36,19 +36,21 @@ void MinMaxExtractor::update()
         if(m_minMax == "min")
         {
             valueToWrite = std::numeric_limits<double>::max();
-            for(IndexType n = 0 ; n < mesh.getNodesNumber() ; ++n)
+            for(std::size_t n = 0 ; n < mesh.getNodesCount() ; ++n)
             {
-                if(!mesh.isNodeBound(n) && !mesh.isNodeFree(n))
-                    valueToWrite = std::min(valueToWrite, mesh.getNodePosition(n, m_coordinate));
+                const Node& node = mesh.getNode(n);
+                if(!node.isBound() && !node.isFree())
+                    valueToWrite = std::min(valueToWrite, node.getPosition(m_coordinate));
             }
         }
         else
         {
             valueToWrite = 0;
-            for(IndexType n = 0 ; n < mesh.getNodesNumber() ; ++n)
+            for(std::size_t n = 0 ; n < mesh.getNodesCount() ; ++n)
             {
-                if(!mesh.isNodeBound(n) && !mesh.isNodeFree(n))
-                    valueToWrite = std::max(valueToWrite, mesh.getNodePosition(n, m_coordinate));
+                const Node& node = mesh.getNode(n);
+                if(!node.isBound() && !node.isFree())
+                    valueToWrite = std::max(valueToWrite, node.getPosition(m_coordinate));
             }
         }
 

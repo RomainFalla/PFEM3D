@@ -1,9 +1,7 @@
-function initFluid(pos) 
-	return {0, 0, 0, 1000, 0, 0}, false 
-end
+BoundaryFixed = true
 
-function initBoundary(pos)
-	return {0, 0, 0, 1000, 0, 0}, false
+function initStates(pos) 
+	return {0, 0, 0, 1000, 0, 0} 
 end
 
 function Boundary(pos, initPos, t) 

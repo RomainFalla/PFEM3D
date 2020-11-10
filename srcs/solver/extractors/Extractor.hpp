@@ -4,8 +4,6 @@
 
 #include <string>
 
-#include "../../mesh/Mesh.hpp"
-
 #include "Solver_export.h"
 
 class Solver;

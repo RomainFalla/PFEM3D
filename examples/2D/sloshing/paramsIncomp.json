@@ -24,7 +24,8 @@
 		},
 		"Fluid": {
 			"rho": 1,
-			"mu": 0.01	
+			"mu": 0.01,
+			"gamma": 0.0
 		},
 		"IBCs": "../../examples/2D/sloshing/IBC_Incomp.lua",
 		"Extractors" : [

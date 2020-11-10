@@ -1,26 +1,26 @@
-INCLUDE(GenerateExportHeader)
+include(GenerateExportHeader)
 
-ADD_SUBDIRECTORY(mesh)
+add_subdirectory(mesh)
 
-ADD_SUBDIRECTORY(solver)
+add_subdirectory(solver)
 
-SET(SRCS
+set(SRCS
 main.cpp)
 
-FIND_PATH(JSON_INCLUDE_DIRS NAMES "nlohmann/json.hpp")
-MESSAGE(STATUS "Found nlohmann json: " ${JSON_INCLUDE_DIRS})
+find_path(JSON_INCLUDE_DIRS NAMES "nlohmann/json.hpp")
+message(STATUS "Found nlohmann json: " ${JSON_INCLUDE_DIRS})
 if(NOT JSON_INCLUDE_DIRS)
-    MESSAGE(FATAL_ERROR "nlohmann json not found!")
-ENDIF()
+    message(FATAL_ERROR "nlohmann json not found!")
+endif()
 
-ADD_EXECUTABLE(pfem ${SRCS})
-TARGET_INCLUDE_DIRECTORIES(pfem SYSTEM
+add_executable(pfem ${SRCS})
+target_include_directories(pfem SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${JSON_INCLUDE_DIRS})
-TARGET_LINK_LIBRARIES(pfem PUBLIC pfemSolver)
-IF(CMAKE_CXX_COMPILER_ID MATCHES GNU)
-    TARGET_COMPILE_OPTIONS(pfem PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
-ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES CLANG)
-    TARGET_COMPILE_OPTIONS(pfem PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wnull-dereference -Wshadow)
-ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
-    TARGET_COMPILE_OPTIONS(pfem PRIVATE /W4 /WX /wd4251)
-ENDIF()
+target_link_libraries(pfem PUBLIC pfemSolver)
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+    target_compile_options(pfem PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES CLANG)
+    target_compile_options(pfem PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wnull-dereference -Wshadow)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+    target_compile_options(pfem PRIVATE /W4 /WX /wd4251)
+endif()

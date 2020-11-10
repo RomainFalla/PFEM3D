@@ -1,0 +1,42 @@
+{
+    "ProblemType": "Incompressible",
+	"Remeshing": {
+		"hchar": 0.25,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-2, -2, -2, 2, 2, 2]
+	},
+	"Solver": {
+		"gravity": 0,
+		"strongPAtFS": false,
+		"Time": {
+			"adaptDT": true,
+    		"coeffDTincrease": 1.5,
+    		"coeffDTdecrease": 2.0,
+    		"maxDT": 0.001,
+			"initialDT": 0.001,
+    		"endTime": 10.1
+		},
+		"Picard": {
+			"relTol": 1e-6,
+    		"maxIter": 10
+		},
+		"Fluid": {
+			"rho": 100,
+			"mu": 1,
+			"gamma": 1.0
+		},
+		"IBCs": "../../examples/3D/cubeToSphere/IBC_Incomp.lua",
+		"Extractors" : [
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 0.025,
+                "whatToWrite": ["ke", "p", "velocity"],
+				"writeAs": "NodesElements"
+			}
+		]
+	},
+	"verboseOutput": false
+}

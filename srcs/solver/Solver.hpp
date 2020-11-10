@@ -23,7 +23,10 @@ enum class SOLVER_TYPE
 {
     Undefined,
     Incompressible_PSPG,
-    WeaklyCompressible
+    WeaklyCompressible,
+    Conduction,
+    Boussinesq,
+    BoussinesqWC
 };
 
 struct SolverCreateInfo
@@ -84,7 +87,7 @@ class SOLVER_API Solver
          * \param state The considered state.
          * \return Return a vector containing the state of a whole element.
          */
-        inline Eigen::VectorXd getElementState(IndexType elm, unsigned short state) const noexcept;
+        Eigen::VectorXd getElementState(const Element& element, uint16_t state) const noexcept;
 
         /**
          * \return Return the maximum physical time at which the simulation will stop in seconds.
@@ -159,7 +162,17 @@ class SOLVER_API Solver
 
         Mesh m_mesh;                       /**< The mesh the solver is using. */
 
-        std::vector<Eigen::MatrixXd> m_N;     /**< The shape functions matrices for eah gauss point (wihout *detJ). */
+        //TO DO: refactor everything
+        std::vector<Eigen::MatrixXd> m_N1;     /**< The shape functions matrices for each reference space gauss point to integrate a ordrer 1 polynomial. */
+        std::vector<Eigen::MatrixXd> m_N2;     /**< The shape functions matrices for each reference space gauss point to integrate a ordrer 2 polynomial. */
+        std::vector<Eigen::MatrixXd> m_N3;     /**< The shape functions matrices for each reference space gauss point to integrate a ordrer 3 polynomial. */
+        std::vector<double> m_w1; /**< Weight for gauss integration of a order 1 polynomial*/
+        std::vector<double> m_w2; /**< Weight for gauss integration of a order 2 polynomial*/
+        std::vector<double> m_w3; /**< Weight for gauss integration of a order 3 polynomial*/
+
+        std::vector<Eigen::MatrixXd> m_ldN2;     /**< The shape functions matrices for each reference space gauss point to integrate a ordrer 1 polynomial (lower dim). */
+        std::vector<double> m_ldw2; /**< Weight for gauss integration of a order 1 polynomial (lower dim)*/
+
         Eigen::VectorXd m_m;
         Eigen::VectorXd m_bodyForces;
 
@@ -171,13 +184,23 @@ class SOLVER_API Solver
          * \return The gradient shape function matrix for the element in the format:
          *         [dN1dx dN2dx dN3dx 0 0 0; 0 0 0 dN1dy dN2dy dN3dy; dN1dx dN2dx dN3dx dN1dy dN2dy dN3dy]
          */
-        inline Eigen::MatrixXd getB(IndexType elementIndex) const noexcept;
+        Eigen::MatrixXd getB(const Element& element) const noexcept;
 
         /**
-         * \return The gradient shape function matrix for each gauss point in the format:
-         *         [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3]
+         * \param dimension The diemnesion of the shape functions;
+         * \param nGP The number of Gauss points;
+         * \return The gradient shape function matrix, evaluated at each Gauss points
+         * in the reference element. Format (2D) [N1 N2 N3];
          */
-        inline std::vector<Eigen::MatrixXd> getN() const noexcept;
+        std::vector<Eigen::MatrixXd> getN(uint8_t dimension, uint8_t nGP) const;
+
+        /**
+         * \param dimension The diemnesion of the shape functions;
+         * \param nGP The number of Gauss points;
+         * \return The gradient shape function matrix, evaluated at each Gauss points
+         * in the reference element. Format (2D) [N1 N2 N3 0 0 0; 0 0 0 N1 N2 N3];
+         */
+        std::vector<Eigen::MatrixXd> getNv(uint8_t dimension, uint8_t nGP) const;
 
         /**
          * \brief Set the initial condition on u, v, p for the initial cloud of nodes.

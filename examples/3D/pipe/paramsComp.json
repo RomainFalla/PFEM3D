@@ -14,7 +14,7 @@
 		"Time": {
 			"adaptDT": true,
 			"securityCoeff": 0.1,
-    		"maxDT": 0.005,
+    		"maxDT": 0.02,
 			"initialDT": 1e-8,
     		"endTime": 5
 		},
@@ -37,7 +37,7 @@
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.05,
+                "timeBetweenWriting": 0.5,
                 "whatToWrite": ["u", "p"],
 				"writeAs": "NodesElements"
 			}

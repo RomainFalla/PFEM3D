@@ -1,75 +1,76 @@
-FIND_PATH(EIGEN_INCLUDE_DIRS NAMES "Eigen")
+find_path(EIGEN_INCLUDE_DIRS NAMES "Eigen")
 if(NOT EIGEN_INCLUDE_DIRS)
-    MESSAGE(FATAL_ERROR "Eigen not found!")
-ELSE()
-	MESSAGE(STATUS "Found Eigen: " ${EIGEN_INCLUDE_DIRS})
-ENDIF()
+    message(FATAL_ERROR "Eigen not found!")
+else()
+	message(STATUS "Found Eigen: " ${EIGEN_INCLUDE_DIRS})
+endif()
 
-FIND_PACKAGE(Lua 5.1 REQUIRED)
+find_package(Lua 5.1 REQUIRED)
 
-FIND_PATH(SOL3_INCLUDE_DIRS NAMES "sol3/sol.hpp")
+find_path(SOL3_INCLUDE_DIRS NAMES "sol3/sol.hpp")
 if(NOT SOL3_INCLUDE_DIRS)
-    MESSAGE(FATAL_ERROR "sol3 not found!")
-ELSE()
-	MESSAGE(STATUS "Found sol3: " ${SOL3_INCLUDE_DIRS})
-ENDIF()
+    message(FATAL_ERROR "sol3 not found!")
+else()
+	message(STATUS "Found sol3: " ${SOL3_INCLUDE_DIRS})
+endif()
 
-SET(LIBSOLVERSRCS
+set(LIBSOLVERSRCS
 ./extractors/Extractor.cpp ./extractors/PointExtractor.cpp
 ./extractors/GMSHExtractor.cpp ./extractors/MinMaxExtractor.cpp ./extractors/MassExtractor.cpp
 ./extractors/Extractor.hpp ./extractors/PointExtractor.hpp ./extractors/MassExtractor.hpp
 ./extractors/GMSHExtractor.hpp ./extractors/MinMaxExtractor.hpp
-./Solver.cpp
-./Solver.hpp ./Solver.inl
-./SolverIncompressible.cpp
-./SolverIncompressible.hpp
-./SolverCompressible.cpp
-./SolverCompressible.hpp ./SolverCompressible.inl)
+./Solver.cpp ./Solver.hpp ./Solver.inl
+./SolverIncompressible.cpp ./SolverIncompressible.hpp
+./SolverCompressible.cpp ./SolverCompressible.hpp ./SolverCompressible.inl
+./SolverConduction.cpp ./SolverConduction.hpp
+./SolverBoussinesq.cpp ./SolverBoussinesq.hpp
+./SolverBoussinesqWC.cpp ./SolverBoussinesqWC.hpp)
 
-ADD_LIBRARY(pfemSolver SHARED ${LIBSOLVERSRCS})
-GENERATE_EXPORT_HEADER(pfemSolver
+add_library(pfemSolver SHARED ${LIBSOLVERSRCS})
+generate_export_header(pfemSolver
                        EXPORT_MACRO_NAME SOLVER_API
 					   EXPORT_FILE_NAME Solver_export.h)
-TARGET_INCLUDE_DIRECTORIES(pfemSolver SYSTEM
+target_include_directories(pfemSolver SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${GMSH_INCLUDE_DIRS}
                            PUBLIC ${EIGEN_INCLUDE_DIRS}
                            PUBLIC ${LUA_INCLUDE_DIR}
                            PUBLIC ${SOL3_INCLUDE_DIRS})
-TARGET_LINK_LIBRARIES(pfemSolver
+target_link_libraries(pfemSolver
                       PRIVATE ${GMSH_LIBRARIES}
+                      PUBLIC OpenMP::OpenMP_CXX
                       PUBLIC ${LUA_LIBRARIES} pfemMesh)
-IF(CMAKE_CXX_COMPILER_ID MATCHES GNU)
-    TARGET_COMPILE_OPTIONS(pfemSolver PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
-ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES CLANG)
-    TARGET_COMPILE_OPTIONS(pfemSolver PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wnull-dereference -Wshadow)
-ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
-    TARGET_COMPILE_OPTIONS(pfemSolver PRIVATE /W4 /WX /wd4251)
-ENDIF()
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+    target_compile_options(pfemSolver PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES CLANG)
+    target_compile_options(pfemSolver PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wnull-dereference -Wshadow)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+    target_compile_options(pfemSolver PRIVATE /W4 /WX /wd4251)
+endif()
 
-FIND_PACKAGE(Python 3 REQUIRED COMPONENTS Interpreter Development)
-MESSAGE(STATUS "Found python: " ${Python_INCLUDE_DIRS})
-MESSAGE(STATUS "Found python: " ${Python_LIBRARY_DIRS})
-MESSAGE(STATUS "Found python: " ${Python_RUNTIME_LIBRARY_DIRS})
+find_package(Python 3 REQUIRED COMPONENTS Interpreter Development)
+message(STATUS "Found python: " ${Python_INCLUDE_DIRS})
+message(STATUS "Found python: " ${Python_LIBRARY_DIRS})
+message(STATUS "Found python: " ${Python_RUNTIME_LIBRARY_DIRS})
 cmake_policy(SET CMP0078 NEW)
 cmake_policy(SET CMP0086 NEW)
-FIND_PACKAGE(SWIG 4.0 REQUIRED)
+find_package(SWIG 4.0 REQUIRED)
 INCLUDE(${SWIG_USE_FILE})
 
-IF(PYTHONLIBS_VERSION_STRING MATCHES "^2.*$" )
+if(PYTHONLIBS_VERSION_STRING MATCHES "^2.*$" )
    set(CMAKE_SWIG_FLAGS -classic)
-ELSE()
+else()
    set(CMAKE_SWIG_FLAGS -py3)
-ENDIF()
+endif()
 
-SET(CMAKE_SWIG_OUTDIR ${PROJECT_BINARY_DIR}/bin/ CACHE PATH "")
+set(CMAKE_SWIG_OUTDIR ${PROJECT_BINARY_DIR}/bin/ CACHE PATH "")
 
-SET_PROPERTY(SOURCE ./Solver.i PROPERTY CPLUSPLUS ON)
-SWIG_ADD_LIBRARY(pfemSolverw
+set_property(SOURCE ./Solver.i PROPERTY CPLUSPLUS ON)
+swig_add_library(pfemSolverw
 				 TYPE SHARED
 				 LANGUAGE python
 				 SOURCES ./Solver.i)
-TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-TARGET_INCLUDE_DIRECTORIES(pfemSolverw PUBLIC ${Python_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-SWIG_LINK_LIBRARIES(pfemSolverw
+target_include_directories(pfemSolverw PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(pfemSolverw PUBLIC ${Python_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
+swig_link_libraries(pfemSolverw
                    pfemSolver ${Python_LIBRARIES})

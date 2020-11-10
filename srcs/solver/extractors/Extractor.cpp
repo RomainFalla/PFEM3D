@@ -1,5 +1,7 @@
 #include "Extractor.hpp"
 
+#include <stdexcept>
+
 Extractor::Extractor(const Solver& solver, const std::string& outFileName, double timeBetweenWriting) :
 m_solver(solver),
 m_outFileName(outFileName),

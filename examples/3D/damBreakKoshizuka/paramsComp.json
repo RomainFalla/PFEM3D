@@ -4,7 +4,7 @@
 		"hchar": 0.0146,
 		"alpha": 1.2,
 		"omega": 0.7,
-		"gamma": 0.5,
+		"gamma": 0.4,
 		"boundingBox": [-1, -1, -1, 1.584, 1.175, 100]
 	},
 	"Solver": {
@@ -23,7 +23,7 @@
 			"mu": 1,
             "K0": 2200000,
             "K0prime": 7.6,
-            "pInfty": 0			
+            "pInfty": 0
 		},
 		"IBCs": "../../examples/3D/damBreakKoshizuka/IBC_Comp.lua",
 		"Extractors" : [

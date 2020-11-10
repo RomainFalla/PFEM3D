@@ -3,8 +3,11 @@
 #define POINTEXTRACTOR_HPP_INCLUDED
 
 #include <fstream>
+#include <vector>
 
 #include "Extractor.hpp"
+
+class Mesh;
 
 class SOLVER_API PointExtractor : public Extractor
 {
@@ -25,7 +28,7 @@ class SOLVER_API PointExtractor : public Extractor
         unsigned short m_stateToWrite;
         std::vector<std::vector<double>> m_points;
 
-        bool findElementIndex(const Mesh& mesh, IndexType& elementIndex, const std::vector<double>& point);
+        bool findElementIndex(const Mesh& mesh, std::size_t& elementIndex, const std::vector<double>& point);
 };
 
 #endif // POINTEXTRACTOR_HPP_INCLUDED

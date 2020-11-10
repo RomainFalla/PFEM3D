@@ -1,0 +1,46 @@
+{
+    "ProblemType": "Boussinesq",
+	"Remeshing": {
+		"hchar": 0.02,
+		"alpha": 1.2,
+		"omega": 0.7,
+		"gamma": 0.7,
+		"boundingBox": [-0.05, -0.05, 1.05, 1.05]
+	},
+	"Solver": {
+		"gravity": 9.81,
+		"strongPAtFS": true,
+		"Time": {
+			"adaptDT": true,
+    		"coeffDTincrease": 1.5,
+    		"coeffDTdecrease": 2.0,
+    		"maxDT": 0.2,
+			"initialDT": 0.2,
+    		"endTime": 50
+		},
+		"Picard": {
+			"relTol": 5e-6,
+    		"maxIter": 10
+		},
+		"Fluid": {
+			"rho": 1000,
+			"mu": 1e-3,
+			"k": 0.6,
+			"cv": 4186,
+			"alpha": 69e-6,
+			"Tr": 300,
+			"gamma": 0
+		},
+		"IBCs": "../../examples/2D/thermalConv/IBC_Incomp.lua",
+		"Extractors" : [
+			{
+				"type": "GMSH",
+				"outputFile": "results.msh",
+                "timeBetweenWriting": 1,
+                "whatToWrite": ["T", "p", "ke"],
+				"writeAs": "NodesElements"
+			}
+		]
+	},
+	"verboseOutput": false
+}

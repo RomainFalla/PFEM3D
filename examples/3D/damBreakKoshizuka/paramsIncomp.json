@@ -16,7 +16,7 @@
     		"coeffDTdecrease": 2.0,
     		"maxDT": 0.001,
 			"initialDT": 1e-8,
-    		"endTime": 1,
+    		"endTime": 1
 		},
 		"Picard": {
 			"relTol": 5e-6,
@@ -24,7 +24,8 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 1e-3	
+			"mu": 1e-3,
+			"gamma": 0.0
 		},
 		"IBCs": "../../examples/3D/damBreakKoshizuka/IBC_Incomp.lua",
 		"Extractors" : [

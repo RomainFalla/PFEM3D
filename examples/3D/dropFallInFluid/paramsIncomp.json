@@ -24,7 +24,8 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 1e-3,		
+			"mu": 1e-3,
+			"gamma": 0.0
 		},
 		"IBCs": "../../examples/3D/dropFallInFluid/IBC_Incomp.lua",
 		"Extractors" : [
@@ -32,7 +33,7 @@
 				"type": "GMSH",
 				"outputFile": "results.msh",
                 "timeBetweenWriting": 0.01,
-                "whatToWrite": ["rho", "p", "ke"],
+                "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			}
 		]

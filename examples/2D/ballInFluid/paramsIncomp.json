@@ -24,7 +24,8 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 1	
+			"mu": 1,
+			"gamma": 0.0
 		},
 		"IBCs": "../../examples/2D/ballInFLuid/IBC_Incomp.lua",
 		"Extractors" : [

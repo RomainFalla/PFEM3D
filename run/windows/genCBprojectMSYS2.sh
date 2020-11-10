@@ -13,10 +13,10 @@ export HERE=$PWD
 cd /c/tools
 
 export HERE_TOOLS=$PWD
-if [ ! -d "cgal-releases-CGAL-5.0.3" ]; then
-    wget https://github.com/CGAL/cgal/archive/releases/CGAL-5.0.3.tar.gz
-    tar -xf CGAL-5.0.3.tar.gz
-    rm -rf CGAL-5.0.3.tar.gz
+if [ ! -d "CGAL-5.1" ]; then
+    wget https://github.com/CGAL/cgal/releases/download/v5.1/CGAL-5.1.tar.xz
+    tar -xf CGAL-5.1.tar.xz
+    rm -rf CGAL-5.1.tar.xz
     cd $HERE_TOOLS
 fi
 
@@ -42,12 +42,12 @@ if [ "$buildType" != "Release" ] && [ "$buildType" != "Debug" ]; then
 	exit 1
 fi
 
-if [ "$IsShared" = "shared" ] && [ ! -d  "/c/tools/CGAL-5.0.3/" ]; then
-	cd /c/tools/cgal-releases-CGAL-5.0.3
+if [ "$IsShared" = "shared" ] && [ ! -d  "/c/tools/CGAL-5.1/" ]; then
+	cd /c/tools/CGAL-5.1
 	rm -rf build
 	mkdir build
 	cd build
-	cmake -G "MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DCMAKE_INSTALL_PREFIX="/c/tools/CGAL-5.0.3/" -DCMAKE_BUILD_TYPE="${buildType}" .. 
+	cmake -G "MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DCMAKE_INSTALL_PREFIX="/c/tools/CGAL-5.1-build/" -DCMAKE_BUILD_TYPE="${buildType}" .. 
 	mingw32-make
 	mingw32-make install
     cd $HERE_TOOLS
@@ -68,9 +68,9 @@ if [ ! -d "gmsh-4.6.0-Windows64-sdk" ]; then
 fi
 
 if [ "$IsShared" = "shared" ]; then 
-	export CGAL_DIR=/c/tools/CGAL-5.0.3
+	export CGAL_DIR=/c/tools/CGAL-5.1-build
 else
-	export CGAL_DIR=/c/tools/cgal-releases-CGAL-5.0.3
+	export CGAL_DIR=/c/tools/CGAL-5.1
 fi
 export GMSHSDK=/c/tools/gmsh-4.6.0-Windows64-sdk #put gmsh sdk here
 export EIGENSDK=/c/tools/msys64/mingw64/include/eigen3
@@ -80,7 +80,7 @@ export PATH=${GMSHSDK}/bin:${GMSHSDK}/lin:${PATH}
 export INCLUDE=${GMSHSDK}/include:${EIGENSDK}:${SOL3SDK}
 export LIB=${GMSHSDK}/lib
 
-cd $HERE
+cd "${HERE}"
 
 cd ../../
 
@@ -103,7 +103,7 @@ cp -r /c/tools/msys64/mingw64/bin/libgomp-1.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libstdc++-6.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libwinpthread-1.dll bin
 if [ "$IsShared" = "shared" ]; then 
-	cp -r /c/tools/CGAL-5.0.3/bin/libCGAL.dll bin
+	cp -r /c/tools/CGAL-5.1/bin/libCGAL.dll bin
 fi
 
 cp -r /c/tools/msys64/mingw64/bin/lua53.dll bin

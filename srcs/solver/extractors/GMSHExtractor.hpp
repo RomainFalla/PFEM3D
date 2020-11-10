@@ -2,6 +2,8 @@
 #ifndef GMSHEXTRACTOR_HPP_INCLUDED
 #define GMSHEXTRACTOR_HPP_INCLUDED
 
+#include <vector>
+
 #include "Extractor.hpp"
 
 class SOLVER_API GMSHExtractor : public Extractor
@@ -22,6 +24,8 @@ class SOLVER_API GMSHExtractor : public Extractor
         std::vector<std::string> m_whatCanBeWritten;
         std::vector<bool> m_whatToWrite;
         std::string m_writeAs;
+
+        static uint16_t m_initialized;
 };
 
 #endif // GMSHEXTRACTOR_HPP_INCLUDED

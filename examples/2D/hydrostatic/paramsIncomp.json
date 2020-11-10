@@ -24,7 +24,8 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 1e-3	
+			"mu": 1e-3,
+			"gamma": 0.0
 		},
 		"IBCs": "../../examples/2D/hydrostatic/IBC_Incomp.lua",
 		"Extractors" : [

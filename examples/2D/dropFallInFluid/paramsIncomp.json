@@ -2,10 +2,10 @@
 	"ProblemType": "Incompressible",
 	"Remeshing": {
 		"hchar": 0.0073,
-		"alpha": 1.2,
+		"alpha": 1.1,
 		"omega": 0.7,
 		"gamma": 0.7,
-		"boundingBox": [-0.05, -0.05, 0.634, 100]
+		"boundingBox": [-0.02, -0.02, 0.604, 100]
 	},
 	"Solver": {
 		"gravity": 9.81,
@@ -14,8 +14,8 @@
 			"adaptDT": true,
     		"coeffDTincrease": 1.5,
     		"coeffDTdecrease": 2.0,
-    		"maxDT": 0.005,
-			"initialDT": 0.005,
+    		"maxDT": 0.001,
+			"initialDT": 0.001,
     		"endTime": 4
 		},
 		"Picard": {
@@ -24,14 +24,15 @@
 		},
 		"Fluid": {
 			"rho": 1000,
-			"mu": 1e-3	
+			"mu": 1e-3,
+			"gamma": 0.0
 		},
 		"IBCs": "../../examples/2D/dropFallInFluid/IBC_Incomp.lua",
 		"Extractors" : [
 			{
 				"type": "GMSH",
 				"outputFile": "results.msh",
-                "timeBetweenWriting": 0.2,
+                "timeBetweenWriting": 0.05,
                 "whatToWrite": ["p", "ke"],
 				"writeAs": "NodesElements"
 			},
@@ -42,5 +43,5 @@
 			}
 		]
 	},
-	"verboseOutput": true
+	"verboseOutput": false
 }

@@ -1,13 +1,12 @@
-function initFluid(pos) 
-	return {0, 0, 0}, false 
+BoundaryFixed = true
+DiskBoundaryFixed = false
+
+function initStates(pos) 
+	return {0, 0, 0} 
 end
 
-function initBoundary(pos)
-	return {0, 0, 0}, false
-end
-
-function initDiskBoundary(pos) 
-	return {1, 0, 0}, false	
+function initDiskBoundaryStates(pos) 
+	return {1, 0, 0}	
 end
 
 function Boundary(pos, initPos, t) 

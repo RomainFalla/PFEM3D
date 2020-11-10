@@ -26,22 +26,28 @@ void MassExtractor::update()
 
         if(m_solver.getSolverType() == SOLVER_TYPE::Incompressible_PSPG)
         {
-            for(IndexType elm = 0 ; elm < mesh.getElementsNumber() ; ++elm)
+            for(std::size_t elm = 0 ; elm < mesh.getElementsCount() ; ++elm)
             {
-                valueToWrite += mesh.getRefElementSize()*mesh.getElementDetJ(elm);
+                const Element& element = mesh.getElement(elm);
+                valueToWrite += mesh.getRefElementSize(mesh.getDim())*element.getDetJ();
             }
         }
         else if(m_solver.getSolverType() == SOLVER_TYPE::WeaklyCompressible)
         {
-            for(IndexType elm = 0 ; elm < mesh.getElementsNumber() ; ++elm)
+            for(std::size_t elm = 0 ; elm < mesh.getElementsCount() ; ++elm)
             {
-                double volume = mesh.getRefElementSize()*mesh.getElementDetJ(elm);
+                const Element& element = mesh.getElement(elm);
+
+                double volume = mesh.getRefElementSize(mesh.getDim())*element.getDetJ();
 
                 double middleRho = 0;
-                for(IndexType n = 0 ; n < mesh.getElement(elm).size() ; ++n)
-                    middleRho += mesh.getNodeState(mesh.getElement(elm)[n], mesh.getDim() + 1);
+                for(std::size_t n = 0 ; n < element.getNodeCount() ; ++n)
+                {
+                    const Node& node = mesh.getNode(element.getNodeIndex(n));
+                    middleRho += node.getState(mesh.getDim() + 1);
+                }
 
-                middleRho /= static_cast<double>(mesh.getElement(elm).size());
+                middleRho /= static_cast<double>(element.getNodeCount());
 
                 valueToWrite += middleRho*volume;
             }
