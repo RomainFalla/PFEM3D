@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "Solver_export.h"
+#include "../solver_defines.h"
 
 class Solver;
 

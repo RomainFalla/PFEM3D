@@ -6,13 +6,15 @@
 #include <cstdint>
 #include <vector>
 
+#include "mesh_defines.h"
+
 class Mesh;
 
 /**
  * \class Node
  * \brief Represents a node in the PFEM.
  */
-class Node
+class MESH_API Node
 {
     public:
         Node()                              = default;

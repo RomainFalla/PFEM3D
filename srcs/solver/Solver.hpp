@@ -17,7 +17,7 @@
 #include "../mesh/Mesh.hpp"
 #include "extractors/Extractors.hpp"
 
-#include "Solver_export.h"
+#include "solver_defines.h"
 
 enum class SOLVER_TYPE
 {

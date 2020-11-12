@@ -14,14 +14,11 @@ set(LIBMESHSRCS
 ./Node.hpp ./Node.inl
 ./Element.hpp ./Element.inl ./Element.cpp
 ./Facet.hpp ./Facet.inl ./Facet.cpp
-./Mesh.hpp ./Mesh.inl ./Mesh.cpp ./Mesh2D.cpp ./Mesh3D.cpp)
+./Mesh.hpp ./Mesh.inl ./Mesh.cpp ./Mesh2D.cpp ./Mesh3D.cpp
+./mesh_defines.h ../sharedLib_defines.h)
 
 add_library(pfemMesh SHARED ${LIBMESHSRCS})
-generate_export_header(pfemMesh
-                       EXPORT_MACRO_NAME MESH_API
-					   EXPORT_FILE_NAME Mesh_export.h)
 target_include_directories(pfemMesh SYSTEM
-                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${EIGEN_INCLUDE_DIRS}
                            PRIVATE ${GMSH_INCLUDE_DIRS})
 target_link_libraries(pfemMesh PRIVATE OpenMP::OpenMP_CXX CGAL::CGAL ${GMSH_LIBRARIES})

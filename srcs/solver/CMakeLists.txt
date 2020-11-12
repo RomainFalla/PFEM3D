@@ -24,14 +24,11 @@ set(LIBSOLVERSRCS
 ./SolverCompressible.cpp ./SolverCompressible.hpp ./SolverCompressible.inl
 ./SolverConduction.cpp ./SolverConduction.hpp
 ./SolverBoussinesq.cpp ./SolverBoussinesq.hpp
-./SolverBoussinesqWC.cpp ./SolverBoussinesqWC.hpp)
+./SolverBoussinesqWC.cpp ./SolverBoussinesqWC.hpp
+./solver_defines.h ../sharedLib_defines.h)
 
 add_library(pfemSolver SHARED ${LIBSOLVERSRCS})
-generate_export_header(pfemSolver
-                       EXPORT_MACRO_NAME SOLVER_API
-					   EXPORT_FILE_NAME Solver_export.h)
 target_include_directories(pfemSolver SYSTEM
-                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${GMSH_INCLUDE_DIRS}
                            PUBLIC ${EIGEN_INCLUDE_DIRS}
                            PUBLIC ${LUA_INCLUDE_DIR}

@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "mesh_defines.h"
+
 class Mesh;
 class Node;
 
@@ -13,7 +15,7 @@ class Node;
  * \class Facet
  * \brief Represents an Facet in the PFEM.
  */
-class Facet
+class MESH_API Facet
 {
     public:
         Facet()                        = default;

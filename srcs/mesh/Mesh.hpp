@@ -9,7 +9,7 @@
 #include "Element.hpp"
 #include "Facet.hpp"
 
-#include "Mesh_export.h"
+#include "mesh_defines.h"
 
 struct MeshCreateInfo
 {
