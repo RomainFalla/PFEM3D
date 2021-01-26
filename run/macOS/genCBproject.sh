@@ -28,13 +28,13 @@ fi
 export GMSHSDK=${PWD}/gmsh-4.7.1-MacOSX-sdk/
 export SOLSDK=${PWD}/
 export EIGENSDK=/usr/local/include/eigen3/
-export LUA_INCLUDE_DIR=/usr/local/include/lua/
-export LUA_LIBDIR=/usr/local/lib/
+
 
 export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:"${PATH}"
 export INCLUDE=${GMSHSDK}/include:"${INCLUDE}"
 export INCLUDE=${SOLSDK}:"${INCLUDE}"
 export INCLUDE=${EIGENSDK}:"${INCLUDE}"
+export INCLUDE=/usr/local/include/lua/:"${INCLUDE}"
 export LIB=${GMSHSDK}/lib:"${LIB}"
 export PYTHONPATH=${GMSHSDK}/lib:"${PYTHONPATH}"
 export DYLD_LIBRARY_PATH=${GMSHSDK}/lib:"${DYLD_LIBRARY_PATH}"
