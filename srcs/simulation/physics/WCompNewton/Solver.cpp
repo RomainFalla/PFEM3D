@@ -99,8 +99,8 @@ Solver(pProblem, pMesh, problemParams)
             if(node.isBound())
             {
                 bool resV = checkBC(bcParamMomCont, n, node, "V", m_pMesh->getDim());
-                bool resT = checkBC(bcParamHeat, n, node, "T", m_pMesh->getDim());
-                bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
+                bool resT = checkBC(bcParamHeat, n, node, "T", 1);
+                bool resQ = checkBC(bcParamHeat, n, node, "Q", 1);
 
                 if(resV)
                     m_pMesh->setNodeFlag(n, 0);

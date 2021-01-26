@@ -1,7 +1,7 @@
 Problem = {
     id = "BoussinesqWC",
 	simulationTime = 4,
-	verboseOutput = true,
+	verboseOutput = false,
 	
 	Mesh = {
 		hchar = 0.1,
@@ -121,10 +121,10 @@ function Problem.Solver.MomEq.BC:LateralQ(pos, initPos, states, t)
 	return {0}
 end
 
-function Problem.Solver.MomEq.BC:TopT(pos, initPos, states, t)
+function Problem.Solver.HeatEq.BC:TopT(pos, initPos, states, t)
 	return {300}
 end
 
-function Problem.Solver.MomEq.BC:BottomT(pos, initPos, states, t)
+function Problem.Solver.HeatEq.BC:BottomT(pos, initPos, states, t)
 	return {1000}
 end
