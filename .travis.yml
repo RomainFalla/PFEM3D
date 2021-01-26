@@ -21,7 +21,7 @@ before_install:
         export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
         export mingw64="$msys2 -mingw64 -full-path -here -c "\"\$@"\" --"
         export msys2+=" -msys2 -c "\"\$@"\" --"
-        $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-boost mingw-w64-x86_64-mpfr mingw-w64-x86_64-gmp mingw-w64-x86_64-eigen3 mingw-w64-x86_64-lua mingw-w64-x86_64-cgal mingw-w64-x86_64-sol
+        $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-boost mingw-w64-x86_64-mpfr mingw-w64-x86_64-gmp mingw-w64-x86_64-eigen3 mingw-w64-x86_64-lua mingw-w64-x86_64-cgal mingw-w64-x86_64-sol2
         ## Install more MSYS2 packages from https://packages.msys2.org/base here
         taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
         export PATH=/C/tools/msys64/mingw64/bin:$PATH
@@ -64,10 +64,4 @@ install:
 
 script:
   - cd build;
-  - if [ $TRAVIS_OS_NAME == linux ]; then
-        make;
-    elif [ $TRAVIS_OS_NAME == osx ]; then
-        make;
-    elif [ $TRAVIS_OS_NAME == windows ]; then
-        mingw32-make;
-    fi
+  - cmake --build .
