@@ -61,7 +61,7 @@ void Mesh::triangulateAlphaShape3D()
         if(m_nodesList[in0].isBound() && m_nodesList[in1].isBound() &&
            m_nodesList[in2].isBound() && m_nodesList[in3].isBound())
         {
-            for(uint8_t i = 0 ; i < 4 ; ++i)
+            for(unsigned int i = 0 ; i < 4 ; ++i)
             {
                 std::set<Alpha_shape_3::Vertex_handle> neighbourVh;
                 as.adjacent_vertices(cell->vertex(i), std::inserter(neighbourVh, neighbourVh.begin()));
@@ -103,9 +103,9 @@ void Mesh::triangulateAlphaShape3D()
             if(checkCellDeletion(cell))
                 continue;
 
-            Element element = {};
+            Element element(*this);
             element.m_nodesIndexes = {in0, in1, in2, in3};
-            element.computeJ(m_nodesList);
+            element.computeJ();
             element.computeDetJ();
             element.computeInvJ();
 
@@ -155,17 +155,24 @@ void Mesh::triangulateAlphaShape3D()
                 facetAS = as.mirror_facet(facetAS);
 
             Alpha_shape_3::Cell_handle cell = facetAS.first;
+
+            if(as.classify(cell) == Alpha_shape_3::EXTERIOR)
+            {
+                facetAS = as.mirror_facet(facetAS);
+                cell = facetAS.first;
+            }
+
             if(checkCellDeletion(cell))
                 continue;
 
-            Facet facet = {};
-            facet.m_nodesIndexes = {facetAS.first->vertex((facetAS.second+1)%4)->info(),
-                                    facetAS.first->vertex((facetAS.second+2)%4)->info(),
-                                    facetAS.first->vertex((facetAS.second+3)%4)->info()};
-            facet.m_outNodeIndex = facetAS.first->vertex(facetAS.second%4)->info();
-            facet.computeJ(m_nodesList);
+            Facet facet(*this);
+            facet.m_nodesIndexes = {facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 0))->info(),
+                                    facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 1))->info(),
+                                    facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 2))->info()};
+            facet.m_outNodeIndex = facetAS.first->vertex(facetAS.second)->info();
+            facet.computeJ();
             facet.computeDetJ();
-            facet.computeInvJ(m_nodesList);
+            facet.computeInvJ();
 
             if(facet.m_outNodeIndex == facet.m_nodesIndexes[0] ||
                facet.m_outNodeIndex == facet.m_nodesIndexes[1] ||
@@ -183,8 +190,6 @@ void Mesh::triangulateAlphaShape3D()
                 m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
                 m_nodesList[facet.m_nodesIndexes[2]].m_isOnFreeSurface = true;
             }
-
-            assert(facet.getNodesCount() == 3);
 
             m_facetsList.push_back(std::move(facet));
 
@@ -206,63 +211,61 @@ void Mesh::computeFSNormalCurvature3D()
 
     //TO DO: // this
     m_freeSurfaceCurvature.clear();
-    m_freeSurfaceNormal.clear();
+    m_boundFSNormal.clear();
 
     for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
     {
         const Node& node = m_nodesList[i];
-        if(!node.isOnFreeSurface())
+        if(!node.isOnFreeSurface() && !(node.isBound() && !node.isFree()))
             continue;
 
-        assert(node.m_facets.size() != 0);
-
-        //std::cout << "(" << node.getPosition(0) << ", " << node.getPosition(1) << ", " << node.getPosition(2) << ") " << node.m_facets.size() << std::endl;
+        assert(node.getFacetCount() != 0);
 
         //We first compute here a "to exterior" normal as the mean of faces normal
         std::array<double, 3> finalNodeNormal = {0, 0, 0};
-        std::set<std::size_t> pateletNodesIndexes;
-        for(std::size_t j = 0; j < node.m_facets.size() ; ++j)
+        std::set<const Node*> pateletNodes;
+        for(std::size_t j = 0; j < node.getFacetCount() ; ++j)
         {
             std::array<double, 3> facetNormal;
 
-            const Facet& f = m_facetsList[node.m_facets[j]];
+            const Facet& f = node.getFacet(j);
 
-            const Node& outNode = m_nodesList[f.getOutNodeIndex()];
+            const Node& outNode = f.getOutNode();
 
-            std::array<std::size_t, 2> facetNodeIndexes;
+            std::array<const Node*, 2> facetNodes;
 
-            if(f.getNodeIndex(0) == i)
+            if(f.getNode(0) == node)
             {
-                facetNodeIndexes = {f.getNodeIndex(1), f.getNodeIndex(2)};
-                pateletNodesIndexes.insert(f.getNodeIndex(1));
-                pateletNodesIndexes.insert(f.getNodeIndex(2));
+                facetNodes = {&f.getNode(1), &f.getNode(2)};
+                pateletNodes.insert(&f.getNode(1));
+                pateletNodes.insert(&f.getNode(2));
             }
-            else if(f.getNodeIndex(1) == i)
+            else if(f.getNode(1) == node)
             {
-                facetNodeIndexes = {f.getNodeIndex(0), f.getNodeIndex(2)};
-                pateletNodesIndexes.insert(f.getNodeIndex(0));
-                pateletNodesIndexes.insert(f.getNodeIndex(2));
+                facetNodes = {&f.getNode(0), &f.getNode(2)};
+                pateletNodes.insert(&f.getNode(0));
+                pateletNodes.insert(&f.getNode(2));
             }
             else
             {
-                facetNodeIndexes = {f.getNodeIndex(0), f.getNodeIndex(1)};
-                pateletNodesIndexes.insert(f.getNodeIndex(0));
-                pateletNodesIndexes.insert(f.getNodeIndex(1));
+                facetNodes = {&f.getNode(0), &f.getNode(1)};
+                pateletNodes.insert(&f.getNode(0));
+                pateletNodes.insert(&f.getNode(1));
             }
 
-            const Node& n1 = m_nodesList[facetNodeIndexes[0]];
-            const Node& n2 = m_nodesList[facetNodeIndexes[1]];
+            const Node& n1 = *facetNodes[0];
+            const Node& n2 = *facetNodes[1];
 
             std::array<double, 3> a = {
-                n1.getPosition(0) - node.getPosition(0),
-                n1.getPosition(1) - node.getPosition(1),
-                n1.getPosition(2) - node.getPosition(2)
+                n1.getCoordinate(0) - node.getCoordinate(0),
+                n1.getCoordinate(1) - node.getCoordinate(1),
+                n1.getCoordinate(2) - node.getCoordinate(2)
             };
 
             std::array<double, 3> b = {
-                n2.getPosition(0) - node.getPosition(0),
-                n2.getPosition(1) - node.getPosition(1),
-                n2.getPosition(2) - node.getPosition(2)
+                n2.getCoordinate(0) - node.getCoordinate(0),
+                n2.getCoordinate(1) - node.getCoordinate(1),
+                n2.getCoordinate(2) - node.getCoordinate(2)
             };
 
             facetNormal[0] = a[1]*b[2] - a[2]*b[1];
@@ -279,9 +282,9 @@ void Mesh::computeFSNormalCurvature3D()
                          /std::sqrt((a[0]*a[0]+a[1]*a[1]+a[2]*a[2])*(b[0]*b[0]+b[1]*b[1]+b[2]*b[2])));
 
             std::array<double, 3> vecToOutNode = {
-                outNode.getPosition(0) - node.getPosition(0),
-                outNode.getPosition(1) - node.getPosition(1),
-                outNode.getPosition(2) - node.getPosition(2)
+                outNode.getCoordinate(0) - node.getCoordinate(0),
+                outNode.getCoordinate(1) - node.getCoordinate(1),
+                outNode.getCoordinate(2) - node.getCoordinate(2)
             };
 
             if(vecToOutNode[0]*facetNormal[0] + vecToOutNode[1]*facetNormal[1] + vecToOutNode[2]*facetNormal[2] > 0)
@@ -290,7 +293,6 @@ void Mesh::computeFSNormalCurvature3D()
                 facetNormal[1] *= -1.0;
                 facetNormal[2] *= -1.0;
             }
-            //std::cout << "\t - (" << facetNormal[0] << ", " << facetNormal[1] << ", " << facetNormal[2] << "), " << angle << std::endl;
 
             for(std::size_t k = 0 ; k < finalNodeNormal.size() ; ++k)
                 finalNodeNormal[k] += angle*facetNormal[k];
@@ -303,13 +305,16 @@ void Mesh::computeFSNormalCurvature3D()
         for(std::size_t k = 0 ; k < finalNodeNormal.size() ; ++k)
             finalNodeNormal[k] /= finalNodeNormalNorm;
 
+        if(node.isBound())
+            continue;
+
         //We now compute the two curvatures by fitting a 2D parabola onto the patelet of nodes.
 
         //Plane equation Ax+By+Cz+D = 0;
         double A = finalNodeNormal[0];
         double B = finalNodeNormal[1];
         double C = finalNodeNormal[2];
-        double D = -(finalNodeNormal[0]*node.getPosition(0) + finalNodeNormal[1]*node.getPosition(1) + finalNodeNormal[2]*node.getPosition(2));
+        double D = -(finalNodeNormal[0]*node.getCoordinate(0) + finalNodeNormal[1]*node.getCoordinate(1) + finalNodeNormal[2]*node.getCoordinate(2));
 
         // Determine two basis vector of the plane;
         std::array<double, 3> a, b;
@@ -338,17 +343,16 @@ void Mesh::computeFSNormalCurvature3D()
         //Determine in the local plane the coordinate of the patelet nodes
         std::vector<std::pair<double, double>> pateletLocalCoord;
         std::vector<double> pateletDist;
-        for(std::size_t pIndex : pateletNodesIndexes)
+        for(const Node* pNode : pateletNodes)
         {
-            const Node& pNode = m_nodesList[pIndex];
-            double dist = A*pNode.getPosition(0) + B*pNode.getPosition(1) + C*pNode.getPosition(2) + D;
+            double dist = A*pNode->getCoordinate(0) + B*pNode->getCoordinate(1) + C*pNode->getCoordinate(2) + D;
 
             pateletDist.push_back(dist);
 
             std::array<double, 3> distVec = {
-                pNode.getPosition(0) - dist*finalNodeNormal[0] - node.getPosition(0),
-                pNode.getPosition(1) - dist*finalNodeNormal[1] - node.getPosition(1),
-                pNode.getPosition(2) - dist*finalNodeNormal[2] - node.getPosition(2)
+                pNode->getCoordinate(0) - dist*finalNodeNormal[0] - node.getCoordinate(0),
+                pNode->getCoordinate(1) - dist*finalNodeNormal[1] - node.getCoordinate(1),
+                pNode->getCoordinate(2) - dist*finalNodeNormal[2] - node.getCoordinate(2)
             };
 
             pateletLocalCoord.push_back(std::make_pair(
@@ -359,13 +363,13 @@ void Mesh::computeFSNormalCurvature3D()
         Eigen::VectorXd d = Eigen::VectorXd::Map(pateletDist.data(), pateletDist.size());
 
         Eigen::MatrixXd U(pateletDist.size(), 3);
-        for(std::size_t k = 0 ; k < pateletNodesIndexes.size() ; ++k)
+        for(std::size_t k = 0 ; k < pateletNodes.size() ; ++k)
         {
             double u = pateletLocalCoord[k].first;
             double v = pateletLocalCoord[k].second;
-            U(k, 0) = u*u;
-            U(k, 1) = 2*u*v;
-            U(k, 2) = v*v;
+            U(k, 0) = 0.5*u*u;
+            U(k, 1) = u*v;
+            U(k, 2) = 0.5*v*v;
         }
 
         Eigen::Matrix3d UTU = U.transpose() * U;
@@ -378,12 +382,6 @@ void Mesh::computeFSNormalCurvature3D()
         double k2 = 0.5*(c[0] + c[2] - std::sqrt(delta));
 
         m_freeSurfaceCurvature[i] = k1 + k2;
-        m_freeSurfaceNormal[i] = finalNodeNormal;
-
-//        std::cout << "(" << node.getPosition(0) << ", " << node.getPosition(1) << ", " << node.getPosition(2) << ")" << std::endl;
-//        std::cout << k1 + k2 << ", (" << finalNodeNormal[0] << ", " << finalNodeNormal[1] << ", " << finalNodeNormal[2] << ")" << std::endl;
+        m_boundFSNormal[i] = finalNodeNormal;
     }
-
-//    char c;
-//    std::cin >> c;
 }

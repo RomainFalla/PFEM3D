@@ -51,16 +51,19 @@ void Mesh::triangulateAlphaShape2D()
 
         if(m_nodesList[in0].isBound() && m_nodesList[in1].isBound() && m_nodesList[in2].isBound())
         {
-            for(uint8_t i = 0 ; i <= 2 ; ++i)
+            for(unsigned int i = 0 ; i <= 2 ; ++i)
             {
                 std::set<Alpha_shape_2::Vertex_handle> neighbourVh;
                 Alpha_shape_2::Face_circulator faceCirc = as.incident_faces(face->vertex(i)), done = faceCirc;
                 do
                 {
-                    for(uint8_t j = 0 ; j <= 2 ; ++j)
+                    if(as.classify(faceCirc) == Alpha_shape_2::INTERIOR)
                     {
-                        if(!as.is_infinite(faceCirc->vertex(j)))
-                            neighbourVh.insert(faceCirc->vertex(j));
+                        for(unsigned int j = 0 ; j <= 2 ; ++j)
+                        {
+                            if(!as.is_infinite(faceCirc->vertex(j)))
+                                neighbourVh.insert(faceCirc->vertex(j));
+                        }
                     }
                     faceCirc++;
                 } while(faceCirc != done);
@@ -77,7 +80,6 @@ void Mesh::triangulateAlphaShape2D()
                     }
                 }
             }
-
             return true;
         }
 
@@ -97,10 +99,10 @@ void Mesh::triangulateAlphaShape2D()
             if(checkFaceDeletion(face))
                 continue;
 
-            Element element = {};
+            Element element(*this);
             element.m_nodesIndexes = {in0, in1, in2};
 
-            element.computeJ(m_nodesList);
+            element.computeJ();
             element.computeDetJ();
             element.computeInvJ();
 
@@ -141,10 +143,17 @@ void Mesh::triangulateAlphaShape2D()
                 edgeAS = as.mirror_edge(edgeAS);
 
             Alpha_shape_2::Face_handle face = edgeAS.first;
+
+            if(as.classify(face) == Alpha_shape_2::EXTERIOR)
+            {
+                edgeAS = as.mirror_edge(edgeAS);
+                face = edgeAS.first;
+            }
+
             if(checkFaceDeletion(face))
                 continue;
 
-            Facet facet = {};
+            Facet facet(*this);
             facet.m_nodesIndexes = {edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
                                    edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
 
@@ -156,9 +165,9 @@ void Mesh::triangulateAlphaShape2D()
                 m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
             }
 
-            facet.computeJ(m_nodesList);
+            facet.computeJ();
             facet.computeDetJ();
-            facet.computeInvJ(m_nodesList);
+            facet.computeInvJ();
 
             m_facetsList.push_back(std::move(facet));
 
@@ -179,63 +188,128 @@ void Mesh::computeFSNormalCurvature2D()
         return;
 
     m_freeSurfaceCurvature.clear();
-    m_freeSurfaceNormal.clear();
+    m_boundFSNormal.clear();
 
     for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
     {
         const Node& node = m_nodesList[i];
-        if(!node.isOnFreeSurface())
-            continue;
-
-        assert(node.m_facets.size() != 0);
-
-        const Facet& f_1 = m_facetsList[node.m_facets[0]];
-        const Facet& f1 = m_facetsList[node.m_facets[1]];
-
-        assert(f_1.getNodesCount() == 2);
-        assert(f1.getNodesCount() == 2);
-
-        const std::size_t n_1 = ((f_1.getNodeIndex(0) == i) ? f_1.getNodeIndex(1) : f_1.getNodeIndex(0));
-        const std::size_t n1 = ((f1.getNodeIndex(0) == i) ? f1.getNodeIndex(1) : f1.getNodeIndex(0));
-
-        assert(n_1 < m_nodesList.size());
-        assert(n1 < m_nodesList.size());
-
-        const Node& node_1 = m_nodesList[n_1];
-        const Node& node1 = m_nodesList[n1];
-
-        double x_1 = node_1.getPosition(0);
-        double x0 = node.getPosition(0);
-        double x1 = node1.getPosition(0);
-
-        double y_1 = node_1.getPosition(1);
-        double y0 = node.getPosition(1);
-        double y1 = node1.getPosition(1);
-
-        double den = x0*(y1 - y_1) + x1*(y_1 - y0) + x_1*(y0 - y1);
-        if(den == 0)
+        if(node.isOnFreeSurface() && !node.isBound())
         {
-            m_freeSurfaceCurvature[i] = 0;
-            m_freeSurfaceNormal[i] = {0, 0, 0};
-            continue;
+            assert(node.getFacetCount() != 0);
+
+            const Facet& f_1 = node.getFacet(0);
+            const Facet& f1 = node.getFacet(1);
+
+            const Node& node_1 = ((f_1.getNode(0) == node) ? f_1.getNode(1) : f_1.getNode(0));
+            const Node& node1 = ((f1.getNode(0) == node) ? f1.getNode(1) : f1.getNode(0));
+
+            double x_1 = node_1.getCoordinate(0);
+            double x0 = node.getCoordinate(0);
+            double x1 = node1.getCoordinate(0);
+
+            double y_1 = node_1.getCoordinate(1);
+            double y0 = node.getCoordinate(1);
+            double y1 = node1.getCoordinate(1);
+
+            double den = x0*(y1 - y_1) + x1*(y_1 - y0) + x_1*(y0 - y1);
+            if(den == 0)
+            {
+                m_freeSurfaceCurvature[i] = 0;
+                m_boundFSNormal[i] = {0, 0, 0};
+                continue;
+            }
+
+            double m = - (x_1*x_1) - (y_1*y_1);
+            double n = - (x0*x0) - (y0*y0);
+            double o = - (x1*x1) - (y1*y1);
+
+            double xc = -0.5*(m*(y0 - y1) + n*(y1 - y_1) - o*(y0-y_1))/den;
+            double yc = -0.5*(-m*(x0 - x1) - n*(x1 - x_1) + o*(x0-x_1))/den;
+            double rc = std::sqrt(xc*xc + yc*yc + (-m*(x0*y1 -x1*y0) -n*(x1*y_1 - x_1*y1) +o*(x0*y_1 - x_1*y0))/den);
+
+            m_freeSurfaceCurvature[i] = 1/rc;
+
+            std::array<double, 3> normal = {
+                (xc - x0)/rc,
+                (yc - y0)/rc,
+                0
+            };
+
+            m_boundFSNormal[i] = normal;
         }
+        else if(node.isBound() && !node.isFree())
+        {
+            const Facet& f_1 = node.getFacet(0);
+            const Facet& f1 = node.getFacet(1);
 
-        double m = - (x_1*x_1) - (y_1*y_1);
-        double n = - (x0*x0) - (y0*y0);
-        double o = - (x1*x1) - (y1*y1);
+            const Node& node_1 = ((f_1.getNode(0) == node) ? f_1.getNode(1) : f_1.getNode(0));
+            const Node& node1 = ((f1.getNode(0) == node) ? f1.getNode(1) : f1.getNode(0));
+            const Node& outNode_1 = f_1.getOutNode();
+            const Node& outNode1 = f1.getOutNode();
 
-        double xc = -0.5*(m*(y0 - y1) + n*(y1 - y_1) - o*(y0-y_1))/den;
-        double yc = -0.5*(-m*(x0 - x1) - n*(x1 - x_1) + o*(x0-x_1))/den;
-        double rc = std::sqrt(xc*xc + yc*yc + (-m*(x0*y1 -x1*y0) -n*(x1*y_1 - x_1*y1) +o*(x0*y_1 - x_1*y0))/den);
+            double x_1 = node_1.getCoordinate(0);
+            double x0 = node.getCoordinate(0);
+            double x1 = node1.getCoordinate(0);
 
-        m_freeSurfaceCurvature[i] = 1/rc;
+            double y_1 = node_1.getCoordinate(1);
+            double y0 = node.getCoordinate(1);
+            double y1 = node1.getCoordinate(1);
 
-        std::array<double, 3> normal = {
-            (xc - x0)/rc,
-            (yc - y0)/rc,
-            0
-        };
+            std::array<double, 3> normalF1 = {
+                -(y0 - y1),
+                x1 - x0,
+                0
+            };
 
-        m_freeSurfaceNormal[i] = normal;
+            std::array<double, 3> vecToOutNode = {
+                outNode1.getCoordinate(0) - x0,
+                outNode1.getCoordinate(1) - y0,
+                0
+            };
+
+            if(normalF1[0]*vecToOutNode[0] + normalF1[1]*vecToOutNode[1] > 0)
+            {
+                normalF1[0] *= -1;
+                normalF1[1] *= -1;
+            }
+
+            double norm = std::sqrt(normalF1[0]*normalF1[0] + normalF1[1]*normalF1[1]);
+            normalF1[0] /= norm;
+            normalF1[1] /= norm;
+
+            std::array<double, 3> normalF_1 = {
+                -(y0 - y_1),
+                x_1 - x0,
+                0
+            };
+
+            vecToOutNode = {
+                outNode_1.getCoordinate(0) - x0,
+                outNode_1.getCoordinate(1) - y0,
+                0
+            };
+
+            if(normalF_1[0]*vecToOutNode[0] + normalF_1[1]*vecToOutNode[1] > 0)
+            {
+                normalF_1[0] *= -1;
+                normalF_1[1] *= -1;
+            }
+
+            norm = std::sqrt(normalF_1[0]*normalF_1[0] + normalF_1[1]*normalF_1[1]);
+            normalF_1[0] /= norm;
+            normalF_1[1] /= norm;
+
+            std::array<double, 3> finalNodeNormal = {
+                normalF1[0] + normalF_1[0],
+                normalF1[1] + normalF_1[1],
+                0
+            };
+
+            norm = std::sqrt(finalNodeNormal[0]*finalNodeNormal[0] + finalNodeNormal[1]*finalNodeNormal[1]);
+            finalNodeNormal[0] /= norm;
+            finalNodeNormal[1] /= norm;
+
+            m_boundFSNormal[i] = finalNodeNormal;
+        }
     }
 }

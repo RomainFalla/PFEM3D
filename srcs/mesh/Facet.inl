@@ -1,11 +1,6 @@
 #include "Facet.hpp"
 
-inline uint8_t Facet::getNodesCount() const noexcept
-{
-    return m_nodesIndexes.size();
-}
-
-inline std::size_t Facet::getNodeIndex(uint8_t node) const noexcept
+inline std::size_t Facet::getNodeIndex(unsigned int node) const noexcept
 {
     return m_nodesIndexes[node];
 }
@@ -20,12 +15,12 @@ inline double Facet::getDetJ() const noexcept
     return m_detJ;
 }
 
-inline double Facet::getJ(uint8_t i, uint8_t j) const noexcept
+inline double Facet::getJ(unsigned int i, unsigned int j) const noexcept
 {
     return m_J[i][j];
 }
 
-inline double Facet::getInvJ(uint8_t i, uint8_t j) const noexcept
+inline double Facet::getInvJ(unsigned int i, unsigned int j) const noexcept
 {
     return m_invJ[i][j];
 }

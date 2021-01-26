@@ -28,6 +28,12 @@ inline std::size_t Mesh::getFacetsCount() const noexcept
     return m_facetsList.size();
 }
 
+inline std::string Mesh::getFacetType(std::size_t facetIndex) const noexcept
+{
+    std::size_t nodeIndex = m_facetsList[facetIndex].m_nodesIndexes[0];
+    return m_tagNames[m_nodesList[nodeIndex].m_tag];
+}
+
 inline double Mesh::getHchar() const noexcept
 {
     return m_hchar;
@@ -54,11 +60,11 @@ std::array<double, 3> Mesh::getBoundNodeInitPos(std::size_t nodeIndex) const
 }
 
 
-inline std::array<double, 3> Mesh::getFreeSurfaceNormal(std::size_t nodeIndex) const
+inline std::array<double, 3> Mesh::getBoundFSNormal(std::size_t nodeIndex) const
 {
-    auto it = m_freeSurfaceNormal.find(nodeIndex);
+    auto it = m_boundFSNormal.find(nodeIndex);
 
-    if(it == m_freeSurfaceNormal.end())
+    if(it == m_boundFSNormal.end())
         throw std::runtime_error("normal is only available for free surface nodes!");
     else
         return it->second;
@@ -74,9 +80,24 @@ inline double Mesh::getFreeSurfaceCurvature(std::size_t nodeIndex) const
         return it->second;
 }
 
+inline unsigned short Mesh::getNodesPerElm() const noexcept
+{
+    return m_dim + 1;
+}
+
+inline unsigned short Mesh::getNodesPerFacet() const noexcept
+{
+    return m_dim;
+}
+
 inline std::string Mesh::getNodeType(std::size_t nodeIndex) const noexcept
 {
     return m_tagNames[m_nodesList[nodeIndex].m_tag];
+}
+
+inline bool Mesh::isNormalCurvComputed() const noexcept
+{
+    return m_computeNormalCurvature;
 }
 
 inline void Mesh::setComputeNormalCurvature(bool activate) noexcept
@@ -84,17 +105,22 @@ inline void Mesh::setComputeNormalCurvature(bool activate) noexcept
     m_computeNormalCurvature = activate;
 }
 
+inline void Mesh::setNodeFlag(std::size_t nodeIndex, unsigned short flag) noexcept
+{
+    m_nodesList[nodeIndex].m_userDefFlags.set(flag, 1);
+}
+
 inline void Mesh::setNodeIsFixed(std::size_t nodeIndex, bool isFixed) noexcept
 {
     m_nodesList[nodeIndex].m_isFixed = isFixed;
 }
 
-inline void Mesh::setNodeState(std::size_t nodeIndex, uint16_t stateIndex, double state) noexcept
+inline void Mesh::setNodeState(std::size_t nodeIndex, unsigned int stateIndex, double state) noexcept
 {
     m_nodesList[nodeIndex].m_states[stateIndex] = state;
 }
 
-void Mesh::setStatesNumber(unsigned short statesNumber)
+void Mesh::setStatesNumber(unsigned int statesNumber)
 {
     for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
     {

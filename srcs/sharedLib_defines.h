@@ -27,7 +27,7 @@
 	#define PFEM_DEPRECATED_EXPORT PFEM_EXPORT PFEM_DEPRECATED
 	#define PFEM_DEPRECATED_NOEXPORT PFEM_NOEXPORT PFEM_DEPRECATED
 #else
-	#error("Unsupported compiler!")
+	#error("Unsupported platform/compiler!")
 #endif
 
 #endif /* SHAREDLIB_DEFINES_H */

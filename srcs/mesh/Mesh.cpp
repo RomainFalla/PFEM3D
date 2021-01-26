@@ -34,9 +34,9 @@ bool Mesh::addNodes(bool verboseOutput)
     for(std::size_t elm = 0 ; elm < elementCount ; ++elm)
     {
         //If an element is too big, we add a node at his center
-        if(m_elementsList[elm].m_detJ*getRefElementSize(m_dim) > limitSize)
+        if(m_elementsList[elm].getSize() > limitSize)
         {
-            Node newNode = {};
+            Node newNode(*this);
 
             for(unsigned short k = 0 ; k < m_dim ; ++k)
             {
@@ -64,7 +64,7 @@ bool Mesh::addNodes(bool verboseOutput)
 
             for(unsigned short d = 0 ; d <= m_dim ; ++d)
             {
-                Element element = {};
+                Element element(*this);
                 switch(m_dim)
                 {
                     case 2:
@@ -321,7 +321,7 @@ void Mesh::computeMeshDim()
 void Mesh::computeFSNormalCurvature()
 {
     m_freeSurfaceCurvature.clear();
-    m_freeSurfaceNormal.clear();
+    m_boundFSNormal.clear();
 
     switch(m_dim)
     {
@@ -344,7 +344,7 @@ void Mesh::displayToConsole() const noexcept
     std::cout << "gamma: " << m_gamma << std::endl;
 }
 
-std::vector<std::array<double, 3>> Mesh::getGaussPoints(uint8_t dimension, uint8_t n) const
+std::vector<std::array<double, 3>> Mesh::getGaussPoints(unsigned int dimension, unsigned int n) const
 {
     switch(dimension)
     {
@@ -418,7 +418,7 @@ std::vector<std::array<double, 3>> Mesh::getGaussPoints(uint8_t dimension, uint8
     }
 }
 
-std::vector<double> Mesh::getGaussWeight(uint8_t dimension, uint8_t n) const
+std::vector<double> Mesh::getGaussWeight(unsigned int dimension, unsigned int n) const
 {
     switch(dimension)
     {
@@ -474,7 +474,7 @@ std::vector<double> Mesh::getGaussWeight(uint8_t dimension, uint8_t n) const
     }
 }
 
-double Mesh::getRefElementSize(uint8_t dimension) const
+double Mesh::getRefElementSize(unsigned int dimension) const
 {
     switch(dimension)
     {
@@ -490,6 +490,96 @@ double Mesh::getRefElementSize(uint8_t dimension) const
         default:
             throw std::runtime_error("Unexpected dimension: " + std::to_string(dimension));
     }
+}
+
+std::vector<std::vector<double>> Mesh::getShapeFunctions(unsigned int dimension, unsigned int n) const
+{
+    std::vector<std::array<double, 3>> gps = getGaussPoints(dimension, n);
+
+    std::vector<std::vector<double>> sfs(gps.size());
+
+    unsigned int counter = 0;
+    for(std::array<double, 3> gp : gps)
+    {
+        std::vector<double> sf(dimension + 1);
+
+        switch(dimension)
+        {
+            case 1:
+                sf[0] = (1 - gp[0])/2;
+                sf[1] = (1 + gp[0])/2;
+                break;
+
+            case 2:
+                sf[0] = 1 - gp[0] - gp[1];
+                sf[1] = gp[0];
+                sf[2] = gp[1];
+                break;
+
+            case 3:
+                sf[0] = 1 - gp[0] - gp[1] - gp[2];
+                sf[1] = gp[0];
+                sf[2] = gp[1];
+                sf[3] = gp[2];
+                break;
+
+            default:
+                throw std::runtime_error("Unexpected dimension: " + std::to_string(dimension));
+        }
+
+        sfs[counter] = std::move(sf);
+        counter++;
+    }
+
+    return sfs;
+}
+
+std::vector<std::vector<double>> Mesh::getGradShapeFunctions(unsigned int dimension) const
+{
+    std::vector<std::vector<double>> gradsfs(dimension);
+
+    for(unsigned int i = 0 ; i < gradsfs.size() ; ++i)
+        gradsfs[i].resize(dimension + 1);
+
+    switch(dimension)
+    {
+        case 1:
+            gradsfs[0][0] = -1;
+            gradsfs[0][1] = 1;
+            break;
+
+        case 2:
+            gradsfs[0][0] = -1;
+            gradsfs[0][1] = 1;
+            gradsfs[0][2] = 0;
+
+            gradsfs[1][0] = -1;
+            gradsfs[1][1] = 0;
+            gradsfs[1][2] = 1;
+            break;
+
+        case 3:
+            gradsfs[0][0] = -1;
+            gradsfs[0][1] = 1;
+            gradsfs[0][2] = 0;
+            gradsfs[0][3] = 0;
+
+            gradsfs[1][0] = -1;
+            gradsfs[1][1] = 0;
+            gradsfs[1][2] = 1;
+            gradsfs[1][3] = 0;
+
+            gradsfs[1][0] = -1;
+            gradsfs[1][1] = 0;
+            gradsfs[1][2] = 0;
+            gradsfs[1][3] = 1;
+            break;
+
+        default:
+            throw std::runtime_error("Unexpected dimension: " + std::to_string(dimension));
+    }
+
+    return gradsfs;
 }
 
 void Mesh::loadFromFile(const std::string& fileName)
@@ -540,7 +630,7 @@ void Mesh::loadFromFile(const std::string& fileName)
 
             for(std::size_t i = 0 ; i < dummyNodesTagsBoundary.size() ; ++i)
             {
-                Node node = {};
+                Node node(*this);
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
                 {
                     node.m_position[d] = coord[3*i + d];
@@ -556,11 +646,11 @@ void Mesh::loadFromFile(const std::string& fileName)
                 if(posBCinTagNames == std::end(m_tagNames))
                 {
                     m_tagNames.push_back(name);
-                    node.m_tag = static_cast<int16_t>(m_tagNames.size() - 1);
+                    node.m_tag = static_cast<int>(m_tagNames.size() - 1);
                 }
                 else
                 {
-                    node.m_tag = static_cast<int16_t>(std::distance(m_tagNames.begin(), posBCinTagNames));
+                    node.m_tag = static_cast<int>(std::distance(m_tagNames.begin(), posBCinTagNames));
                 }
                 m_nodesList.push_back(std::move(node));
                 m_boundaryInitialPos[m_nodesList.size() - 1] = m_nodesList.back().m_position;
@@ -580,7 +670,7 @@ void Mesh::loadFromFile(const std::string& fileName)
 
         for(std::size_t i = 0 ; i < dummyNodesTags.size() ; ++i)
         {
-            Node node = {};
+            Node node(*this);
             for(unsigned short d = 0 ; d < m_dim ; ++d)
                 node.m_position[d] = coord[3*i + d];
 
@@ -748,7 +838,7 @@ void Mesh::restoreNodesList()
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
     {
-        m_elementsList[elm].computeJ(m_nodesList);
+        m_elementsList[elm].computeJ();
         m_elementsList[elm].computeDetJ();
         m_elementsList[elm].computeInvJ();
     }
@@ -756,9 +846,9 @@ void Mesh::restoreNodesList()
     #pragma omp parallel for default(shared)
     for(std::size_t facet = 0 ; facet < m_facetsList.size() ; ++facet)
     {
-        m_facetsList[facet].computeJ(m_nodesList);
+        m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
-        m_facetsList[facet].computeInvJ(m_nodesList);
+        m_facetsList[facet].computeInvJ();
     }
 
     computeFSNormalCurvature();
@@ -770,14 +860,6 @@ void Mesh::saveNodesList()
         throw std::runtime_error("the nodes list does not exist!");
 
     m_nodesListSave = m_nodesList;
-}
-
-void Mesh::setUserDefTag(std::size_t nodeIndex, int16_t tag)
-{
-    if(tag < -1)
-        throw std::runtime_error("User defined tag should be greater than -1 (which is the default).");
-
-    m_nodesList[nodeIndex].m_userDefTag = tag;
 }
 
 void Mesh::triangulateAlphaShape()
@@ -808,7 +890,7 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
     {
-        m_elementsList[elm].computeJ(m_nodesList);
+        m_elementsList[elm].computeJ();
         m_elementsList[elm].computeDetJ();
         m_elementsList[elm].computeInvJ();
     }
@@ -816,9 +898,9 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
     #pragma omp parallel for default(shared)
     for(std::size_t facet = 0 ; facet < m_facetsList.size() ; ++facet)
     {
-        m_facetsList[facet].computeJ(m_nodesList);
+        m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
-        m_facetsList[facet].computeInvJ(m_nodesList);
+        m_facetsList[facet].computeInvJ();
     }
 
     computeFSNormalCurvature();
@@ -846,7 +928,7 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
     {
-        m_elementsList[elm].computeJ(m_nodesList);
+        m_elementsList[elm].computeJ();
         m_elementsList[elm].computeDetJ();
         m_elementsList[elm].computeInvJ();
     }
@@ -854,9 +936,9 @@ void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
     #pragma omp parallel for default(shared)
     for(std::size_t facet = 0 ; facet < m_facetsList.size() ; ++facet)
     {
-        m_facetsList[facet].computeJ(m_nodesList);
+        m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
-        m_facetsList[facet].computeInvJ(m_nodesList);
+        m_facetsList[facet].computeInvJ();
     }
 
     computeFSNormalCurvature();

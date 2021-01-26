@@ -21,7 +21,7 @@ before_install:
         export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
         export mingw64="$msys2 -mingw64 -full-path -here -c "\"\$@"\" --"
         export msys2+=" -msys2 -c "\"\$@"\" --"
-        $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-boost mingw-w64-x86_64-mpfr mingw-w64-x86_64-gmp mingw-w64-x86_64-nlohmann-json mingw-w64-x86_64-eigen3 mingw-w64-x86_64-lua mingw-w64-x86_64-swig
+        $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-boost mingw-w64-x86_64-mpfr mingw-w64-x86_64-gmp mingw-w64-x86_64-eigen3 mingw-w64-x86_64-lua mingw-w64-x86_64-cgal mingw-w64-x86_64-sol
         ## Install more MSYS2 packages from https://packages.msys2.org/base here
         taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
         export PATH=/C/tools/msys64/mingw64/bin:$PATH
@@ -47,12 +47,12 @@ cache:
    
 install:
   - if [ $TRAVIS_OS_NAME == linux ]; then 
-        sudo apt-get update && sudo apt-get install -y cmake wget tar libgmsh-dev libcgal-dev liblua5.3-dev libpython3-dev swig4.0 libeigen3-dev nlohmann-json3-dev;
+        sudo apt-get update && sudo apt-get install -y cmake wget tar libgmsh-dev libcgal-dev liblua5.3-dev libeigen3-dev;
         cd run/linux;
         ./genCBproject.sh;
         cd ../../;
     elif [ $TRAVIS_OS_NAME == osx ]; then 
-        brew update && brew upgrade cmake && brew install wget gnu-tar llvm libomp unzip swig cgal lua python@3.7 nlohmann-json eigen;
+        brew update && brew install wget gnu-tar llvm libomp unzip cgal lua eigen;
         cd run/macos;
         ./genCBproject.sh;
         cd ../../;

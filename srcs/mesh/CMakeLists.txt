@@ -10,14 +10,13 @@ if(CGAL_FOUND)
     message(STATUS "Found CGAL: " ${CGAL_DIR})
 endif()
 
-set(LIBMESHSRCS
-./Node.hpp ./Node.inl
-./Element.hpp ./Element.inl ./Element.cpp
-./Facet.hpp ./Facet.inl ./Facet.cpp
-./Mesh.hpp ./Mesh.inl ./Mesh.cpp ./Mesh2D.cpp ./Mesh3D.cpp
-./mesh_defines.h ../sharedLib_defines.h)
+file(GLOB_RECURSE LIBMESH_SRCS
+     "${PROJECT_SOURCE_DIR}/srcs/mesh/*.h"
+     "${PROJECT_SOURCE_DIR}/srcs/mesh/*.inl"
+     "${PROJECT_SOURCE_DIR}/srcs/mesh/*.hpp"
+     "${PROJECT_SOURCE_DIR}/srcs/mesh/*.cpp")
 
-add_library(pfemMesh SHARED ${LIBMESHSRCS})
+add_library(pfemMesh SHARED ${LIBMESH_SRCS})
 target_include_directories(pfemMesh SYSTEM
                            PRIVATE ${EIGEN_INCLUDE_DIRS}
                            PRIVATE ${GMSH_INCLUDE_DIRS})

@@ -1,20 +1,15 @@
 add_subdirectory(mesh)
 
-add_subdirectory(solver)
+add_subdirectory(simulation)
 
 set(SRCS
-main.cpp)
-
-find_path(JSON_INCLUDE_DIRS NAMES "nlohmann/json.hpp")
-message(STATUS "Found nlohmann json: " ${JSON_INCLUDE_DIRS})
-if(NOT JSON_INCLUDE_DIRS)
-    message(FATAL_ERROR "nlohmann json not found!")
-endif()
+main.cpp
+sharedLib_defines.h)
 
 add_executable(pfem ${SRCS})
 target_include_directories(pfem SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${JSON_INCLUDE_DIRS})
-target_link_libraries(pfem PUBLIC pfemSolver)
+target_link_libraries(pfem PUBLIC pfemSimulation)
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
     target_compile_options(pfem PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES CLANG)

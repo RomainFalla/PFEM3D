@@ -76,7 +76,3 @@ Physical Surface("Bottom") = {6};
 Physical Surface("Lateral") = {1, 4, 3, 2};
 //+
 Physical Volume("Fluid") = {1};
-//+
-Transfinite Surface{1, 2, 3, 4, 5, 6};
-//+
-Transfinite Volume{1};

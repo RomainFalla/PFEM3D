@@ -72,7 +72,3 @@ Volume(1) = {1};
 Physical Surface("FreeSurface") = {1, 2, 5, 3, 4, 6};
 //+
 Physical Volume("Fluid") = {1};
-//+
-Transfinite Surface{1, 2, 3, 4, 5, 6};
-//+
-Transfinite Volume{1};

@@ -5,19 +5,34 @@ inline std::array<double, 3> Node::getPosition() const noexcept
     return m_position;
 }
 
-inline double Node::getPosition(uint8_t xyz) const noexcept
+inline double Node::getCoordinate(unsigned int xyz) const noexcept
 {
     return m_position[xyz];
 }
 
-inline double Node::getState(uint16_t state) const noexcept
+inline std::vector<double> Node::getStates() const noexcept
+{
+    return m_states;
+}
+
+inline double Node::getState(unsigned int state) const noexcept
 {
     return m_states[state];
 }
 
-inline int16_t Node::getUserDefTag() const noexcept
+inline bool Node::getFlag(unsigned short flag) const noexcept
 {
-    return m_userDefTag;
+    return m_userDefFlags[flag];
+}
+
+inline unsigned int Node::getElementCount() const noexcept
+{
+    return m_elements.size();
+}
+
+inline unsigned int Node::getFacetCount() const noexcept
+{
+    return m_facets.size();
 }
 
 inline bool Node::isFree() const noexcept

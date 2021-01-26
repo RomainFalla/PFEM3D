@@ -10,21 +10,22 @@ fi
 
 cd dependencies/
 
-if [ ! -d "sol3" ]; then
-  mkdir sol3
-  cd sol3
-  wget https://github.com/ThePhD/sol2/releases/download/v3.0.3/sol.hpp
-  wget https://github.com/ThePhD/sol2/releases/download/v3.0.3/forward.hpp
+if [ ! -d "sol" ]; then
+  mkdir sol
+  cd sol
+  wget https://github.com/ThePhD/sol2/releases/download/v3.2.2/sol.hpp
+  wget https://github.com/ThePhD/sol2/releases/download/v3.2.2/forward.hpp
+  wget https://github.com/ThePhD/sol2/releases/download/v3.2.2/config.hpp
   cd ../
 fi
 
-if [ ! -d "gmsh-4.7.0-MacOSX-sdk.tgz" ]; then
-  wget http://gmsh.info/bin/MacOSX/gmsh-4.7.0-MacOSX-sdk.tgz
-  gtar -xf gmsh-4.7.0-MacOSX-sdk.tgz 
-  rm -rf gmsh-4.7.0-MacOSX-sdk.tgz 
+if [ ! -d "gmsh-4.7.1-MacOSX-sdk.tgz" ]; then
+  wget http://gmsh.info/bin/MacOSX/gmsh-4.7.1-MacOSX-sdk.tgz
+  gtar -xf gmsh-4.7.1-MacOSX-sdk.tgz 
+  rm -rf gmsh-4.7.1-MacOSX-sdk.tgz 
 fi
 
-export GMSHSDK=${PWD}/gmsh-4.7.0-MacOSX-sdk/
+export GMSHSDK=${PWD}/gmsh-4.7.1-MacOSX-sdk/
 export SOLSDK=${PWD}/
 export EIGENSDK=/usr/local/include/eigen3/
 
