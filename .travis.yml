@@ -5,8 +5,8 @@ jobs:
     - os: linux
       dist: focal
       compiler: gcc
-    - os: osx
-      osx_image: xcode12u
+    #- os: osx
+     # osx_image: xcode12u
     - os: windows
 
 before_install:
