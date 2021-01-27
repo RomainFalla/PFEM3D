@@ -6,3 +6,5 @@ sol3/
 gmsh-*/
 nlohmann/
 *.msh
+*.cpp.save-failed
+*.hpp.save-failed

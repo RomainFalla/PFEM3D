@@ -3,7 +3,7 @@ L = 0.146;
 //+
 b = 0.175;
 //+
-d = 0.146/5; 
+d = 0.146/10; 
 //+
 Point(1) = {0, 0, 0, d};
 //+
@@ -179,7 +179,3 @@ Physical Surface("Boundary") = {2, 3, 9, 7, 10, 11, 15, 16, 5, 12, 1, 8, 14, 13}
 Physical Surface("FreeSurface") = {6, 4};
 //+
 Physical Volume("Fluid") = {1};
-//+
-Transfinite Surface{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-//+
-Transfinite Volume{1};

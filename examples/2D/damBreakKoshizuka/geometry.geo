@@ -1,7 +1,7 @@
 //+
 L = 0.146;
 //+
-d = L/20;
+d = L/10;
 //+
 Point(1) = {4*L, 0, 0, d};
 //+
@@ -42,4 +42,4 @@ Physical Curve("FreeSurface") = {2,3};
 //+
 Physical Surface("Fluid") = {1};
 //+
-Transfinite Surface{1};
+//Transfinite Surface{1};

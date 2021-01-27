@@ -35,4 +35,4 @@ Plane Surface(1) = {1};
 //+
 Physical Surface("Fluid") = {1};
 //+
-Transfinite Surface{1};
+//Transfinite Surface{1};

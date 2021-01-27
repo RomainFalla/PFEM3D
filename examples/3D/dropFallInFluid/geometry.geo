@@ -194,5 +194,3 @@ Physical Surface("Boundary") = {4, 9, 10, 5, 7, 6, 8, 3, 1};
 Physical Surface("FreeSurface") = {2, 14, 17, 15, 13, 11, 18, 16, 12};
 //+
 Physical Volume("Fluid") = {2, 1};
-//+
-Transfinite Surface{3, 4, 5, 6, 7, 8, 9, 10};

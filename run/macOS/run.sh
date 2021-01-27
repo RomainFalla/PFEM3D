@@ -2,7 +2,7 @@
 #Example of usage of PFEM
 #Please take care of the lib location !
 
-export GMSHSDK=../../dependencies/gmsh-4.6.0-MacOSX-sdk/
+export GMSHSDK=../../dependencies/gmsh-4.7.1-MacOSX-sdk/
 
 export OMP_NUM_THREADS=2
 
