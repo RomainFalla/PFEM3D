@@ -34,7 +34,6 @@ export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:"${PATH}"
 export INCLUDE=${GMSHSDK}/include:"${INCLUDE}"
 export INCLUDE=${SOLSDK}:"${INCLUDE}"
 export INCLUDE=${EIGENSDK}:"${INCLUDE}"
-export INCLUDE=/usr/local/include/lua/:"${INCLUDE}"
 export LIB=${GMSHSDK}/lib:"${LIB}"
 export PYTHONPATH=${GMSHSDK}/lib:"${PYTHONPATH}"
 export DYLD_LIBRARY_PATH=${GMSHSDK}/lib:"${DYLD_LIBRARY_PATH}"
@@ -45,7 +44,7 @@ rm -rf build
 mkdir build
 cd build
 
-LDFLAGS="-L/usr/local/opt/llvm/lib" CPPFLAGS="-I/usr/local/opt/llvm/include" cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++  -G "CodeBlocks - Unix Makefiles"
+LDFLAGS="-L/usr/local/opt/llvm/lib -L/usr/local/opt/lua/lib/" CPPFLAGS="-I/usr/local/opt/llvm/include -I/usr/local/opt/lua/include/" cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++  -G "CodeBlocks - Unix Makefiles"
 
 cp ../run/macos/run.sh bin/
 
