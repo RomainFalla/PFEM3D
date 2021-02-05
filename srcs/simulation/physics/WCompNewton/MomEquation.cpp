@@ -247,7 +247,7 @@ void MomEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& i
         {
             for(unsigned short d = 0 ; d < dim ; ++d)
             {
-                F(n + d*nodesCount) = - m_bodyForce[d];
+                F(n + d*nodesCount) = m_bodyForce[d];
                 invMDiag[n + d*nodesCount] = 1;
             }
         }
