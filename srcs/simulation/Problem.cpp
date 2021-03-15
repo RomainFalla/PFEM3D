@@ -48,14 +48,30 @@ m_step(0)
 
     SolTable mesh = SolTable("Mesh", m_problemParams[0]);
 
-    MeshCreateInfo createInfo = {
-        mesh.checkAndGet<double>("hchar"),
-        mesh.checkAndGet<double>("alpha"),
-        mesh.checkAndGet<double>("gamma"),
-        mesh.checkAndGet<double>("omega"),
-        mesh.checkAndGet<std::vector<double>>("boundingBox"),
-        mesh.checkAndGet<std::string>("mshFile")
-    };
+    MeshCreateInfo createInfo = {};
+
+    createInfo.hchar = mesh.checkAndGet<double>("hchar");
+    createInfo.alpha = mesh.checkAndGet<double>("alpha");
+    createInfo.gamma = mesh.checkAndGet<double>("gamma");
+    createInfo.omega = mesh.checkAndGet<double>("omega");
+    createInfo.useMeshRefinement = mesh.checkAndGet<bool>("useMeshRefinement");
+    createInfo.boundingBox = mesh.checkAndGet<std::vector<double>>("boundingBox");
+    createInfo.mshFile = mesh.checkAndGet<std::string>("mshFile");
+
+    if (createInfo.useMeshRefinement) 
+    {
+        SolTable refinement = SolTable("Refinement", mesh);
+
+        createInfo.refInfo = {};
+
+        createInfo.refInfo.alphaRatio = refinement.checkAndGet<double>("alphaRatio");
+        createInfo.refInfo.gamma2 = refinement.checkAndGet<double>("gamma2");
+        createInfo.refInfo.minTargetMeshSize = refinement.checkAndGet<double>("minTargetMeshSize");
+        createInfo.refInfo.maxTargetMeshSize = refinement.checkAndGet<double>("maxTargetMeshSize");
+        createInfo.refInfo.maxProgressionFactor = refinement.checkAndGet<double>("maxProgressionFactor");
+
+    }
+
 
     std::cout << "Loading the mesh" << std::flush;
     m_pMesh = std::make_unique<Mesh>(createInfo);
@@ -275,6 +291,12 @@ void Problem::simulate()
         pExtractor->update();
     }
 
+    if (m_pMesh->useMeshRefinement())
+    {
+        m_pMesh->updateBoundingElementSize();
+        m_pMesh->updateLocalElementSize();
+    }
+
     while(m_time < m_maxTime)
     {
         if(m_verboseOutput)
@@ -304,6 +326,8 @@ void Problem::simulate()
             {
                 pExtractor->update();
             }
+            if (m_pMesh->useMeshRefinement())
+                m_pMesh->updateLocalElementSize(); // The local element size is updated at each iteration
         }
 
         m_pSolver->computeNextDT();

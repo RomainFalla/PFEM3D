@@ -1,14 +1,17 @@
 #include "Mesh.hpp"
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+//#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
+#include <CGAL/Triangulation_face_base_with_info_2.h> 
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Alpha_shape_2.h>
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
-
+#include <CGAL/Regular_triangulation_2.h>
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel                 Kernel;
+//typedef CGAL::Exact_predicates_exact_constructions_kernel                   Kernel;
 typedef Kernel::FT                                                          FT;
 typedef CGAL::Triangulation_vertex_base_with_info_2<std::size_t, Kernel>    Vb2;
 typedef CGAL::Alpha_shape_vertex_base_2<Kernel, Vb2>                        asVb2;
@@ -18,6 +21,29 @@ typedef CGAL::Delaunay_triangulation_2<Kernel,asTds2>                       asTr
 typedef CGAL::Alpha_shape_2<asTriangulation_2>                              Alpha_shape_2;
 typedef Kernel::Point_2                                                     Point_2;
 typedef Kernel::Triangle_2                                                  Triangle_2;
+
+struct FaceInfo2
+{
+    FaceInfo2() { isExt = true;  }
+    std::size_t index;
+    std::vector<std::size_t> neighboursElemIndexes;
+    bool isExt;
+};
+
+typedef CGAL::Triangulation_face_base_with_info_2<FaceInfo2,Kernel>        Fb2;
+typedef CGAL::Triangulation_data_structure_2<Vb2, Fb2>                     Tds2;
+typedef CGAL::Delaunay_triangulation_2<Kernel, Tds2>                       Triangulation_2;
+
+
+//typedef CGAL::Regular_triangulation_vertex_base_2<Kernel, Vb2>              regVb2;
+//typedef CGAL::Regular_triangulation_face_base_2<Kernel>                     regFb2;
+//typedef CGAL::Alpha_shape_vertex_base_2<Kernel, regVb2>                     wasVb2;
+//typedef CGAL::Alpha_shape_face_base_2<Kernel, regFb2>                       wasFb2;
+//typedef CGAL::Triangulation_data_structure_2<wasVb2, wasFb2>                wasTds2;
+//typedef CGAL::Regular_triangulation_2<Kernel, wasTds2>                      wasTriangulation_2;
+//typedef CGAL::Alpha_shape_2<wasTriangulation_2>                             Weighted_Alpha_shape_2;
+//typedef Kernel::Weighted_point_2                                            Weighted_point_2;
+
 
 
 void Mesh::triangulateAlphaShape2D()
@@ -89,9 +115,8 @@ void Mesh::triangulateAlphaShape2D()
     // We check for each triangle which one will be kept (alpha shape), then we
     // perfom operations on the remaining elements
     for(auto fit = as.finite_faces_begin() ; fit != as.finite_faces_end() ; ++fit)
-    {
-        // If true, the elements are fluid elements
-        if(as.classify(fit) == Alpha_shape_2::INTERIOR)
+    {   
+        if(as.classify(fit) == Alpha_shape_2::INTERIOR) // If true, the elements are fluid elements
         {
             const Alpha_shape_2::Face_handle face{fit};
             std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
@@ -115,6 +140,8 @@ void Mesh::triangulateAlphaShape2D()
 
             m_nodesList[in2].m_neighbourNodes.push_back(in0);
             m_nodesList[in2].m_neighbourNodes.push_back(in1);
+
+            element.m_index = m_elementsList.size();
 
             m_elementsList.push_back(std::move(element));
 
@@ -176,10 +203,308 @@ void Mesh::triangulateAlphaShape2D()
         }
     }
 
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 
     if(m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
+}
+
+void Mesh::TriangulateWeightedAlphaShape2D() 
+{
+    if (m_nodesList.empty())
+        throw std::runtime_error("You should load the mesh from a file before trying to remesh !");
+
+    std::cout << "We are in regular triangulation!" << "\n";
+    std::cout << "alphaRatio= " << m_alphaRatio << "\n";
+    std::cout << "minTargetMeshSize= " << m_minTargetMeshSize << "\n";
+
+    /*for (auto it = m_elementsList.begin(); it != m_elementsList.end(); ++it) 
+    {
+        Element el = *it;
+        std::cout << "\n";
+        std::cout << "Element:\n";
+        for (auto it2 = el.m_nodesIndexes.begin(); it2 != el.m_nodesIndexes.end(); ++it2) 
+        {
+            std::cout << "w1 = " << m_nodesList[*it2].getWeight(m_alphaRatio, m_minTargetMeshSize) << "\n";
+        }
+    }*/
+
+    m_elementsList.clear();
+    m_facetsList.clear();
+
+    // We have to construct an intermediate representation for CGAL. We also reset
+    // nodes properties.
+    std::vector<std::pair<Point_2, std::size_t>> PointsList;
+
+    for (std::size_t i = 0; i < m_nodesList.size(); ++i)
+    {
+        Point_2 P = Point_2(m_nodesList[i].m_position[0],m_nodesList[i].m_position[1]);
+        //double weight = m_nodesList[i].getWeight(m_alphaRatio,m_minTargetMeshSize);
+        //std::cout << "weight= " << weight << "\n";
+        //Weighted_point_2 wP = Weighted_point_2(P, weight/100.);
+
+        PointsList.push_back(std::make_pair(P, i));
+
+        m_nodesList[i].m_isOnFreeSurface = false;
+        m_nodesList[i].m_neighbourNodes.clear();
+        m_nodesList[i].m_elements.clear();
+        m_nodesList[i].m_facets.clear();
+    }
+
+    //std::cout << "Weighted alpha shape ...!" << "\n";
+    Triangulation_2 T(PointsList.begin(), PointsList.end());
+
+    /*auto checkFaceDeletion = [&](Triangulation_2::Face_handle face) -> bool
+    {
+        std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
+
+        if (m_nodesList[in0].isBound() && m_nodesList[in1].isBound() && m_nodesList[in2].isBound())
+        {
+            for (unsigned int i = 0; i <= 2; ++i)
+            {
+                std::set<Triangulation_2::Vertex_handle> neighbourVh;
+                Triangulation_2::Face_circulator faceCirc = T.incident_faces(face->vertex(i)), done = faceCirc;
+                do
+                {
+                    if (was.classify(faceCirc) == Weighted_Alpha_shape_2::INTERIOR)
+                    {
+                        for (unsigned int j = 0; j <= 2; ++j)
+                        {
+                            if (!was.is_infinite(faceCirc->vertex(j)))
+                                neighbourVh.insert(faceCirc->vertex(j));
+                        }
+                    }
+                    faceCirc++;
+                } while (faceCirc != done);
+
+                for (auto vh : neighbourVh)
+                {
+                    if (vh->info() == in0 || vh->info() == in1 || vh->info() == in2)
+                        continue;
+
+                    if (was.classify(vh) == Weighted_Alpha_shape_2::REGULAR || was.classify(vh) == Weighted_Alpha_shape_2::INTERIOR)
+                    {
+                        if (!m_nodesList[vh->info()].isBound())
+                            return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        return false;
+    };*/
+
+    std::size_t index = 0;
+    std::vector<Triangulation_2::Face_handle> elementCopies;
+    std::vector<Triangulation_2::Face_handle> elToPotentiallyRemove;
+    for (auto fit = T.finite_faces_begin(); fit != T.finite_faces_end(); ++fit)
+    {
+        index = m_elementsList.size();
+        Triangulation_2::Face_handle face{ fit };
+
+        if (T.is_infinite(face))
+            std::cout << "foundInfiniteFace\n";
+       
+        std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
+        std::vector<std::size_t> nodeIndexes = { in0,in1,in2 };
+        ELEMENT_TYPE elmType = getElementType(nodeIndexes);
+
+        Element element(*this);
+        element.m_nodesIndexes = { in0, in1, in2 };
+
+        std::size_t nbNodes = m_nodesList.size();
+        if (in0 >= nbNodes || in0 <0 )
+        {
+            std::cout << "in0 = " << in0 << " > nb Nodes = " << nbNodes << "\n";
+        }
+        if (in1 >= nbNodes || in1 < 0)
+        {
+            std::cout << "in0 = " << in0 << " > nb Nodes = " << nbNodes << "\n";
+        }
+        if (in2 >= nbNodes || in2 < 0)
+        {
+            std::cout << "in0 = " << in0 << " > nb Nodes = " << nbNodes << "\n";
+        }
+
+        element.build(nodeIndexes, m_nodesList);
+        element.updateLargestExtension();
+
+        double L = element.getLargestExtension();
+        double minMeshSize = element.getMinMeshSize();
+        double realMeshSize = element.getNaturalMeshSize(false);
+        double naturalMeshSize = element.getNaturalMeshSize(true);
+        double localMeshSize = element.getLocalMeshSize();
+
+        bool keepElement = false;
+
+        double limitVal = 0.5 * m_minTargetMeshSize * m_minTargetMeshSize;
+
+        if (L < 4. * m_maxProgressionFactor * naturalMeshSize)
+        {
+            double r = getCircumScribedRadius(nodeIndexes);
+            std::vector<std::size_t> v = { in0,in1,in2 };
+            
+            if (elmType == IN_BULK)
+            {
+                keepElement = true;
+            }
+            else if (elmType == INSIDE_BOUNDARY)
+            {
+                if (r > m_alphaRatio * localMeshSize)
+                {
+                    if (element.getSize() > limitVal)
+                    {
+                        keepElement = true;
+                        element.m_forcedRefinement = true;
+                    }
+                }
+                else
+                {
+                    keepElement = true;
+                }
+            }
+            else if (elmType == OUTSIDE_BOUNDARY && r < m_alphaRatio * localMeshSize && realMeshSize < 1.4 * minMeshSize)
+            {
+                keepElement = true;
+            }
+            
+        }
+        if (keepElement)
+        {
+            face->info().isExt = false;
+            face->info().index = index;
+            element.m_index = index;
+            for (std::size_t j = 0; j < m_dim + 1; j++)
+            {
+                face->neighbor(j)->info().neighboursElemIndexes.push_back(index);
+            }
+            elementCopies.push_back(face);
+            m_elementsList.push_back(std::move(element));
+            for (std::size_t i : m_elementsList.back().m_nodesIndexes)
+                m_nodesList[i].m_elements.push_back(m_elementsList.size() - 1);     
+        }
+    }
+    
+    std::size_t NbKeptElements = elementCopies.size();
+    for (std::size_t i = 0; i < NbKeptElements; i++) 
+    {
+        m_elementsList[i].m_elemsIndexes = elementCopies[i]->info().neighboursElemIndexes; // copy the links from the CGAL data structure to our data structure.
+    }
+
+
+    elementCopies.clear();
+   
+    /**/
+#pragma omp parallel for default(shared)
+    for (std::size_t n = 0; n < m_nodesList.size(); ++n)
+    {
+        std::sort(m_nodesList[n].m_neighbourNodes.begin(), m_nodesList[n].m_neighbourNodes.end());
+        m_nodesList[n].m_neighbourNodes.erase(
+            std::unique(m_nodesList[n].m_neighbourNodes.begin(), m_nodesList[n].m_neighbourNodes.end()),
+            m_nodesList[n].m_neighbourNodes.end());
+    }
+
+    /*for (auto it = m_elementsList.begin(); it != m_elementsList.end(); ++it)
+    {
+        Element el = *it;
+        std::size_t elem_index = el.m_index;
+        for (auto it2 = el.m_nodesIndexes.begin(); it2 != el.m_nodesIndexes.end(); ++it2)
+        {
+            std::size_t node_index = *it2;
+            m_nodesList[node_index].m_elements.push_back(elem_index);
+        }
+    }*/
+
+    std::cout << "Finish!!!\n";
+    
+    int count1 = 0;
+    int count2 = 0;
+    int count3 = 0;
+    int count4 = 0;
+    for (auto it = T.finite_edges_begin(); it != T.finite_edges_end(); ++it)
+    {
+        count1++;
+        // We compute the free surface nodes
+        Triangulation_2::Edge edge1{ *it };
+        Triangulation_2::Edge edge2=T.mirror_edge(edge1);
+
+        Triangulation_2::Face_handle face1 = edge1.first;
+        Triangulation_2::Face_handle face2 = edge2.first;
+
+        Triangulation_2::Edge edgeToBuildFacet;
+
+        if (!face1->info().isExt && !face2->info().isExt) // not OnBoundary
+        {
+            count2++;
+            continue;
+        }
+
+        if (face1->info().isExt && face2->info().isExt) // not on boundary + this condition --> not Regular
+        {
+            count3++;
+            continue;
+        }
+
+        count4++;
+       
+        if (face1->info().isExt)
+            edgeToBuildFacet = edge1;
+        else 
+            edgeToBuildFacet = edge2;
+
+        Triangulation_2::Vertex_handle outVertex = edgeToBuildFacet.first->vertex((edgeToBuildFacet.second) % 3);
+
+        if (T.is_infinite(outVertex)) {
+            edgeToBuildFacet = T.mirror_edge(edgeToBuildFacet);
+            //std::cout << "foundInfiniteVertex\n";
+        }
+        /*Weighted_Alpha_shape_2::Face_handle face = edgeAS.first;
+        std::cout << "face number =" << elementsMap[face] << "\n";
+
+        if (was.classify(face) == Weighted_Alpha_shape_2::EXTERIOR)
+        {
+            edgeAS = was.mirror_edge(edgeAS);
+            face = edgeAS.first;
+        }
+
+        //if (checkFaceDeletion(face))
+            //continue;*/
+        Facet facet(*this);
+        facet.m_nodesIndexes = { edgeToBuildFacet.first->vertex((edgeToBuildFacet.second + 1) % 3)->info(),
+                                edgeToBuildFacet.first->vertex((edgeToBuildFacet.second + 2) % 3)->info() };
+
+        facet.m_outNodeIndex = edgeToBuildFacet.first->vertex((edgeToBuildFacet.second) % 3)->info();
+        facet.m_elementIndex = edgeToBuildFacet.first->info().index;
+
+        if (!(m_nodesList[facet.m_nodesIndexes[0]].isBound() && m_nodesList[facet.m_nodesIndexes[1]].isBound()))
+        {
+            m_nodesList[facet.m_nodesIndexes[0]].m_isOnFreeSurface = true;
+            m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
+        }
+
+        facet.computeJ();
+        facet.computeDetJ();
+        facet.computeInvJ();
+
+        m_facetsList.push_back(std::move(facet));
+
+        for (std::size_t i : m_facetsList.back().m_nodesIndexes)
+            m_nodesList[i].m_facets.push_back(m_facetsList.size() - 1);
+
+    }
+    std::cout << "count 1 =" << count1 << "\n";
+    std::cout << "count 2 =" << count2 << "\n";
+    std::cout << "count 3 =" << count3 << "\n";
+    std::cout << "count 4 =" << count4 << "\n";
+    
+    //computeFSNormalCurvature();
+
+    if (m_elementsList.empty())
+        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
+
+    std::cout << "Finish2!!!\n";
+        
 }
 
 void Mesh::computeFSNormalCurvature2D()

@@ -5,10 +5,12 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <set>
 
 #include "mesh_defines.h"
 
 class Mesh;
+class Element;
 class Node;
 
 /**
@@ -44,6 +46,8 @@ class MESH_API Facet
 
         /// \return The determinant of the Jacobian matrix of the change of variable to the reference space.
         inline double getDetJ() const noexcept;
+
+        inline bool isOnBoundary() const noexcept;
 
         /**
          * \brief Get an element of the Jacobian matrix of the change of variable to the reference space:
@@ -95,6 +99,8 @@ class MESH_API Facet
 
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this facet. */
         std::size_t m_outNodeIndex;                     /**< Indexes of the node which is "in front of" this facet. */
+        std::size_t m_elementIndex;                     /**< Index of the boundary element. */
+        //std::set<Element*> m_elements;                  /**< set of pointer to the elements that are adjacent to the facet  */
 
         double m_detJ;                                  /**< Determinant of the Jacobian matrix of the facet. */
         std::array<std::array<double, 2>, 3> m_J;       /**< Jacobian matrix of the facet. */

@@ -20,6 +20,21 @@ inline double Node::getState(unsigned int state) const noexcept
     return m_states[state];
 }
 
+inline double Node::getLocalMeshSize() const noexcept
+{
+    return m_target_mesh_size;
+}
+
+inline double Node::getNaturalMeshSize() const noexcept
+{
+    return m_natural_mesh_size;
+}
+
+inline void Node::setLocalMeshSize(double tmsize)
+{
+    m_target_mesh_size = tmsize;
+}
+
 inline bool Node::getFlag(unsigned short flag) const noexcept
 {
     return m_userDefFlags[flag];
@@ -53,6 +68,11 @@ inline bool Node::isOnFreeSurface() const noexcept
 inline bool Node::isFixed() const noexcept
 {
     return m_isFixed;
+}
+
+inline bool Node::isOnBoundary() const noexcept
+{
+    return m_isOnBoundary;
 }
 
 inline bool operator==(const Node& a, const Node& b) noexcept

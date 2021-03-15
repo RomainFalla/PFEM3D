@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "Node.hpp"
+#include "Element.hpp"
 #include "Mesh.hpp"
 
 Facet::Facet(Mesh& mesh):

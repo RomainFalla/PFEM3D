@@ -5,11 +5,15 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <set>
 
 #include "mesh_defines.h"
 
 class Mesh;
 class Node;
+class Facet;
+
+/// \enumeration to identify the type of element
 
 /**
  * \class Element
@@ -77,6 +81,15 @@ class MESH_API Element
          */
         inline double getInvJ(unsigned int i, unsigned int j) const noexcept;
 
+        /// \return The highest separation between 2 nodes of the element.
+        inline double getLargestExtension() const noexcept;
+
+        /// \update The highest separation between 2 nodes of the element.
+        void updateLargestExtension();
+
+        /// \make the connection between the nodes of the elements
+        void build(std::vector<std::size_t> nodeIndices, std::vector<Node>& nodesList);
+            
         /// \param gp The position of the gauss point in the reference space.
         /// \return The position in real space.
         std::array<double, 3> getPosFromGP(const std::array<double, 3>& gp) const noexcept;
@@ -86,6 +99,19 @@ class MESH_API Element
 
         /// \return The area or volume of the element.
         double getSize() const noexcept;
+
+        /// \return The mean mesh size among tho nodes belonging to the element.
+        double getLocalMeshSize() const noexcept;
+
+        /// \return The minimal mesh size among tho nodes belonging to the element.
+        double getMinMeshSize() const noexcept;
+
+        /// \return The square root of the area or the cubic root of the mesh size of the element.
+        double getNaturalMeshSize(bool valueAtNodes = false);
+
+        
+        /// \return The type of element depending on the boundary node.
+        //ELEMENT_TYPE getType() const noexcept;
 
         /// \return Is the element near a boundary?
         bool isContact() const noexcept;
@@ -97,12 +123,18 @@ class MESH_API Element
 
     private:
         Mesh* m_pMesh;                                  /**< A pointer to the mesh from which the facet comes from. */
+        double m_largest_extension;                     /**< contains the highest separation between 2 nodes of the element*/
+        bool m_forcedRefinement;
 
+        std::size_t m_index;                            /** Index of the element in the element list of the mesh*/
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this element. */
+        std::vector<std::size_t> m_elemsIndexes;        /**< Indexes of the neighbors elements. */
+        //std::set<Facet*> m_facets;                      /**< set of pointer to the faces which have this element. */
 
         double m_detJ;                                  /**< Determinant of the Jacobian matrix of the element. */
         std::array<std::array<double, 3>, 3> m_J;       /**< Jacobian matrix of the element. */
         std::array<std::array<double, 3>, 3> m_invJ;    /**< Inverse Jacobian matrix of the element. */
+
 
         /// Compute the Jacobian matrix of the change of variable to the reference space.
         void computeJ();
@@ -114,6 +146,7 @@ class MESH_API Element
         void computeInvJ();
 
         friend class Mesh;
+        friend class Node;
 };
 
 #include "Element.inl"

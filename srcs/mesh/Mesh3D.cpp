@@ -204,6 +204,188 @@ void Mesh::triangulateAlphaShape3D()
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
 }
 
+void Mesh::regularTriangulateWeightedAlphaShape3D()
+{
+    if (m_nodesList.empty())
+        throw std::runtime_error("You should load the mesh from a file before trying to remesh !");
+
+    m_elementsList.clear();
+    m_facetsList.clear();
+
+    // We have to construct an intermediate representation for CGAL. We also reset
+    // nodes properties.
+    std::vector<std::pair<Point_3, std::size_t>> pointsList;
+    for (std::size_t i = 0; i < m_nodesList.size(); ++i)
+    {
+        pointsList.push_back(std::make_pair(Point_3(m_nodesList[i].m_position[0],
+            m_nodesList[i].m_position[1],
+            m_nodesList[i].m_position[2]), i));
+
+        m_nodesList[i].m_isOnFreeSurface = false;
+        m_nodesList[i].m_neighbourNodes.clear();
+        m_nodesList[i].m_elements.clear();
+        m_nodesList[i].m_facets.clear();
+    }
+
+    const Alpha_shape_3 as(pointsList.begin(), pointsList.end(), m_alpha * m_alpha * m_hchar * m_hchar);
+
+    auto checkCellDeletion = [&](Alpha_shape_3::Cell_handle cell) -> bool
+    {
+        std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
+            in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
+
+        Tetrahedron_3 tetrahedron(pointsList[in0].first, pointsList[in1].first,
+            pointsList[in2].first, pointsList[in3].first);
+
+        if (tetrahedron.volume() < 1e-4 * m_hchar * m_hchar * m_hchar)
+            return true;
+
+        if (m_nodesList[in0].isBound() && m_nodesList[in1].isBound() &&
+            m_nodesList[in2].isBound() && m_nodesList[in3].isBound())
+        {
+            for (unsigned int i = 0; i < 4; ++i)
+            {
+                std::set<Alpha_shape_3::Vertex_handle> neighbourVh;
+                as.adjacent_vertices(cell->vertex(i), std::inserter(neighbourVh, neighbourVh.begin()));
+
+                for (auto vh : neighbourVh)
+                {
+                    if (as.is_infinite(vh))
+                        continue;
+
+                    if (vh->info() == in0 || vh->info() == in1 || vh->info() == in2 || vh->info() == in3)
+                        continue;
+
+                    if (as.classify(vh) == Alpha_shape_3::REGULAR || as.classify(vh) == Alpha_shape_3::INTERIOR)
+                    {
+                        if (!m_nodesList[vh->info()].isBound())
+                            return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    };
+
+    // We check for each triangle which one will be kept (alpha shape), then we
+    // perform operations on the remaining elements
+    for (auto fit = as.finite_cells_begin(); fit != as.finite_cells_end(); ++fit)
+    {
+        // If true, the elements are fluid elements
+        if (as.classify(fit) == Alpha_shape_3::INTERIOR)
+        {
+            const Alpha_shape_3::Cell_handle cell{ fit };
+
+            std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
+                in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
+
+            if (checkCellDeletion(cell))
+                continue;
+
+            Element element(*this);
+            element.m_nodesIndexes = { in0, in1, in2, in3 };
+            element.computeJ();
+            element.computeDetJ();
+            element.computeInvJ();
+
+            //            std::cout << in0 << ", " << in1 << ", " << in2 << ", " << in3 << ": " << m_nodesList.size() -1 << std::endl;
+            //            std::cout << m_nodesList[in0].m_neighbourNodes.size() << ", " << m_nodesList[in0].m_neighbourNodes.capacity() << std::endl;
+                        // We compute the neighbour nodes of each nodes
+            m_nodesList[in0].m_neighbourNodes.push_back(in1);
+            m_nodesList[in0].m_neighbourNodes.push_back(in2);
+            m_nodesList[in0].m_neighbourNodes.push_back(in3);
+
+            m_nodesList[in1].m_neighbourNodes.push_back(in0);
+            m_nodesList[in1].m_neighbourNodes.push_back(in2);
+            m_nodesList[in1].m_neighbourNodes.push_back(in3);
+
+            m_nodesList[in2].m_neighbourNodes.push_back(in0);
+            m_nodesList[in2].m_neighbourNodes.push_back(in1);
+            m_nodesList[in2].m_neighbourNodes.push_back(in3);
+
+            m_nodesList[in3].m_neighbourNodes.push_back(in0);
+            m_nodesList[in3].m_neighbourNodes.push_back(in1);
+            m_nodesList[in3].m_neighbourNodes.push_back(in2);
+
+            m_elementsList.push_back(std::move(element));
+
+            for (std::size_t index : m_elementsList.back().m_nodesIndexes)
+                m_nodesList[index].m_elements.push_back(m_elementsList.size() - 1);
+        }
+    }
+
+#pragma omp parallel for default(shared)
+    for (std::size_t n = 0; n < m_nodesList.size(); ++n)
+    {
+        std::sort(m_nodesList[n].m_neighbourNodes.begin(), m_nodesList[n].m_neighbourNodes.end());
+        m_nodesList[n].m_neighbourNodes.erase(
+            std::unique(m_nodesList[n].m_neighbourNodes.begin(), m_nodesList[n].m_neighbourNodes.end()),
+            m_nodesList[n].m_neighbourNodes.end());
+    }
+
+    for (auto it = as.finite_facets_begin(); it != as.finite_facets_end(); ++it)
+    {
+        // We compute the free surface nodes
+        Alpha_shape_3::Facet facetAS{ *it };
+        if (as.classify(facetAS) == Alpha_shape_3::REGULAR)
+        {
+            Alpha_shape_3::Vertex_handle outVertex = facetAS.first->vertex((facetAS.second) % 4);
+            if (as.is_infinite(outVertex))
+                facetAS = as.mirror_facet(facetAS);
+
+            Alpha_shape_3::Cell_handle cell = facetAS.first;
+
+            if (as.classify(cell) == Alpha_shape_3::EXTERIOR)
+            {
+                facetAS = as.mirror_facet(facetAS);
+                cell = facetAS.first;
+            }
+
+            if (checkCellDeletion(cell))
+                continue;
+
+            Facet facet(*this);
+            facet.m_nodesIndexes = { facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 0))->info(),
+                                    facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 1))->info(),
+                                    facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 2))->info() };
+            facet.m_outNodeIndex = facetAS.first->vertex(facetAS.second)->info();
+            facet.computeJ();
+            facet.computeDetJ();
+            facet.computeInvJ();
+
+            if (facet.m_outNodeIndex == facet.m_nodesIndexes[0] ||
+                facet.m_outNodeIndex == facet.m_nodesIndexes[1] ||
+                facet.m_outNodeIndex == facet.m_nodesIndexes[2])
+            {
+                std::cerr << "A face with an outIndex equal to one of the face node index has been encountered" << std::endl;
+                continue;
+            }
+
+            if (!(m_nodesList[facet.m_nodesIndexes[0]].isBound() &&
+                m_nodesList[facet.m_nodesIndexes[1]].isBound() &&
+                m_nodesList[facet.m_nodesIndexes[2]].isBound()))
+            {
+                m_nodesList[facet.m_nodesIndexes[0]].m_isOnFreeSurface = true;
+                m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
+                m_nodesList[facet.m_nodesIndexes[2]].m_isOnFreeSurface = true;
+            }
+
+            m_facetsList.push_back(std::move(facet));
+
+            for (std::size_t index : m_facetsList.back().m_nodesIndexes)
+                m_nodesList[index].m_facets.push_back(m_facetsList.size() - 1);
+        }
+    }
+
+    computeFSNormalCurvature3D();
+
+    if (m_elementsList.empty())
+        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
+}
+
 void Mesh::computeFSNormalCurvature3D()
 {
     if(!m_computeNormalCurvature)

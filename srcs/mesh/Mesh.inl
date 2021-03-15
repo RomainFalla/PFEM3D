@@ -49,6 +49,11 @@ inline std::size_t Mesh::getNodesCount() const noexcept
     return m_nodesList.size();
 }
 
+inline bool Mesh::useMeshRefinement() const noexcept
+{
+    return m_useMeshRefinement;
+}
+
 std::array<double, 3> Mesh::getBoundNodeInitPos(std::size_t nodeIndex) const
 {
     auto it = m_boundaryInitialPos.find(nodeIndex);

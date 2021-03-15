@@ -43,6 +43,12 @@ class MESH_API Node
         /// \return The states of the node.
         inline std::vector<double> getStates() const noexcept;
 
+        /// \return The Local mesh size at the node.
+        inline double getLocalMeshSize() const noexcept;
+
+        /// \set The Local mesh size = tmsize, at the node.
+        inline void setLocalMeshSize(double tmsize);
+
         /// \return The user-defined flag of the node.
         inline bool getFlag(unsigned short flag) const noexcept;
 
@@ -69,11 +75,25 @@ class MESH_API Node
         /// \return Is the node position fixed ?
         inline bool isFixed() const noexcept;
 
+        /// \return Is the node on any type of boundary ?
+        inline bool isOnBoundary() const noexcept;
+
         /// \return Is the node free of elements ?
         inline bool isFree() const noexcept;
 
         /// \return Is the node on the free surface ?
         inline bool isOnFreeSurface() const noexcept;
+
+        /// \return the natural mesh size at the node
+        inline double getNaturalMeshSize() const noexcept;
+
+        /// \update the natural mesh size at the node
+        void updateNaturalMeshSize();
+
+
+
+        /// \return the point weight used for the weighted triangulation and alpha shape
+        double getWeight(double alphaRatio,double minTargetMeshSize);
 
         friend inline bool operator==(const Node& a, const Node& b) noexcept;
 
@@ -94,11 +114,16 @@ class MESH_API Node
         bool m_isBound = false;                     /**< Is the node a wall node. */
         bool m_isOnFreeSurface = false;             /**< Is the node on the free surface. */
         bool m_isFixed = false;                     /**< Is the node fixed (has a speed but does not move) ? */
+        bool m_isOnBoundary = false;                /**< Is the node of any boundary type. */
+
+        double m_target_mesh_size = 0.;
+        double m_natural_mesh_size = 0.;
 
         int m_tag = -1;                             /**< Identify to which Physical group this node belongs to.*/
         std::bitset<8> m_userDefFlags;              /**< User define flags (can be used to tag nodes based on BC to apply).*/
 
         friend class Mesh;
+        friend class Element;
 };
 
 #include "Node.inl"

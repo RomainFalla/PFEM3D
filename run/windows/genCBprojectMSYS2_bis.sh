@@ -1,13 +1,3 @@
-#!/bin/sh
-#Launch this in MinGW64 shell from MSYS2
-
-pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-eigen3 mingw-w64-x86_64-nlohmann-json mingw-w64-x86_64-cgal mingw-w64-x86_64-sol2
-
-buildType="Release"
-if [ ! -z "$2" ]; then
-	buildType="$2"
-fi
-
 cd ../../
 if [ ! -d "dependencies" ]; then
     mkdir dependencies

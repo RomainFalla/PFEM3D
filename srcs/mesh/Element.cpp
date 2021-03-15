@@ -4,12 +4,14 @@
 #include <Eigen/Dense>
 
 #include "Node.hpp"
+#include "Facet.hpp"
 #include "Mesh.hpp"
 
 Element::Element(Mesh& mesh):
 m_pMesh(&mesh)
 {
-
+    m_forcedRefinement = false;
+    m_largest_extension = 0;
 }
 
 void Element::computeJ()
@@ -134,6 +136,81 @@ void Element::computeInvJ()
     }
 }
 
+double Element::getLocalMeshSize() const noexcept
+{
+    if (m_nodesIndexes.size() == 3)
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+        const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+
+        return (1. / 3.) * (n0.getLocalMeshSize() + n1.getLocalMeshSize() + n2.getLocalMeshSize());
+    }
+    else
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+        const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+        const Node& n3 = m_pMesh->getNode(m_nodesIndexes[3]);
+
+        return (1. / 4.) * (n0.getLocalMeshSize() + n1.getLocalMeshSize() + n2.getLocalMeshSize() + n3.getLocalMeshSize());
+    }
+    return 0;
+}
+
+double Element::getMinMeshSize() const noexcept
+{
+    double result = std::numeric_limits<double>::infinity();
+    std::size_t L = m_nodesIndexes.size();
+    for (std::size_t i = 0; i < L; i++)
+    {
+        Node n = m_pMesh->getNode(m_nodesIndexes[i]);
+        double temp = n.getLocalMeshSize();
+        if (temp < result) result = temp;
+    }
+    return result;
+}
+
+/*ELEMENT_TYPE Element::getType() const noexcept
+{
+    int counter = 0;
+    if (m_nodesIndexes.size() == 3)
+    {
+        for (int k = 0; k < 3; k++)
+        {
+            if (m_pMesh->getNode(m_nodesIndexes[k]).isOnBoundary()) counter++;
+        }
+
+        if (counter < 2)
+            return IN_BULK;
+        else 
+        {
+            if (counter == 2)
+                return INSIDE_BOUNDARY;
+            else //counter==3
+                return OUTSIDE_BOUNDARY;
+        }
+    }
+    else
+    {
+        for (int k = 0; k < 3; k++)
+        {
+            if (m_pMesh->getNode(m_nodesIndexes[k]).isOnBoundary()) counter++;
+        }
+
+        if (counter < 3)
+            return IN_BULK;
+        else
+        {
+            if (counter == 3)
+                return INSIDE_BOUNDARY;
+            else //counter==4
+                return OUTSIDE_BOUNDARY;;
+        }
+    }
+    return IN_BULK; // default value to avoid the compilator complaining
+}*/
+
 const Node& Element::getNode(unsigned int nodeIndex) const noexcept
 {
     return m_pMesh->getNode(m_nodesIndexes[nodeIndex]);
@@ -153,7 +230,37 @@ std::array<double, 3> Element::getPosFromGP(const std::array<double, 3>& gp) con
 
 double Element::getSize() const noexcept
 {
-    return m_detJ*m_pMesh->getRefElementSize(m_pMesh->getDim());
+    return abs(m_detJ*m_pMesh->getRefElementSize(m_pMesh->getDim()));
+}
+
+double Element::getNaturalMeshSize(bool valueAtNodes)
+{
+    if (!valueAtNodes) 
+    {
+        double fraction = 1. / double(m_pMesh->getDim());
+        return std::pow(getSize(), fraction);
+    }
+    else
+    {
+        if (m_nodesIndexes.size() == 3)
+        {
+            const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+            const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+            const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+
+            return (1. / 3.) * (n0.getNaturalMeshSize() + n1.getNaturalMeshSize() + n2.getNaturalMeshSize());
+        }
+        else
+        {
+            const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+            const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+            const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+            const Node& n3 = m_pMesh->getNode(m_nodesIndexes[3]);
+
+            return (1. / 4.) * (n0.getNaturalMeshSize() + n1.getNaturalMeshSize() + n2.getNaturalMeshSize() + n3.getNaturalMeshSize());
+        }
+        return 0;
+    }
 }
 
 double Element::getRin() const noexcept
@@ -276,5 +383,43 @@ bool Element::isContact() const noexcept
     }
 
     return false;
+}
+
+//could use a default value, but use another constructor avoid to check  the if condition each time an element is constructed
+void Element::updateLargestExtension()
+{
+    m_largest_extension = 0.;
+    double dist = 0.;
+    std::size_t L = m_nodesIndexes.size();
+    for (std::size_t i = 0; i < L; i++)
+    {
+        Node n1 = m_pMesh->getNode(m_nodesIndexes[i]);
+        for (std::size_t j = 0; j < L; j++)
+        {
+            Node n2 = m_pMesh->getNode(m_nodesIndexes[j]);
+            dist = Node::distance(n1, n2);
+            if (dist > m_largest_extension)
+                m_largest_extension = dist;
+        }
+    }
+}
+
+/// \make the connection between the nodes of the elements
+void Element::build(std::vector<std::size_t> nodeIndices, std::vector<Node> &nodesList)
+{
+    computeJ();
+    computeDetJ();
+    computeInvJ();
+
+    std::size_t L = nodeIndices.size();
+    for (std::size_t  i = 0; i < L; i++)
+    {
+        for (std::size_t  j = 0; j < L; j++)
+        {
+            if (j == i) continue;
+
+            nodesList[nodeIndices[i]].m_neighbourNodes.push_back(nodeIndices[j]);
+        }
+    }
 }
 

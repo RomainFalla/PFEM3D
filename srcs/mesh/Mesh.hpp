@@ -15,17 +15,35 @@
  * \struct MeshCreateInfo
  * \brief Structure containing the required parameters to initialize a Mesh class
  */
+struct RefinementInfo
+{
+    double alphaRatio = 1.8; /**< The required \f$ \alpha \f$  ratio value for the weighted \f$ \alpha \f$-shape algorithm*/
+    double gamma2 = 0.7; /**< A node should be deleted if ...*/
+    double minTargetMeshSize = 0.; /**< The minimal target mesh sizeinside the mesh*/
+    double maxTargetMeshSize = 0.; /**< The maximal target mesh sizeinside the mesh*/
+    double maxProgressionFactor = 1.25; /**< Maximal progression of the target mesh size from node to node*/
+};
+
 struct MeshCreateInfo
 {
     double hchar = 0; /**< The characteristic element size of the mesh*/
     double alpha = 1; /**< The required \f$ \alpha \f$ value for the \f$ \alpha \f$-shape algorithm*/
     double gamma = 0; /**< A node should be deleted if \f$ d(n_1, n_2) < \gamma h_{char} \f$ */
     double omega = 1e16; /**< A node should be added in the center of an element if \f$ A_{elm} > \omega h_{char}^{dim} \f$ */
+    bool useMeshRefinement = false; /**< Define wether we use mesh refinement or not*/
+    RefinementInfo refInfo = {};
+
     std::vector<double> boundingBox = {}; /**< Nodes and elements outised bounding box are deleted. Format:
                                                \f$ [x_{min}, y_{min}, (z_{min}, )x_{max}, y_{max}, (z_{max}) ] \f$ */
     std::string mshFile = {}; /**< The path to the .msh file to load */
 };
 
+enum ELEMENT_TYPE
+{
+    IN_BULK = 0,
+    INSIDE_BOUNDARY = 1,
+    OUTSIDE_BOUNDARY = 2,
+};
 /**
  * \class Mesh
  * \brief Represents a Lagrangian mesh.
@@ -44,6 +62,7 @@ class MESH_API Mesh
         Mesh()                              = delete;
         /// \param meshInfos a reference to a MeshCreateInfo structure
         Mesh(const MeshCreateInfo& meshInfos);
+        //Mesh(const MeshCreateInfo& meshInfos, const RefinementInfo& refInfos);
         Mesh(const Mesh& mesh)              = delete;
         Mesh& operator=(const Mesh& mesh)   = delete;
         Mesh(Mesh&& mesh)                   = delete;
@@ -82,6 +101,9 @@ class MESH_API Mesh
         /// \return The curvature of the boundary at the node.
         inline double getFreeSurfaceCurvature(std::size_t nodeIndex) const;
 
+        /// \return true in the case we use mesh refinement
+        inline bool useMeshRefinement() const noexcept;
+
         /// \param nodeIndex The index of the boudary or free surface node in the nodes list.
         /// \return The exterior normal of the boundary at the node.
         inline std::array<double, 3> getBoundFSNormal(std::size_t nodeIndex) const;
@@ -119,6 +141,15 @@ class MESH_API Mesh
         /// \param dimension The dimension of the reference element on which you want the weights.
         /// \return The size of the element in the reference coordinate system.
         double getRefElementSize(unsigned int dimension) const;
+
+        /// \update the maximal and minimal target mesh size
+        void updateBoundingElementSize();
+
+        /// \update the target target mesh size at each node
+        void updateLocalElementSize();
+
+        ///  \make the ling between the facets and the elements
+        void linkElementsAndFacets();
 
         /**
          * \param dimension The dimension of the reference element on which you want the shape functions.
@@ -198,9 +229,16 @@ class MESH_API Mesh
         double m_alpha; /**< Alpha parameter of the alpha-shape algorithm (triangles are discared if  r_circumcircle > alpha*hchar). */
         double m_omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
         double m_gamma; /**< Control the deletetion of node if two are too close to each other (a node is deleted if d_nodes < gamma*hchar). */
+        bool m_useMeshRefinement; /**< Define wether we use mesh refinement or not*/
         std::vector<double> m_boundingBox; /**< Box delimiting the zone of nodes existence (format: [xmin, ymin, xmax, ymax]). */
 
         bool m_computeNormalCurvature;      /**< Control if mesh update should compute normals and curvatures of free surface. */
+
+        double m_alphaRatio; /**< The required \f$ \alpha \f$  ratio value for the weighted \f$ \alpha \f$-shape algorithm*/
+        double m_gamma2; /**< A node should be deleted if ...*/
+        double m_minTargetMeshSize; /**< The minimal target mesh size inside the mesh*/
+        double m_maxTargetMeshSize; /**< The maximal target mesh size inside the mesh*/
+        double m_maxProgressionFactor;/**< Maximal progression of the target mesh size from node to node*/
 
         unsigned short m_dim;               /**< The mesh dimension. */
 
@@ -218,7 +256,20 @@ class MESH_API Mesh
          * \brief Add nodes in element whose area is too big (A_tringle > omega*hchar^2.
          * \return true if at least one node was added, false otherwise).
          */
-        bool addNodes(bool verboseOutput);
+        bool addNodes(bool verboseOutput, bool &needToRefineMore);
+
+        /// \return The node that split The 2 elements of the facet in 2 (3) parts in 2D (3D). 
+        //void splitElements(Facet* f, std::vector<Element*>& childElements);
+
+        /// \return The index of the node of *element that is opposite to *face;
+        std::size_t getOutNodeIndex(Facet* face, Element* element);
+
+        
+        /// \find a pointer to the largest facet of one element and put it in face
+        // getLargestFacet(Element* element, Facet*& face);
+
+        /// \return The node that split The element in 2 (3) parts in 2D (3D) at the level of the face opposite to the node labelled by "oppositeNodeIndex" 
+        Node splitBoundaryElement(Element* elm, std::size_t oppositeNodeIndex);
 
         /**
          * \brief Check if a node is outside the bounding box and deletes it if so.
@@ -252,6 +303,16 @@ class MESH_API Mesh
 
         /// \brief Remesh the nodes in nodesList using CGAL (Delaunay triangulation and alpha-shape) (3D).
         void triangulateAlphaShape3D();
+
+        /// \brief Remesh the nodes in nodesList using CGAL (Weighted Delaunay triangulation and weighted alpha-shape) (2D).
+        void TriangulateWeightedAlphaShape2D();
+
+        /// \brief Remesh the nodes in nodesList using CGAL (Weighted Delaunay triangulation and weighted alpha-shape) (3D).
+        void regularTriangulateWeightedAlphaShape3D();
+
+        double getCircumScribedRadius(std::vector<size_t> nods);
+
+        ELEMENT_TYPE getElementType(std::vector<std::size_t> nodesIndexes);
 
         /**
          * \brief Removes nodes if they are too close from each other
