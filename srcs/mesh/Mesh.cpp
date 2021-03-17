@@ -639,7 +639,7 @@ void Mesh::updateBoundingElementSize()
     for (auto it = m_elementsList.begin(); it != m_elementsList.end(); ++it) 
     {
         Element el = *it;
-        double L = el.getNaturalMeshSize();
+        double L = el.getNaturalMeshSize(false);
         if (L > maxValue) maxValue = L;
         if (L < minValue) minValue = L;
     }
@@ -753,6 +753,8 @@ void Mesh::loadFromFile(const std::string& fileName)
 {
     m_nodesList.clear();
 
+    std::map<std::size_t, std::size_t> nodeIndexMap;
+
     gmsh::initialize();
 #ifndef NDEBUG
     gmsh::option::setNumber("General.Terminal", 1);
@@ -822,6 +824,7 @@ void Mesh::loadFromFile(const std::string& fileName)
                     node.m_tag = static_cast<int>(std::distance(m_tagNames.begin(), posBCinTagNames));
                 }
             }
+            nodeIndexMap[dummyNodesTagsBoundary[i]] = m_nodesList.size();
             m_nodesList.push_back(std::move(node));
             m_boundaryInitialPos[m_nodesList.size() - 1] = m_nodesList.back().m_position;
         }
@@ -861,6 +864,7 @@ void Mesh::loadFromFile(const std::string& fileName)
                 node.m_tag = static_cast<uint16_t>(std::distance(m_tagNames.begin(), posBCinTagNames));
             }
 
+            nodeIndexMap[dummyNodesTags[i]] = m_nodesList.size();
             m_nodesList.push_back(std::move(node));
         }
     }
@@ -926,10 +930,10 @@ void Mesh::loadFromFile(const std::string& fileName)
         for (int i = 0; i < L; ++i)
         {
             Element element(*this);
-            std::vector<std::size_t> elementNodes = { triangles[3 * i],triangles[3 * i + 1],triangles[3 * i + 2] };
+            std::vector<std::size_t> elementNodes = { nodeIndexMap[triangles[3 * i]], nodeIndexMap[triangles[3 * i + 1]], nodeIndexMap[triangles[3 * i + 2]]};
             element.m_nodesIndexes = elementNodes;
-            element.build(elementNodes, m_nodesList);
             element.m_index = m_elementsList.size();
+            element.build(elementNodes, m_nodesList);
             //std::cout << element.getSize() << "\n";
             m_elementsList.push_back(element);
         }
@@ -949,7 +953,7 @@ void Mesh::loadFromFile(const std::string& fileName)
         for (int i = 0; i < L; ++i)
         {
             Element element(*this);
-            std::vector<std::size_t> elementNodes = { tetrahedrons[3 * i],tetrahedrons[3 * i + 1], tetrahedrons[3 * i + 2], tetrahedrons[3 * i + 3] };
+            std::vector<std::size_t> elementNodes = { nodeIndexMap[tetrahedrons[3 * i]],nodeIndexMap[tetrahedrons[3 * i + 1]], nodeIndexMap[tetrahedrons[3 * i + 2]], nodeIndexMap[tetrahedrons[3 * i + 3]]};
             element.m_nodesIndexes = elementNodes;
             element.build(elementNodes, m_nodesList);
             element.m_index = m_elementsList.size();
@@ -962,21 +966,27 @@ void Mesh::loadFromFile(const std::string& fileName)
 
     gmsh::finalize();
 
+    //double meanElementSize = 0.;
+
     if (m_useMeshRefinement)
     {
         std::cout << "updateLocalMeshSize!\n";
         for (auto it = m_elementsList.begin(); it != m_elementsList.end(); ++it)
         {
             Element el = *it;
+            //meanElementSize += el.getSize();
             std::size_t elem_index = el.m_index;
-            for (auto it2 = el.m_nodesIndexes.begin(); it2 != el.m_nodesIndexes.end(); ++it2)
+            std::size_t L = el.m_nodesIndexes.size();
+            for (std::size_t k = 0; k < L; k++)
             {
-                std::size_t node_index = *it2;
+                std::size_t node_index = el.m_nodesIndexes[k];
                 m_nodesList[node_index].m_elements.push_back(elem_index);
             }
         }
         updateBoundingElementSize();
         updateLocalElementSize();
+        //meanElementSize /= m_elementsList.size();
+        //std::cout << "meanElementSize = " << meanElementSize << "\n";
     }
     triangulateAlphaShape();
 }

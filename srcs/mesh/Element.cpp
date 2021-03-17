@@ -238,7 +238,8 @@ double Element::getNaturalMeshSize(bool valueAtNodes)
     if (!valueAtNodes) 
     {
         double fraction = 1. / double(m_pMesh->getDim());
-        return std::pow(getSize(), fraction);
+        double result = std::pow(getSize(), fraction);
+        return result;
     }
     else
     {

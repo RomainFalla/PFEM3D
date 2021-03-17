@@ -57,11 +57,24 @@ void Node::updateNaturalMeshSize()
     for (int i=0;i < nb_adjacent_elements;++i)
     {
         Element el = getElement(i);
-        element_size_sum += el.getNaturalMeshSize();
+        element_size_sum += el.getNaturalMeshSize(false);
+        /*if (m_isOnBoundary && nb_adjacent_elements == 4)
+        {
+            std::cout << "el.getNaturalMeshSize() = " << el.getNaturalMeshSize(false) << "\n";
+        }*/
     }
+    /*if (m_isOnBoundary && nb_adjacent_elements == 4)
+    {
+        std::cout << "element_size_sum = " << element_size_sum << "\n";
+        std::cout << "nb_adjacent_elements =" << nb_adjacent_elements << "\n";
+    }*/
     //std::coutelement_size_sum
     if (nb_adjacent_elements != 0)
+    {
         m_natural_mesh_size = element_size_sum / nb_adjacent_elements;
+        /*if (m_isOnBoundary && nb_adjacent_elements == 4)
+            std::cout << "m_natural_mesh_size = " << m_natural_mesh_size << "\n";*/
+    }
     else
         m_natural_mesh_size = 0.;
 }

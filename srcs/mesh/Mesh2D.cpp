@@ -22,6 +22,7 @@ typedef CGAL::Alpha_shape_2<asTriangulation_2>                              Alph
 typedef Kernel::Point_2                                                     Point_2;
 typedef Kernel::Triangle_2                                                  Triangle_2;
 
+// structure to keep track of the link between elements and nodes and transpose this part of cgal data structure into the code data structure.
 struct FaceInfo2
 {
     FaceInfo2() { isExt = true;  }
@@ -203,7 +204,7 @@ void Mesh::triangulateAlphaShape2D()
         }
     }
 
-    //computeFSNormalCurvature();
+    computeFSNormalCurvature();
 
     if(m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
@@ -213,10 +214,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 {
     if (m_nodesList.empty())
         throw std::runtime_error("You should load the mesh from a file before trying to remesh !");
-
-    std::cout << "We are in regular triangulation!" << "\n";
-    std::cout << "alphaRatio= " << m_alphaRatio << "\n";
-    std::cout << "minTargetMeshSize= " << m_minTargetMeshSize << "\n";
 
     /*for (auto it = m_elementsList.begin(); it != m_elementsList.end(); ++it) 
     {
@@ -228,6 +225,7 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             std::cout << "w1 = " << m_nodesList[*it2].getWeight(m_alphaRatio, m_minTargetMeshSize) << "\n";
         }
     }*/
+    std::cout << "m_elementsList size = " << m_elementsList.size() << "\n";
 
     m_elementsList.clear();
     m_facetsList.clear();
@@ -245,7 +243,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
         PointsList.push_back(std::make_pair(P, i));
 
-        m_nodesList[i].m_isOnFreeSurface = false;
         m_nodesList[i].m_neighbourNodes.clear();
         m_nodesList[i].m_elements.clear();
         m_nodesList[i].m_facets.clear();
@@ -298,8 +295,18 @@ void Mesh::TriangulateWeightedAlphaShape2D()
     std::size_t index = 0;
     std::vector<Triangulation_2::Face_handle> elementCopies;
     std::vector<Triangulation_2::Face_handle> elToPotentiallyRemove;
+
+    /*int count_total = 0;
+    int count_bulk = 0;
+    int count_inboundary = 0;
+    int count_outboundary = 0;
+    int count_outalpha = 0;
+    int count_notSmooth = 0;*/
+
+    double meanElementSize = 0.;
     for (auto fit = T.finite_faces_begin(); fit != T.finite_faces_end(); ++fit)
     {
+        //count_total++;
         index = m_elementsList.size();
         Triangulation_2::Face_handle face{ fit };
 
@@ -314,18 +321,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
         element.m_nodesIndexes = { in0, in1, in2 };
 
         std::size_t nbNodes = m_nodesList.size();
-        if (in0 >= nbNodes || in0 <0 )
-        {
-            std::cout << "in0 = " << in0 << " > nb Nodes = " << nbNodes << "\n";
-        }
-        if (in1 >= nbNodes || in1 < 0)
-        {
-            std::cout << "in0 = " << in0 << " > nb Nodes = " << nbNodes << "\n";
-        }
-        if (in2 >= nbNodes || in2 < 0)
-        {
-            std::cout << "in0 = " << in0 << " > nb Nodes = " << nbNodes << "\n";
-        }
 
         element.build(nodeIndexes, m_nodesList);
         element.updateLargestExtension();
@@ -335,6 +330,8 @@ void Mesh::TriangulateWeightedAlphaShape2D()
         double realMeshSize = element.getNaturalMeshSize(false);
         double naturalMeshSize = element.getNaturalMeshSize(true);
         double localMeshSize = element.getLocalMeshSize();
+
+        //meanElementSize += element.getSize();
 
         bool keepElement = false;
 
@@ -348,9 +345,11 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             if (elmType == IN_BULK)
             {
                 keepElement = true;
+                //count_bulk++;
             }
             else if (elmType == INSIDE_BOUNDARY)
             {
+                //count_inboundary++;
                 if (r > m_alphaRatio * localMeshSize)
                 {
                     if (element.getSize() > limitVal)
@@ -366,10 +365,20 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             }
             else if (elmType == OUTSIDE_BOUNDARY && r < m_alphaRatio * localMeshSize && realMeshSize < 1.4 * minMeshSize)
             {
+                //count_outboundary++;
                 keepElement = true;
             }
+            /*else 
+            {
+                count_outalpha++;
+                count_outboundary++;
+            }*/
             
         }
+        /*else 
+        {
+            count_notSmooth++;
+        }*/
         if (keepElement)
         {
             face->info().isExt = false;
@@ -385,6 +394,8 @@ void Mesh::TriangulateWeightedAlphaShape2D()
                 m_nodesList[i].m_elements.push_back(m_elementsList.size() - 1);     
         }
     }
+    //meanElementSize /= m_elementsList.size();
+    //std::cout << "meanElementSize = " << meanElementSize << "\n";
     
     std::size_t NbKeptElements = elementCopies.size();
     for (std::size_t i = 0; i < NbKeptElements; i++) 
@@ -394,6 +405,15 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
 
     elementCopies.clear();
+
+    //I leave it here for debugging purpose
+    /*std::cout << " count_total = " << count_total << "\n";
+    std::cout << " count_notSmooth = " << count_notSmooth << "\n";
+    std::cout << " count_bulk  = " << count_bulk << "\n";
+    std::cout << " count_inboundary = " << count_inboundary << "\n";
+    std::cout << " count_outboundary  = " << count_outboundary << "\n";
+    std::cout << " count_outalpha = " << count_outalpha << "\n";*/
+ 
    
     /**/
 #pragma omp parallel for default(shared)
@@ -416,15 +436,21 @@ void Mesh::TriangulateWeightedAlphaShape2D()
         }
     }*/
 
-    std::cout << "Finish!!!\n";
+    for (std::size_t i = 0; i < m_nodesList.size(); ++i)
+    {
+        m_nodesList[i].m_isOnFreeSurface = false;
+        m_nodesList[i].m_isOnBoundary = false;
+    }
     
-    int count1 = 0;
+    /*int count1 = 0;
     int count2 = 0;
     int count3 = 0;
     int count4 = 0;
+    int count5 = 0;*/
+
     for (auto it = T.finite_edges_begin(); it != T.finite_edges_end(); ++it)
     {
-        count1++;
+        //count1++;
         // We compute the free surface nodes
         Triangulation_2::Edge edge1{ *it };
         Triangulation_2::Edge edge2=T.mirror_edge(edge1);
@@ -436,29 +462,25 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
         if (!face1->info().isExt && !face2->info().isExt) // not OnBoundary
         {
-            count2++;
+            //count2++;
             continue;
         }
 
         if (face1->info().isExt && face2->info().isExt) // not on boundary + this condition --> not Regular
         {
-            count3++;
+            //count3++;
             continue;
         }
 
-        count4++;
+        //count4++;
        
         if (face1->info().isExt)
-            edgeToBuildFacet = edge1;
-        else 
             edgeToBuildFacet = edge2;
+        else 
+            edgeToBuildFacet = edge1;
 
         Triangulation_2::Vertex_handle outVertex = edgeToBuildFacet.first->vertex((edgeToBuildFacet.second) % 3);
 
-        if (T.is_infinite(outVertex)) {
-            edgeToBuildFacet = T.mirror_edge(edgeToBuildFacet);
-            //std::cout << "foundInfiniteVertex\n";
-        }
         /*Weighted_Alpha_shape_2::Face_handle face = edgeAS.first;
         std::cout << "face number =" << elementsMap[face] << "\n";
 
@@ -483,6 +505,9 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
         }
 
+        m_nodesList[facet.m_nodesIndexes[0]].m_isOnBoundary = true;
+        m_nodesList[facet.m_nodesIndexes[1]].m_isOnBoundary = true;
+
         facet.computeJ();
         facet.computeDetJ();
         facet.computeInvJ();
@@ -493,17 +518,16 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             m_nodesList[i].m_facets.push_back(m_facetsList.size() - 1);
 
     }
-    std::cout << "count 1 =" << count1 << "\n";
+    /*std::cout << "count 1 =" << count1 << "\n";
     std::cout << "count 2 =" << count2 << "\n";
     std::cout << "count 3 =" << count3 << "\n";
     std::cout << "count 4 =" << count4 << "\n";
+    std::cout << "count 5 =" << count5 << "\n";*/
     
-    //computeFSNormalCurvature();
+    computeFSNormalCurvature();
 
     if (m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
-
-    std::cout << "Finish2!!!\n";
         
 }
 
