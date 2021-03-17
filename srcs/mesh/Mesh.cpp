@@ -62,6 +62,44 @@ bool Mesh::addNodes(bool verboseOutput,bool &needToRefineMore)
             }
         }
 
+        if (m_elementsList[elm].m_forcedRefinement) 
+        {
+            Node newNode(*this);
+
+            /*for (auto it = m_elementsList[elm].m_facets.begin(); it != m_elementsList[elm].m_facets.end(); ++it)
+            {
+                Facet* facet = *it;
+                facet->m_elements.erase(&(m_elementsList[elm]));
+            }*/
+
+            for (unsigned short k = 0; k < m_dim; ++k)
+            {
+                newNode.m_position[k] = 0;
+                for (unsigned short d = 0; d <= m_dim; ++d)
+                {
+                    assert(m_elementsList[elm].m_nodesIndexes[d] < m_nodesList.size());
+                    if (m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].isOnBoundary())
+                        newNode.m_position[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_position[k];
+                }
+                newNode.m_position[k] /= m_dim;
+            }
+
+            newNode.m_states.resize(m_nodesList[0].m_states.size());
+            for (unsigned short k = 0; k < m_nodesList[0].m_states.size(); ++k)
+            {
+                newNode.m_states[k] = 0;
+                for (unsigned short d = 0; d <= m_dim; ++d)
+                {
+                    if (m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].isOnBoundary())
+                        newNode.m_states[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_states[k];
+                }
+                newNode.m_states[k] /= (m_dim + 1);
+            }
+            newNode.m_isOnBoundary = true;
+            newNode.m_isOnFreeSurface= true;
+            m_nodesList.push_back(std::move(newNode));
+        }
+
         //If an element is too big, we add a node at his center
         if (/**!needToRefineMore &&*/ m_elementsList[elm].getSize() > limitSize)
         {

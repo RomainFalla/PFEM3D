@@ -225,7 +225,7 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             std::cout << "w1 = " << m_nodesList[*it2].getWeight(m_alphaRatio, m_minTargetMeshSize) << "\n";
         }
     }*/
-    std::cout << "m_elementsList size = " << m_elementsList.size() << "\n";
+    //std::cout << "m_elementsList size = " << m_elementsList.size() << "\n";
 
     m_elementsList.clear();
     m_facetsList.clear();
@@ -438,8 +438,16 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
     for (std::size_t i = 0; i < m_nodesList.size(); ++i)
     {
-        m_nodesList[i].m_isOnFreeSurface = false;
-        m_nodesList[i].m_isOnBoundary = false;
+        if (m_nodesList[i].m_elements.size() != 0)
+        {
+            m_nodesList[i].m_isOnFreeSurface = false;
+            m_nodesList[i].m_isOnBoundary = false;
+        }
+        else
+        {   //flying nodes
+            m_nodesList[i].m_isOnFreeSurface = true;
+            m_nodesList[i].m_isOnBoundary = true;
+        }
     }
     
     /*int count1 = 0;
