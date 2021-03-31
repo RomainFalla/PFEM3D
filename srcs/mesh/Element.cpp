@@ -404,6 +404,74 @@ void Element::updateLargestExtension()
         }
     }
 }
+void Element::updateCircumscribedRadius()
+{
+    if (m_nodesIndexes.size() == 3) 
+    {
+        Eigen::MatrixXd A(3, 3);
+        Eigen::MatrixXd Bx(3,3);
+        Eigen::MatrixXd By(3,3);
+        Eigen::MatrixXd C(3, 3);
+
+        for (std::size_t i = 0; i < 3; i++) 
+        {
+            Node n = m_pMesh->getNode(m_nodesIndexes[i]);
+
+            double x = n.getCoordinate(0);
+            double y = n.getCoordinate(1);
+            double R2 = std::pow(x, 2.) + std::pow(y, 2.);
+
+            A(i, 0) = x; A(i, 1) = y; A(i, 2) = 1;
+
+            Bx(i, 0) = R2;  Bx(i, 1) = y; Bx(i, 2) = 1.;
+            By(i, 0) = R2; By(i, 1) = x; By(i, 2) = 1.;
+
+            C(i, 0) = R2; C(i, 1) = x;  C(i, 2) = y;
+        }
+        double a = A.determinant();
+        double bx = -Bx.determinant();
+        double by = By.determinant();
+        double c = -C.determinant();
+
+        m_r = std::sqrt(std::pow(bx, 2) + std::pow(by, 2) - 4 * a * c) / (2. * fabs(a));
+    }
+    else //m_nodesIndexes.size() == 4
+    {
+        Eigen::MatrixXd A(4, 4);
+        Eigen::MatrixXd Dx(4, 4);
+        Eigen::MatrixXd Dy(4, 4);
+        Eigen::MatrixXd Dz(4, 4);
+        Eigen::MatrixXd C(4, 4);
+
+        for (std::size_t i = 0; i < 4; i++)
+        {
+            Node n = m_pMesh->getNode(m_nodesIndexes[i]);
+
+            double x = n.getCoordinate(0);
+            double y = n.getCoordinate(1);
+            double z = n.getCoordinate(2);
+
+            double R2 = std::pow(x, 2.) + std::pow(y, 2.) + std::pow(z, 2.);
+
+            A(i, 0) = x; A(i, 1) = y; A(i, 2) = z; A(i, 3) = 1;
+
+            Dx(i, 0) = R2;  Dx(i, 1) = y; Dx(i, 2) = z; Dx(i, 3) = 1.;
+            Dy(i, 0) = R2; Dy(i, 1) = x; Dy(i, 2) = z; Dy(i, 3) = 1.;
+            Dz(i, 0) = R2;  Dz(i, 1) = x; Dz(i, 2) = y; Dz(i, 3) = 1.;
+
+            C(i, 0) = R2; C(i, 1) = x; C(i, 2) = y; C(i, 3) = z;
+        }
+
+        double a = A.determinant();
+        double dx = Dx.determinant();
+        double dy = -Dy.determinant();
+        double dz = Dz.determinant();
+        double c = C.determinant();
+
+        m_r = std::sqrt(std::pow(dx, 2) + std::pow(dy, 2) + std::pow(dz, 2) - 4 * a * c) / (2 * fabs(a));
+    }
+}
+
 
 /// \make the connection between the nodes of the elements
 void Element::build(std::vector<std::size_t> nodeIndices, std::vector<Node> &nodesList)
@@ -422,5 +490,7 @@ void Element::build(std::vector<std::size_t> nodeIndices, std::vector<Node> &nod
             nodesList[nodeIndices[i]].m_neighbourNodes.push_back(nodeIndices[j]);
         }
     }
+
+    updateCircumscribedRadius();
 }
 

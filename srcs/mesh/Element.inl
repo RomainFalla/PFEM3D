@@ -25,6 +25,11 @@ inline double Element::getLargestExtension() const noexcept
     return m_largest_extension;
 }
 
+inline double Element::getCircumscribedRadius() const noexcept
+{
+    return m_r;
+}
+
 inline bool operator==(const Element& a, const Element& b) noexcept
 {
     return std::equal(a.m_nodesIndexes.cbegin(), a.m_nodesIndexes.cend(), b.m_nodesIndexes.cbegin());

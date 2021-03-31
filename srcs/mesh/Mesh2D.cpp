@@ -309,9 +309,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
         //count_total++;
         index = m_elementsList.size();
         Triangulation_2::Face_handle face{ fit };
-
-        if (T.is_infinite(face))
-            std::cout << "foundInfiniteFace\n";
        
         std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
         std::vector<std::size_t> nodeIndexes = { in0,in1,in2 };
@@ -331,6 +328,8 @@ void Mesh::TriangulateWeightedAlphaShape2D()
         double naturalMeshSize = element.getNaturalMeshSize(true);
         double localMeshSize = element.getLocalMeshSize();
 
+        double r = element.getCircumscribedRadius(); 
+        //double r = getCircumScribedRadius(nodeIndexes);
         //meanElementSize += element.getSize();
 
         bool keepElement = false;
@@ -339,7 +338,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
         if (L < 4. * m_maxProgressionFactor * naturalMeshSize)
         {
-            double r = getCircumScribedRadius(nodeIndexes);
             std::vector<std::size_t> v = { in0,in1,in2 };
             
             if (elmType == IN_BULK)

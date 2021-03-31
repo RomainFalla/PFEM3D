@@ -84,6 +84,10 @@ class MESH_API Element
         /// \return The highest separation between 2 nodes of the element.
         inline double getLargestExtension() const noexcept;
 
+        /// \get the private value of the circumscribed radius of that element.
+        double getCircumscribedRadius() const noexcept;
+
+
         /// \update The highest separation between 2 nodes of the element.
         void updateLargestExtension();
 
@@ -109,7 +113,9 @@ class MESH_API Element
         /// \return The square root of the area or the cubic root of the mesh size of the element.
         double getNaturalMeshSize(bool valueAtNodes = false);
 
-        
+        /// \update the private value of the circumscribed radius of this element.
+        void updateCircumscribedRadius();
+
         /// \return The type of element depending on the boundary node.
         //ELEMENT_TYPE getType() const noexcept;
 
@@ -125,6 +131,8 @@ class MESH_API Element
         Mesh* m_pMesh;                                  /**< A pointer to the mesh from which the facet comes from. */
         double m_largest_extension;                     /**< contains the highest separation between 2 nodes of the element*/
         bool m_forcedRefinement;
+
+        double m_r;                                      /**< circumscrived radius*/
 
         std::size_t m_index;                            /** Index of the element in the element list of the mesh*/
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this element. */

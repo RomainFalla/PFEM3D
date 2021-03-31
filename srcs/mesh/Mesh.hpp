@@ -308,7 +308,7 @@ class MESH_API Mesh
         void TriangulateWeightedAlphaShape2D();
 
         /// \brief Remesh the nodes in nodesList using CGAL (Weighted Delaunay triangulation and weighted alpha-shape) (3D).
-        void regularTriangulateWeightedAlphaShape3D();
+        void TriangulateWeightedAlphaShape3D();
 
         double getCircumScribedRadius(std::vector<size_t> nods);
 

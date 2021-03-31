@@ -4,6 +4,7 @@
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <CGAL/Triangulation_cell_base_with_info_3.h>
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Fixed_alpha_shape_3.h>
 #include <CGAL/Fixed_alpha_shape_vertex_base_3.h>
@@ -21,6 +22,18 @@ typedef CGAL::Delaunay_triangulation_3<Kernel, asTds3, CGAL::Fast_location>     
 typedef CGAL::Fixed_alpha_shape_3<asTriangulation_3>                            Alpha_shape_3;
 typedef Kernel::Point_3                                                         Point_3;
 typedef Kernel::Tetrahedron_3                                                   Tetrahedron_3;
+
+struct CellInfo3
+{
+    CellInfo2() { isExt = true; }
+    std::size_t index;
+    std::vector<std::size_t> neighboursElemIndexes;
+    bool isExt;
+};
+
+typedef CGAL::Triangulation_cell_base_with_info_3<CellInfo3, Kernel>        Cb3;
+typedef CGAL::Triangulation_data_structure_3<Vb3, Cb3>                      Tds3;
+typedef CGAL::Delaunay_triangulation_3<Kernel, Tds3>                        Triangulation_3;
 
 void Mesh::triangulateAlphaShape3D()
 {
@@ -204,7 +217,7 @@ void Mesh::triangulateAlphaShape3D()
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
 }
 
-void Mesh::regularTriangulateWeightedAlphaShape3D()
+void Mesh::TriangulateWeightedAlphaShape3D()
 {
     if (m_nodesList.empty())
         throw std::runtime_error("You should load the mesh from a file before trying to remesh !");
@@ -214,109 +227,144 @@ void Mesh::regularTriangulateWeightedAlphaShape3D()
 
     // We have to construct an intermediate representation for CGAL. We also reset
     // nodes properties.
-    std::vector<std::pair<Point_3, std::size_t>> pointsList;
+    std::vector<std::pair<Point_3, std::size_t>> PointsList;
+
     for (std::size_t i = 0; i < m_nodesList.size(); ++i)
     {
-        pointsList.push_back(std::make_pair(Point_3(m_nodesList[i].m_position[0],
-            m_nodesList[i].m_position[1],
-            m_nodesList[i].m_position[2]), i));
+        Point_3 P = Point_3(m_nodesList[i].m_position[0],m_nodesList[i].m_position[1], m_nodesList[i].m_position[2]);
 
-        m_nodesList[i].m_isOnFreeSurface = false;
+        PointsList.push_back(std::make_pair(P, i));
+
         m_nodesList[i].m_neighbourNodes.clear();
         m_nodesList[i].m_elements.clear();
         m_nodesList[i].m_facets.clear();
     }
 
-    const Alpha_shape_3 as(pointsList.begin(), pointsList.end(), m_alpha * m_alpha * m_hchar * m_hchar);
+    //std::cout << "Weighted alpha shape ...!" << "\n";
+    Triangulation_3 T(PointsList.begin(), PointsList.end());
 
-    auto checkCellDeletion = [&](Alpha_shape_3::Cell_handle cell) -> bool
+    std::size_t index = 0;
+    std::vector<Triangulation_3::Cell_handle> elementCopies;
+    std::vector<Triangulation_3::Cell_handle> elToPotentiallyRemove;
+
+    int count_total = 0;
+    int count_bulk = 0;
+    int count_inboundary = 0;
+    int count_outboundary = 0;
+    int count_outalpha = 0;
+    int count_notSmooth = 0;
+
+    double meanElementSize = 0.;
+    for (auto fit = T.finite_cells_begin(); fit != T.finite_cells_end(); ++fit)
     {
+        count_total++;
+        index = m_elementsList.size();
+        Triangulation_3::Cell_handle cell{ fit };
+       
         std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
             in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
 
-        Tetrahedron_3 tetrahedron(pointsList[in0].first, pointsList[in1].first,
-            pointsList[in2].first, pointsList[in3].first);
+        std::vector<std::size_t> nodeIndexes = { in0,in1,in2,in3};
+        ELEMENT_TYPE elmType = getElementType(nodeIndexes);
+        Element element(*this);
+        element.m_nodesIndexes = nodeIndexes;
+        std::size_t nbNodes = m_nodesList.size();
 
-        if (tetrahedron.volume() < 1e-4 * m_hchar * m_hchar * m_hchar)
-            return true;
+        element.build(nodeIndexes, m_nodesList);
+        element.updateLargestExtension();
 
-        if (m_nodesList[in0].isBound() && m_nodesList[in1].isBound() &&
-            m_nodesList[in2].isBound() && m_nodesList[in3].isBound())
+        double L = element.getLargestExtension();
+        double minMeshSize = element.getMinMeshSize();
+        double realMeshSize = element.getNaturalMeshSize(false);
+        double naturalMeshSize = element.getNaturalMeshSize(true);
+        double localMeshSize = element.getLocalMeshSize();
+
+        double r = element.getCircumscribedRadius();
+
+        meanElementSize += element.getSize();
+
+        bool keepElement = false;
+
+        double limitVal = 0.5 * m_minTargetMeshSize * m_minTargetMeshSize;
+
+        if (L < 4. * m_maxProgressionFactor * naturalMeshSize)
         {
-            for (unsigned int i = 0; i < 4; ++i)
+            std::vector<std::size_t> v = { in0,in1,in2 };
+            
+            if (elmType == IN_BULK)
             {
-                std::set<Alpha_shape_3::Vertex_handle> neighbourVh;
-                as.adjacent_vertices(cell->vertex(i), std::inserter(neighbourVh, neighbourVh.begin()));
-
-                for (auto vh : neighbourVh)
+                keepElement = true;
+                count_bulk++;
+            }
+            else if (elmType == INSIDE_BOUNDARY)
+            {
+                count_inboundary++;
+                if (r > m_alphaRatio * localMeshSize)
                 {
-                    if (as.is_infinite(vh))
-                        continue;
-
-                    if (vh->info() == in0 || vh->info() == in1 || vh->info() == in2 || vh->info() == in3)
-                        continue;
-
-                    if (as.classify(vh) == Alpha_shape_3::REGULAR || as.classify(vh) == Alpha_shape_3::INTERIOR)
+                    if (element.getSize() > limitVal)
                     {
-                        if (!m_nodesList[vh->info()].isBound())
-                            return false;
+                        keepElement = true;
+                        //element.m_forcedRefinement = true;
                     }
                 }
+                else
+                {
+                    keepElement = true;
+                }
             }
-
-            return true;
+            else if (elmType == OUTSIDE_BOUNDARY && r < m_alphaRatio * localMeshSize && realMeshSize < 1.4 * minMeshSize)
+            {
+                count_outboundary++;
+                keepElement = true;
+            }
+            else 
+            {
+                count_outalpha++;
+                count_outboundary++;
+            }
+            
         }
-
-        return false;
-    };
-
-    // We check for each triangle which one will be kept (alpha shape), then we
-    // perform operations on the remaining elements
-    for (auto fit = as.finite_cells_begin(); fit != as.finite_cells_end(); ++fit)
-    {
-        // If true, the elements are fluid elements
-        if (as.classify(fit) == Alpha_shape_3::INTERIOR)
+        else 
         {
-            const Alpha_shape_3::Cell_handle cell{ fit };
-
-            std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
-                in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
-
-            if (checkCellDeletion(cell))
-                continue;
-
-            Element element(*this);
-            element.m_nodesIndexes = { in0, in1, in2, in3 };
-            element.computeJ();
-            element.computeDetJ();
-            element.computeInvJ();
-
-            //            std::cout << in0 << ", " << in1 << ", " << in2 << ", " << in3 << ": " << m_nodesList.size() -1 << std::endl;
-            //            std::cout << m_nodesList[in0].m_neighbourNodes.size() << ", " << m_nodesList[in0].m_neighbourNodes.capacity() << std::endl;
-                        // We compute the neighbour nodes of each nodes
-            m_nodesList[in0].m_neighbourNodes.push_back(in1);
-            m_nodesList[in0].m_neighbourNodes.push_back(in2);
-            m_nodesList[in0].m_neighbourNodes.push_back(in3);
-
-            m_nodesList[in1].m_neighbourNodes.push_back(in0);
-            m_nodesList[in1].m_neighbourNodes.push_back(in2);
-            m_nodesList[in1].m_neighbourNodes.push_back(in3);
-
-            m_nodesList[in2].m_neighbourNodes.push_back(in0);
-            m_nodesList[in2].m_neighbourNodes.push_back(in1);
-            m_nodesList[in2].m_neighbourNodes.push_back(in3);
-
-            m_nodesList[in3].m_neighbourNodes.push_back(in0);
-            m_nodesList[in3].m_neighbourNodes.push_back(in1);
-            m_nodesList[in3].m_neighbourNodes.push_back(in2);
-
+            count_notSmooth++;
+        }
+        if (keepElement)
+        {
+            cell->info().isExt = false;
+            cell->info().index = index;
+            element.m_index = index;
+            for (std::size_t j = 0; j < m_dim + 1; j++)
+            {
+                cell->neighbor(j)->info().neighboursElemIndexes.push_back(index);
+            }
+            elementCopies.push_back(cell);
             m_elementsList.push_back(std::move(element));
-
-            for (std::size_t index : m_elementsList.back().m_nodesIndexes)
-                m_nodesList[index].m_elements.push_back(m_elementsList.size() - 1);
+            for (std::size_t i : m_elementsList.back().m_nodesIndexes)
+                m_nodesList[i].m_elements.push_back(m_elementsList.size() - 1);     
         }
     }
+    meanElementSize /= m_elementsList.size();
+    std::cout << "meanElementSize = " << meanElementSize << "\n";
+    
+    std::size_t NbKeptElements = elementCopies.size();
+    for (std::size_t i = 0; i < NbKeptElements; i++) 
+    {
+        m_elementsList[i].m_elemsIndexes = elementCopies[i]->info().neighboursElemIndexes; // copy the links from the CGAL data structure to our data structure.
+    }
 
+
+    elementCopies.clear();
+
+    //I leave it here for debugging purpose
+    std::cout << " count_total = " << count_total << "\n";
+    std::cout << " count_notSmooth = " << count_notSmooth << "\n";
+    std::cout << " count_bulk  = " << count_bulk << "\n";
+    std::cout << " count_inboundary = " << count_inboundary << "\n";
+    std::cout << " count_outboundary  = " << count_outboundary << "\n";
+    std::cout << " count_outalpha = " << count_outalpha << "\n";
+ 
+   
+    /**/
 #pragma omp parallel for default(shared)
     for (std::size_t n = 0; n < m_nodesList.size(); ++n)
     {
@@ -326,59 +374,94 @@ void Mesh::regularTriangulateWeightedAlphaShape3D()
             m_nodesList[n].m_neighbourNodes.end());
     }
 
-    for (auto it = as.finite_facets_begin(); it != as.finite_facets_end(); ++it)
+    int count1 = 0;
+    int count2 = 0;
+    int count3 = 0;
+    int count4 = 0;
+    int count5 = 0;
+    for (std::size_t i = 0; i < m_nodesList.size(); ++i)
     {
-        // We compute the free surface nodes
-        Alpha_shape_3::Facet facetAS{ *it };
-        if (as.classify(facetAS) == Alpha_shape_3::REGULAR)
+        if (m_nodesList[i].m_elements.size() != 0)
         {
-            Alpha_shape_3::Vertex_handle outVertex = facetAS.first->vertex((facetAS.second) % 4);
-            if (as.is_infinite(outVertex))
-                facetAS = as.mirror_facet(facetAS);
-
-            Alpha_shape_3::Cell_handle cell = facetAS.first;
-
-            if (as.classify(cell) == Alpha_shape_3::EXTERIOR)
-            {
-                facetAS = as.mirror_facet(facetAS);
-                cell = facetAS.first;
-            }
-
-            if (checkCellDeletion(cell))
-                continue;
-
-            Facet facet(*this);
-            facet.m_nodesIndexes = { facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 0))->info(),
-                                    facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 1))->info(),
-                                    facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 2))->info() };
-            facet.m_outNodeIndex = facetAS.first->vertex(facetAS.second)->info();
-            facet.computeJ();
-            facet.computeDetJ();
-            facet.computeInvJ();
-
-            if (facet.m_outNodeIndex == facet.m_nodesIndexes[0] ||
-                facet.m_outNodeIndex == facet.m_nodesIndexes[1] ||
-                facet.m_outNodeIndex == facet.m_nodesIndexes[2])
-            {
-                std::cerr << "A face with an outIndex equal to one of the face node index has been encountered" << std::endl;
-                continue;
-            }
-
-            if (!(m_nodesList[facet.m_nodesIndexes[0]].isBound() &&
-                m_nodesList[facet.m_nodesIndexes[1]].isBound() &&
-                m_nodesList[facet.m_nodesIndexes[2]].isBound()))
-            {
-                m_nodesList[facet.m_nodesIndexes[0]].m_isOnFreeSurface = true;
-                m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
-                m_nodesList[facet.m_nodesIndexes[2]].m_isOnFreeSurface = true;
-            }
-
-            m_facetsList.push_back(std::move(facet));
-
-            for (std::size_t index : m_facetsList.back().m_nodesIndexes)
-                m_nodesList[index].m_facets.push_back(m_facetsList.size() - 1);
+            m_nodesList[i].m_isOnFreeSurface = false;
+            m_nodesList[i].m_isOnBoundary = false;
+        }
+        else
+        {   //flying nodes
+            m_nodesList[i].m_isOnFreeSurface = true;
+            m_nodesList[i].m_isOnBoundary = true;
         }
     }
+
+    for (auto it = T.finite_facets_begin(); it != T.finite_facets_end(); ++it)
+    {
+        count1++;
+        // We compute the free surface nodes
+        Triangulation_3::Facet facet1{ *it };
+        Triangulation_3::Facet facet2 = T.mirror_facet(facet1);
+
+        Triangulation_3::Cell_handle cell1 = facet1.first;
+        Triangulation_3::Cell_handle cell2 = facet2.first;
+
+        Triangulation_3::Facet facetToBuildFacet;
+
+        if (!cell1->info().isExt && !cell2->info().isExt) // not OnBoundary
+        {
+            count2++;
+            continue;
+        }
+
+        if (cell1->info().isExt && cell2->info().isExt) // not on boundary + this condition --> not Regular
+        {
+            count3++;
+            continue;
+        }
+
+        count4++;
+
+        if (cell1->info().isExt)
+            facetToBuildFacet = facet2;
+        else
+            facetToBuildFacet = facet1;
+
+        Triangulation_3::Vertex_handle outVertex = facetToBuildFacet.first->vertex((facetToBuildFacet.second) % 4);
+
+        Facet facet(*this);
+        facet.m_nodesIndexes = { facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 0))->info(),
+                                facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 1))->info(),
+                                facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 2))->info()};
+
+        facet.m_outNodeIndex = facetToBuildFacet.first->vertex((facetToBuildFacet.second))->info();
+        facet.m_elementIndex = facetToBuildFacet.first->info().index;
+
+        if (!(m_nodesList[facet.m_nodesIndexes[0]].isBound() &&
+            m_nodesList[facet.m_nodesIndexes[1]].isBound() &&
+            m_nodesList[facet.m_nodesIndexes[2]].isBound()))
+        {
+            m_nodesList[facet.m_nodesIndexes[0]].m_isOnFreeSurface = true;
+            m_nodesList[facet.m_nodesIndexes[1]].m_isOnFreeSurface = true;
+            m_nodesList[facet.m_nodesIndexes[2]].m_isOnFreeSurface = true;
+        }
+
+        m_nodesList[facet.m_nodesIndexes[0]].m_isOnBoundary = true;
+        m_nodesList[facet.m_nodesIndexes[1]].m_isOnBoundary = true;
+        m_nodesList[facet.m_nodesIndexes[2]].m_isOnBoundary = true;
+
+        facet.computeJ();
+        facet.computeDetJ();
+        facet.computeInvJ();
+
+        m_facetsList.push_back(std::move(facet));
+
+        for (std::size_t i : m_facetsList.back().m_nodesIndexes)
+            m_nodesList[i].m_facets.push_back(m_facetsList.size() - 1);
+
+    }
+   std::cout << "count 1 =" << count1 << "\n";
+   std::cout << "count 2 =" << count2 << "\n";
+   std::cout << "count 3 =" << count3 << "\n";
+   std::cout << "count 4 =" << count4 << "\n";
+   std::cout << "count 5 =" << count5 << "\n";
 
     computeFSNormalCurvature3D();
 

@@ -51,6 +51,7 @@ bool PicardAlgo::solve(Mesh* pMesh, const Eigen::VectorXd& qPrev, bool verboseOu
         qIterPrev = qIter;
 
         m_buildAb(A, b, qPrev);
+        A.makeCompressed();
         m_applyBC(b, qPrev);
         m_solver.compute(A);
 

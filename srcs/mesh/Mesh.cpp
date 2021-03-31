@@ -907,7 +907,7 @@ void Mesh::loadFromFile(const std::string& fileName)
         }
     }
 
-#ifndef NDEBUG
+//#ifndef NDEBUG
     for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
     {
         for(std::size_t n2 = 0 ; n2 < m_nodesList.size() ; ++n2)
@@ -936,7 +936,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     {
         std::cout << aString << std::endl;
     }
-#endif
+//#endif
 
     if(m_nodesList.empty())
         throw std::runtime_error("no nodes loaded! Did you add the physical groups in the .geo file?");
@@ -1187,7 +1187,7 @@ void Mesh::triangulateAlphaShape()
         if (m_dim == 2)
             TriangulateWeightedAlphaShape2D();
         else
-            regularTriangulateWeightedAlphaShape3D();
+            TriangulateWeightedAlphaShape3D();
     }
 }
 
