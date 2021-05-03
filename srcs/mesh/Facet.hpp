@@ -22,6 +22,7 @@ class MESH_API Facet
     public:
         /// \param mesh a reference to the mesh
         Facet(Mesh& mesh);
+        Facet(Mesh& mesh, std::vector<std::size_t> nodeIndexes);
         Facet(const Facet& facet)      = default;
         Facet(Facet&& facet)           = default;
         ~Facet()                       = default;
@@ -40,14 +41,25 @@ class MESH_API Facet
         /// \return A constant reference to the facet's opposite node.
         const Node& getOutNode() const noexcept;
 
+
+        ///  \return true if this facet is a facet with all its node having "isBound=true" ;
+        bool isBound() const noexcept;
+
+        ///  \return true if this facet is a facet with all its node of a boundary (whatever the type of it) ;
+        bool isOnBoundary() const noexcept;
+
+        /// \return The length or area of the facet.
+        double getSize() const noexcept;
+
+        /// \return The local target mesh size of the facet.
+        double getLocalMeshSize();
+
         /// \param stateIndex The index of the state.
         /// \return A vector containing the considered state for each node of the facet.
         std::vector<double> getState(unsigned int stateIndex) const noexcept;
 
         /// \return The determinant of the Jacobian matrix of the change of variable to the reference space.
         inline double getDetJ() const noexcept;
-
-        inline bool isOnBoundary() const noexcept;
 
         /**
          * \brief Get an element of the Jacobian matrix of the change of variable to the reference space:
@@ -98,9 +110,10 @@ class MESH_API Facet
         Mesh* m_pMesh;                                  /**< A pointer to the mesh from which the facet comes from. */
 
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this facet. */
-        std::size_t m_outNodeIndex;                     /**< Indexes of the node which is "in front of" this facet. */
-        std::size_t m_elementIndex;                     /**< Index of the boundary element. */
-        //std::set<Element*> m_elements;                  /**< set of pointer to the elements that are adjacent to the facet  */
+        //std::size_t m_outNodeIndex;                     /**< Indexes of the node which is "in front of" this facet. */
+        //std::size_t m_elementIndex;                     /**< Index of the boundary element. */
+        std::vector<std::size_t> m_outNodeIndexes;        /**< Indexes of the node which is "in front of" this facet. */
+        std::vector<std::size_t> m_elementIndexes;        /**< Index of the elements that share this facet. */
 
         double m_detJ;                                  /**< Determinant of the Jacobian matrix of the facet. */
         std::array<std::array<double, 2>, 3> m_J;       /**< Jacobian matrix of the facet. */

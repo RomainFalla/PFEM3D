@@ -22,6 +22,8 @@ struct RefinementInfo
     double minTargetMeshSize = 0.; /**< The minimal target mesh sizeinside the mesh*/
     double maxTargetMeshSize = 0.; /**< The maximal target mesh sizeinside the mesh*/
     double maxProgressionFactor = 1.25; /**< Maximal progression of the target mesh size from node to node*/
+    std::vector<int> imposedTargetMeshSizeBCtags = {};
+    std::vector<double> imposedTargetMeshSizeValues = {};
 };
 
 struct MeshCreateInfo
@@ -121,8 +123,11 @@ class MESH_API Mesh
         /// \return The characteristic size of the mesh.
         inline double getHchar() const noexcept;
 
-        /// \return The number of nodes in the mesh.
+        /// \return a constant reference of a node in the mesh
         inline const Node& getNode(std::size_t nodeIndex) const noexcept;
+        
+        /// \return a non-constant pointer to a node in the mesh
+        inline Node* getNodePtr(std::size_t nodeIndex);
 
         /// \return The number of nodes in the mesh.
         inline std::size_t getNodesCount() const noexcept;
@@ -229,8 +234,9 @@ class MESH_API Mesh
         double m_alpha; /**< Alpha parameter of the alpha-shape algorithm (triangles are discared if  r_circumcircle > alpha*hchar). */
         double m_omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
         double m_gamma; /**< Control the deletetion of node if two are too close to each other (a node is deleted if d_nodes < gamma*hchar). */
-        bool m_useMeshRefinement; /**< Define wether we use mesh refinement or not*/
         std::vector<double> m_boundingBox; /**< Box delimiting the zone of nodes existence (format: [xmin, ymin, xmax, ymax]). */
+        bool m_useMeshRefinement; /**< Define wether we use mesh refinement or not*/
+        
 
         bool m_computeNormalCurvature;      /**< Control if mesh update should compute normals and curvatures of free surface. */
 
@@ -240,12 +246,23 @@ class MESH_API Mesh
         double m_maxTargetMeshSize; /**< The maximal target mesh size inside the mesh*/
         double m_maxProgressionFactor;/**< Maximal progression of the target mesh size from node to node*/
 
+        double m_refinementLevels[6]; /**Area thresholds levels used for mesh refinement*/
+        double m_refinementFactor; /**Area thresholds factor used for mesh refinement*/
+
+
         unsigned short m_dim;               /**< The mesh dimension. */
 
         std::vector<Node> m_nodesList;      /**< List of nodes of the mesh. */
         std::vector<Node> m_nodesListSave;  /**< A copy of the nodes list (usefull for non-linear algorithm). */
+
+        std::vector<int> m_ImposedTargetMeshSizeBCtags; /**vector of vectors to pointers to which the target mesh size is imposed.
+                                                                          The number of entries correspond to the number of boundaries */
+        std::vector<double> m_ImposedTargetMeshSizeValues;                      /**Target mesh size imposed at some boundaries. 
+                                                                          The number of entries correspond to the number of boundaries*/
+
         std::vector<Element> m_elementsList;    /**< The list of elements. */
         std::vector<Facet> m_facetsList;        /**< The list of boundary facets. */
+        std::vector<Facet> m_inBulkFacetList;    /**< The list of non-boundary facets. */
 
         std::vector<std::string> m_tagNames; /**< The name of the tag of the nodes. */
         std::map<std::size_t, std::array<double, 3>> m_boundaryInitialPos;  /**< Initial position of node at the boundary. */
@@ -256,20 +273,17 @@ class MESH_API Mesh
          * \brief Add nodes in element whose area is too big (A_tringle > omega*hchar^2.
          * \return true if at least one node was added, false otherwise).
          */
-        bool addNodes(bool verboseOutput, bool &needToRefineMore);
+        bool addNodes(bool verboseOutput);
 
-        /// \return The node that split The 2 elements of the facet in 2 (3) parts in 2D (3D). 
-        //void splitElements(Facet* f, std::vector<Element*>& childElements);
+        /// \divide an element by adding several nodes depending on a level parameters = 1,2,3.
+        void divideElement(Element& el, unsigned int level) ;
+
 
         /// \return The index of the node of *element that is opposite to *face;
         std::size_t getOutNodeIndex(Facet* face, Element* element);
 
-        
         /// \find a pointer to the largest facet of one element and put it in face
         // getLargestFacet(Element* element, Facet*& face);
-
-        /// \return The node that split The element in 2 (3) parts in 2D (3D) at the level of the face opposite to the node labelled by "oppositeNodeIndex" 
-        Node splitBoundaryElement(Element* elm, std::size_t oppositeNodeIndex);
 
         /**
          * \brief Check if a node is outside the bounding box and deletes it if so.
@@ -289,6 +303,8 @@ class MESH_API Mesh
         /// \brief Compute the normal and curvature of each boundary and free surface (3D).
         void computeFSNormalCurvature3D();
 
+        /// \brief function that goes from the nodes with the smallest target mesh size to the neighbours, and limit the progression from node to node to the value "m_maxProgressionFactor".
+        void smoothingLcLoc();
         /**
          * \brief Load the nodes from a file using gmsh.
          * \param fileName The name of the .msh file.

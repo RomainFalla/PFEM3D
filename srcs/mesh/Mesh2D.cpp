@@ -185,7 +185,7 @@ void Mesh::triangulateAlphaShape2D()
             facet.m_nodesIndexes = {edgeAS.first->vertex((edgeAS.second+1)%3)->info(),
                                    edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
 
-            facet.m_outNodeIndex = edgeAS.first->vertex((edgeAS.second)%3)->info();
+            facet.m_outNodeIndexes.push_back(edgeAS.first->vertex((edgeAS.second)%3)->info());
 
             if(!(m_nodesList[facet.m_nodesIndexes[0]].isBound() && m_nodesList[facet.m_nodesIndexes[1]].isBound()))
             {
@@ -229,6 +229,7 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
     m_elementsList.clear();
     m_facetsList.clear();
+    m_inBulkFacetList.clear();
 
     // We have to construct an intermediate representation for CGAL. We also reset
     // nodes properties.
@@ -303,7 +304,7 @@ void Mesh::TriangulateWeightedAlphaShape2D()
     int count_outalpha = 0;
     int count_notSmooth = 0;*/
 
-    double meanElementSize = 0.;
+    //double meanElementSize = 0.;
     for (auto fit = T.finite_faces_begin(); fit != T.finite_faces_end(); ++fit)
     {
         //count_total++;
@@ -316,8 +317,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
         Element element(*this);
         element.m_nodesIndexes = { in0, in1, in2 };
-
-        std::size_t nbNodes = m_nodesList.size();
 
         element.build(nodeIndexes, m_nodesList);
         element.updateLargestExtension();
@@ -341,10 +340,7 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             std::vector<std::size_t> v = { in0,in1,in2 };
             
             if (elmType == IN_BULK)
-            {
                 keepElement = true;
-                //count_bulk++;
-            }
             else if (elmType == INSIDE_BOUNDARY)
             {
                 //count_inboundary++;
@@ -353,36 +349,25 @@ void Mesh::TriangulateWeightedAlphaShape2D()
                     if (element.getSize() > limitVal)
                     {
                         keepElement = true;
-                        element.m_forcedRefinement = true;
+                        double length = element.getBoundaryFacetSize();
+                        if (realMeshSize/length < 0.5)
+                            element.m_forcedRefinement = true;
                     }
                 }
                 else
-                {
                     keepElement = true;
-                }
+
             }
             else if (elmType == OUTSIDE_BOUNDARY && r < m_alphaRatio * localMeshSize && realMeshSize < 1.4 * minMeshSize)
-            {
-                //count_outboundary++;
                 keepElement = true;
-            }
-            /*else 
-            {
-                count_outalpha++;
-                count_outboundary++;
-            }*/
-            
+
         }
-        /*else 
-        {
-            count_notSmooth++;
-        }*/
         if (keepElement)
         {
             face->info().isExt = false;
             face->info().index = index;
             element.m_index = index;
-            for (std::size_t j = 0; j < m_dim + 1; j++)
+            for (int j = 0; j < m_dim + 1; j++)
             {
                 face->neighbor(j)->info().neighboursElemIndexes.push_back(index);
             }
@@ -392,28 +377,14 @@ void Mesh::TriangulateWeightedAlphaShape2D()
                 m_nodesList[i].m_elements.push_back(m_elementsList.size() - 1);     
         }
     }
-    //meanElementSize /= m_elementsList.size();
-    //std::cout << "meanElementSize = " << meanElementSize << "\n";
-    
     std::size_t NbKeptElements = elementCopies.size();
     for (std::size_t i = 0; i < NbKeptElements; i++) 
     {
         m_elementsList[i].m_elemsIndexes = elementCopies[i]->info().neighboursElemIndexes; // copy the links from the CGAL data structure to our data structure.
     }
 
-
     elementCopies.clear();
 
-    //I leave it here for debugging purpose
-    /*std::cout << " count_total = " << count_total << "\n";
-    std::cout << " count_notSmooth = " << count_notSmooth << "\n";
-    std::cout << " count_bulk  = " << count_bulk << "\n";
-    std::cout << " count_inboundary = " << count_inboundary << "\n";
-    std::cout << " count_outboundary  = " << count_outboundary << "\n";
-    std::cout << " count_outalpha = " << count_outalpha << "\n";*/
- 
-   
-    /**/
 #pragma omp parallel for default(shared)
     for (std::size_t n = 0; n < m_nodesList.size(); ++n)
     {
@@ -422,17 +393,6 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             std::unique(m_nodesList[n].m_neighbourNodes.begin(), m_nodesList[n].m_neighbourNodes.end()),
             m_nodesList[n].m_neighbourNodes.end());
     }
-
-    /*for (auto it = m_elementsList.begin(); it != m_elementsList.end(); ++it)
-    {
-        Element el = *it;
-        std::size_t elem_index = el.m_index;
-        for (auto it2 = el.m_nodesIndexes.begin(); it2 != el.m_nodesIndexes.end(); ++it2)
-        {
-            std::size_t node_index = *it2;
-            m_nodesList[node_index].m_elements.push_back(elem_index);
-        }
-    }*/
 
     for (std::size_t i = 0; i < m_nodesList.size(); ++i)
     {
@@ -447,17 +407,9 @@ void Mesh::TriangulateWeightedAlphaShape2D()
             m_nodesList[i].m_isOnBoundary = true;
         }
     }
-    
-    /*int count1 = 0;
-    int count2 = 0;
-    int count3 = 0;
-    int count4 = 0;
-    int count5 = 0;*/
 
     for (auto it = T.finite_edges_begin(); it != T.finite_edges_end(); ++it)
     {
-        //count1++;
-        // We compute the free surface nodes
         Triangulation_2::Edge edge1{ *it };
         Triangulation_2::Edge edge2=T.mirror_edge(edge1);
 
@@ -466,44 +418,43 @@ void Mesh::TriangulateWeightedAlphaShape2D()
 
         Triangulation_2::Edge edgeToBuildFacet;
 
+        Facet facet(*this);
+
         if (!face1->info().isExt && !face2->info().isExt) // not OnBoundary
         {
-            //count2++;
+            facet.m_nodesIndexes = { edge1.first->vertex((edge1.second + 1) % 3)->info(),
+                                    edge1.first->vertex((edge1.second + 2) % 3)->info() };
+
+            facet.m_outNodeIndexes.push_back(edge1.first->vertex((edge1.second) % 3)->info());
+            facet.m_outNodeIndexes.push_back(edge2.first->vertex((edge2.second) % 3)->info());
+            facet.m_elementIndexes.push_back(edge1.first->info().index);
+            facet.m_elementIndexes.push_back(edge2.first->info().index);
+            m_inBulkFacetList.push_back(std::move(facet));
             continue;
         }
 
         if (face1->info().isExt && face2->info().isExt) // not on boundary + this condition --> not Regular
-        {
-            //count3++;
             continue;
-        }
-
-        //count4++;
        
         if (face1->info().isExt)
             edgeToBuildFacet = edge2;
         else 
             edgeToBuildFacet = edge1;
 
-        Triangulation_2::Vertex_handle outVertex = edgeToBuildFacet.first->vertex((edgeToBuildFacet.second) % 3);
-
-        /*Weighted_Alpha_shape_2::Face_handle face = edgeAS.first;
-        std::cout << "face number =" << elementsMap[face] << "\n";
-
-        if (was.classify(face) == Weighted_Alpha_shape_2::EXTERIOR)
-        {
-            edgeAS = was.mirror_edge(edgeAS);
-            face = edgeAS.first;
-        }
-
-        //if (checkFaceDeletion(face))
-            //continue;*/
-        Facet facet(*this);
         facet.m_nodesIndexes = { edgeToBuildFacet.first->vertex((edgeToBuildFacet.second + 1) % 3)->info(),
                                 edgeToBuildFacet.first->vertex((edgeToBuildFacet.second + 2) % 3)->info() };
 
-        facet.m_outNodeIndex = edgeToBuildFacet.first->vertex((edgeToBuildFacet.second) % 3)->info();
-        facet.m_elementIndex = edgeToBuildFacet.first->info().index;
+        facet.m_outNodeIndexes.push_back(edgeToBuildFacet.first->vertex((edgeToBuildFacet.second) % 3)->info());
+        facet.m_elementIndexes.push_back(edgeToBuildFacet.first->info().index);
+
+        if (facet.isBound())
+        {
+            for (std::size_t k = 0; k < m_elementsList[facet.m_elementIndexes[0]].m_nodesIndexes.size(); k++)
+            {
+                if (facet.m_outNodeIndexes[0] == m_elementsList[facet.m_elementIndexes[0]].m_nodesIndexes[k])
+                    m_elementsList[facet.m_elementIndexes[0]].m_chargedNode[k] = true;
+            }
+        }
 
         if (!(m_nodesList[facet.m_nodesIndexes[0]].isBound() && m_nodesList[facet.m_nodesIndexes[1]].isBound()))
         {
@@ -519,17 +470,25 @@ void Mesh::TriangulateWeightedAlphaShape2D()
         facet.computeInvJ();
 
         m_facetsList.push_back(std::move(facet));
-
-        for (std::size_t i : m_facetsList.back().m_nodesIndexes)
-            m_nodesList[i].m_facets.push_back(m_facetsList.size() - 1);
-
     }
-    /*std::cout << "count 1 =" << count1 << "\n";
-    std::cout << "count 2 =" << count2 << "\n";
-    std::cout << "count 3 =" << count3 << "\n";
-    std::cout << "count 4 =" << count4 << "\n";
-    std::cout << "count 5 =" << count5 << "\n";*/
-    
+
+    std::size_t facetCounter = 0;
+    for (auto it = m_inBulkFacetList.begin(); it != m_inBulkFacetList.end(); ++it)
+    {
+        m_elementsList[it->m_elementIndexes[0]].m_facets.push_back(facetCounter);
+        m_elementsList[it->m_elementIndexes[1]].m_facets.push_back(facetCounter);
+        for (std::size_t i : it->m_nodesIndexes)
+            m_nodesList[i].m_facets.push_back(facetCounter); // because of this,  I have slightly modified the computation of the curvature function, cause we have to check the facets that are on the boundaries -R.F.
+        facetCounter++;
+    }
+    for (auto it = m_facetsList.begin(); it != m_facetsList.end(); ++it)
+    {
+        m_elementsList[it->m_elementIndexes[0]].m_facets.push_back(facetCounter);
+        for (std::size_t i : it->m_nodesIndexes)
+            m_nodesList[i].m_facets.push_back(facetCounter);
+        facetCounter++;
+    }
+
     computeFSNormalCurvature();
 
     if (m_elementsList.empty())
@@ -545,19 +504,29 @@ void Mesh::computeFSNormalCurvature2D()
     m_freeSurfaceCurvature.clear();
     m_boundFSNormal.clear();
 
+    std::size_t minIndex = m_inBulkFacetList.size();
     for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
     {
         const Node& node = m_nodesList[i];
+
+        std::vector<Facet*> boundaryEdges;
+        unsigned int nbFacets = node.getFacetCount();
+     
         if(node.isOnFreeSurface() && !node.isBound())
         {
             assert(node.getFacetCount() != 0);
 
-            const Facet& f_1 = node.getFacet(0);
-            const Facet& f1 = node.getFacet(1);
+            for (unsigned int k = 0; k < nbFacets; k++) 
+            {
+                int index = int(node.m_facets[k] - minIndex);
+                if (index >= 0)
+                    boundaryEdges.push_back(&(m_facetsList[index]));
+            }
 
-            const Node& node_1 = ((f_1.getNode(0) == node) ? f_1.getNode(1) : f_1.getNode(0));
-            const Node& node1 = ((f1.getNode(0) == node) ? f1.getNode(1) : f1.getNode(0));
+            const Node& node_1 = ((boundaryEdges[0]->getNode(0) == node) ? boundaryEdges[0]->getNode(1) : boundaryEdges[0]->getNode(0));
+            const Node& node1 = ((boundaryEdges[1]->getNode(0) == node) ? boundaryEdges[1]->getNode(1) : boundaryEdges[1]->getNode(0));
 
+            //code unchanged from here...
             double x_1 = node_1.getCoordinate(0);
             double x0 = node.getCoordinate(0);
             double x1 = node1.getCoordinate(0);
@@ -594,13 +563,18 @@ void Mesh::computeFSNormalCurvature2D()
         }
         else if(node.isBound() && !node.isFree())
         {
-            const Facet& f_1 = node.getFacet(0);
-            const Facet& f1 = node.getFacet(1);
+            for (unsigned int k = 0; k < nbFacets; k++)
+            {
+                int index = int(node.m_facets[k] - minIndex);
+                if (index >= 0)
+                    boundaryEdges.push_back(&(m_facetsList[index]));
+            }
 
-            const Node& node_1 = ((f_1.getNode(0) == node) ? f_1.getNode(1) : f_1.getNode(0));
-            const Node& node1 = ((f1.getNode(0) == node) ? f1.getNode(1) : f1.getNode(0));
-            const Node& outNode_1 = f_1.getOutNode();
-            const Node& outNode1 = f1.getOutNode();
+            const Node& node_1 = ((boundaryEdges[0]->getNode(0) == node) ? boundaryEdges[0]->getNode(1) : boundaryEdges[0]->getNode(0));
+            const Node& node1 = ((boundaryEdges[1]->getNode(0) == node) ? boundaryEdges[1]->getNode(1) : boundaryEdges[1]->getNode(0));
+
+            const Node& outNode_1 = boundaryEdges[0]->getOutNode();
+            const Node& outNode1 = boundaryEdges[1]->getOutNode();
 
             double x_1 = node_1.getCoordinate(0);
             double x0 = node.getCoordinate(0);

@@ -44,6 +44,11 @@ inline const Node& Mesh::getNode(std::size_t nodeIndex) const noexcept
     return m_nodesList[nodeIndex];
 }
 
+inline Node* Mesh::getNodePtr(std::size_t nodeIndex)
+{
+    return &(m_nodesList[nodeIndex]);
+}
+
 inline std::size_t Mesh::getNodesCount() const noexcept
 {
     return m_nodesList.size();

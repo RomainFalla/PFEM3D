@@ -24,13 +24,126 @@ m_computeNormalCurvature(true)
         m_minTargetMeshSize = meshInfos.refInfo.minTargetMeshSize;
         m_maxTargetMeshSize = meshInfos.refInfo.maxTargetMeshSize;
         m_maxProgressionFactor = meshInfos.refInfo.maxProgressionFactor;
+        m_ImposedTargetMeshSizeBCtags = meshInfos.refInfo.imposedTargetMeshSizeBCtags;
+        m_ImposedTargetMeshSizeValues = meshInfos.refInfo.imposedTargetMeshSizeValues;
     }
     loadFromFile(meshInfos.mshFile);
 }
-
-bool Mesh::addNodes(bool verboseOutput,bool &needToRefineMore)
+bool Mesh::addNodes(bool verboseOutput)
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh!");
+
+    double m_dim_d = double(m_dim);
+    double minLocalMeshSizeAfterRefinement = 0.;// for non-uniform refinement only
+    if (m_useMeshRefinement)
+    {
+        std::size_t bulkFacetCount = m_inBulkFacetList.size();
+        std::size_t boundaryFacetCount = m_facetsList.size();
+
+        double ratio;
+
+        /*for (std::size_t facetIndex = 0; facetIndex < bulkFacetCount; ++facetIndex) 
+        {
+            std::size_t indexElm1 = m_inBulkFacetList[facetIndex].m_elementIndexes[0];
+            std::size_t indexElm2 = m_inBulkFacetList[facetIndex].m_elementIndexes[1];
+
+            double L = m_inBulkFacetList[facetIndex].getLocalMeshSize();
+
+            double meanMesure = (1. / 2.) * (m_elementsList[indexElm1].getSize() + m_elementsList[indexElm2].getSize()); // mesure means area or volume in 3D
+            ratio = std::pow(meanMesure, (m_dim_d - 1.) / m_dim_d) / m_inBulkFacetList[facetIndex].getSize(); 
+
+            minLocalMeshSizeAfterRefinement = m_refinementFactor * std::pow(L, m_dim_d);
+
+            if (meanMesure / minLocalMeshSizeAfterRefinement < m_refinementLevels[0]) continue;
+
+            if (meanMesure / minLocalMeshSizeAfterRefinement > m_refinementLevels[1]) continue;
+
+            if (ratio > 1. / m_dim_d) continue;
+            //it is difficult to understand why, it just results from small calculus on paper. The idea is that the surface or length of the facet must be high enough compare to the adjacent elements
+
+            Node newNode(*this);
+
+            newNode.m_target_mesh_size = L;
+            newNode.m_natural_mesh_size = std::pow(meanMesure, 1. / m_dim_d);
+
+            for (unsigned short k = 0; k < m_dim; ++k)
+            {
+                newNode.m_position[k] = 0;
+                for (unsigned short d = 0; d <= m_dim-1; ++d)
+                {
+                    assert(m_inBulkFacetList[facetIndex].m_nodesIndexes[d] < bulkFacetCount);
+                    newNode.m_position[k] += m_nodesList[m_inBulkFacetList[facetIndex].m_nodesIndexes[d]].m_position[k];
+                }
+                newNode.m_position[k] /= m_dim;
+            }
+
+            newNode.m_states.resize(m_nodesList[0].m_states.size());
+            for (unsigned short k = 0; k < m_nodesList[0].m_states.size(); ++k)
+            {
+                newNode.m_states[k] = 0;
+                for (unsigned short d = 0; d <= m_dim-1; ++d)
+                {
+                    newNode.m_states[k] += m_nodesList[m_inBulkFacetList[facetIndex].m_nodesIndexes[d]].m_states[k];
+                }
+                newNode.m_states[k] /= m_dim ;
+            }
+
+            m_nodesList.push_back(std::move(newNode));
+        }
+
+        for (std::size_t facetIndex = 0; facetIndex < boundaryFacetCount; ++facetIndex)
+        {
+            if (m_facetsList[facetIndex].isBound()) continue;
+
+            std::size_t indexElm = m_facetsList[facetIndex].m_elementIndexes[0];
+
+            double L = m_facetsList[facetIndex].getLocalMeshSize();
+
+            double mesure = m_elementsList[indexElm].getSize(); // mesure means area or volume in 3D
+            ratio = std::pow(mesure, (m_dim_d - 1.) / m_dim_d) / m_facetsList[facetIndex].getSize();
+
+            minLocalMeshSizeAfterRefinement = m_refinementFactor * std::pow(L, m_dim_d);
+
+            if (mesure / minLocalMeshSizeAfterRefinement < m_refinementLevels[0]) continue;
+
+            if (mesure / minLocalMeshSizeAfterRefinement > m_refinementLevels[1]) continue;
+
+            if (ratio > 1. / m_dim_d) continue;
+
+            Node newNode(*this);
+
+            newNode.m_target_mesh_size = L;
+            newNode.m_natural_mesh_size = std::pow(mesure, 1. / m_dim_d);
+
+            for (unsigned short k = 0; k < m_dim; ++k)
+            {
+                newNode.m_position[k] = 0;
+                for (unsigned short d = 0; d <= m_dim-1; ++d)
+                {
+                    assert(m_facetsList[facetIndex].m_nodesIndexes[d] < boundaryFacetCount);
+                    newNode.m_position[k] += m_nodesList[m_facetsList[facetIndex].m_nodesIndexes[d]].m_position[k];
+                }
+                newNode.m_position[k] /= m_dim;
+            }
+
+            newNode.m_states.resize(m_nodesList[0].m_states.size());
+            for (unsigned short k = 0; k < m_nodesList[0].m_states.size(); ++k)
+            {
+                newNode.m_states[k] = 0;
+                for (unsigned short d = 0; d <= m_dim-1; ++d)
+                {
+                    newNode.m_states[k] += m_nodesList[m_facetsList[facetIndex].m_nodesIndexes[d]].m_states[k];
+                }
+                newNode.m_states[k] /= m_dim;
+            }
+
+            newNode.m_isBound = false;
+            newNode.m_isOnBoundary = true;
+            newNode.m_isOnFreeSurface = true;
+
+            m_nodesList.push_back(std::move(newNode));
+        }*/
+    }
 
     bool addedNodes = false;
     //bool refineMore = false;
@@ -39,38 +152,28 @@ bool Mesh::addNodes(bool verboseOutput,bool &needToRefineMore)
     //std::vector<bool> toBeDeletedFacets(m_facetsList.size(), false);
 
     double limitSize = 0.;
-    
-    limitSize = m_omega*std::pow(m_hchar, m_dim);
-    std::size_t elementCount = m_elementsList.size(); //avoid problems becuse the follwinĝ for loop will increase the element number
 
-    double limitSize2 = 0.;
+    limitSize = m_omega * std::pow(m_hchar, m_dim);
+    std::size_t elementCount = m_elementsList.size(); //avoid problems becuse the follwinĝ for loop will increase the element number
 
     for(std::size_t elm = 0 ; elm < elementCount ; ++elm)
     {
-        if (m_useMeshRefinement) // in that case the limit size depend on the local target mesh size
-        {
-            double L = m_elementsList[elm].getLocalMeshSize();
-            if (getDim() == 2)
-            {
-                limitSize = 2. * L * L;
-                limitSize2 = (4. / 3.) * L * L;
-            }
-            else
-            {
-                limitSize = 2. * L * L * L * std::sqrt(2.); //not sure about the correct value in 3D, to see later --R. Falla
-                limitSize2 = (4. / 3.) * L * L * L * std::sqrt(4. / 3.);
-            }
-        }
+        double currentRefinementRatio; // only for non-uniform meshes
+        double L = m_elementsList[elm].getLocalMeshSize(); // only for non-uniform meshes
 
-        if (m_elementsList[elm].m_forcedRefinement) 
+        if (m_useMeshRefinement)
+            minLocalMeshSizeAfterRefinement = m_refinementFactor * std::pow(L, double(m_dim));
+
+        if (m_elementsList[elm].m_forcedRefinement) // m_forcedRefinement is (should be) always false for each element in uniform meshes.
         {
             Node newNode(*this);
 
-            /*for (auto it = m_elementsList[elm].m_facets.begin(); it != m_elementsList[elm].m_facets.end(); ++it)
-            {
-                Facet* facet = *it;
-                facet->m_elements.erase(&(m_elementsList[elm]));
-            }*/
+            newNode.m_target_mesh_size = L;
+            newNode.m_natural_mesh_size = m_elementsList[elm].getNaturalMeshSize(true);
+
+            bool wallNode = true;
+            int tag = -1;
+            std::bitset<8> userDefFlags;
 
             for (unsigned short k = 0; k < m_dim; ++k)
             {
@@ -79,10 +182,17 @@ bool Mesh::addNodes(bool verboseOutput,bool &needToRefineMore)
                 {
                     assert(m_elementsList[elm].m_nodesIndexes[d] < m_nodesList.size());
                     if (m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].isOnBoundary())
+                    {
                         newNode.m_position[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_position[k];
+                        wallNode = wallNode && m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_isBound; // this will be false as soon as a boundary node is not flagged as a wall node
+                        tag = m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_tag;
+                        userDefFlags = m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_userDefFlags;
+                    }
                 }
                 newNode.m_position[k] /= m_dim;
             }
+
+            if (wallNode) continue; // we do not add a node on a solid wall for the moment due to some inconsistencies with the implementation of the initial BCs. R. Falla
 
             newNode.m_states.resize(m_nodesList[0].m_states.size());
             for (unsigned short k = 0; k < m_nodesList[0].m_states.size(); ++k)
@@ -93,115 +203,146 @@ bool Mesh::addNodes(bool verboseOutput,bool &needToRefineMore)
                     if (m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].isOnBoundary())
                         newNode.m_states[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_states[k];
                 }
-                newNode.m_states[k] /= (m_dim + 1);
+                newNode.m_states[k] /= m_dim;
             }
             newNode.m_isOnBoundary = true;
-            newNode.m_isOnFreeSurface= true;
+            newNode.m_isOnFreeSurface = !wallNode; // true
+            newNode.m_isBound = wallNode; // false
+            if (wallNode)
+            {
+                newNode.m_tag = tag;
+                newNode.m_userDefFlags = userDefFlags;
+                std::cout << "tag = " << tag<<"\n" ;
+            }
             m_nodesList.push_back(std::move(newNode));
+            //m_boundaryInitialPos[m_nodesList.size() - 1] = m_nodesList.back().m_position;
         }
 
-        //If an element is too big, we add a node at his center
-        if (/**!needToRefineMore &&*/ m_elementsList[elm].getSize() > limitSize)
+        if (m_useMeshRefinement) 
         {
-            Node newNode(*this);
+            currentRefinementRatio = m_elementsList[elm].getSize() / minLocalMeshSizeAfterRefinement;
+            unsigned int refinementLevel = 0;
+            while (currentRefinementRatio > m_refinementLevels[refinementLevel + 1] && refinementLevel < 5)
+                refinementLevel++;
 
-            /*for (auto it = m_elementsList[elm].m_facets.begin(); it != m_elementsList[elm].m_facets.end(); ++it)
-            {
-                Facet* facet = *it;
-                facet->m_elements.erase(&(m_elementsList[elm]));
-            }*/
+            if (refinementLevel == 1)
+                goto addOneNodeInTheMiddle; // get back the classic refinement used for uniform meshes, except that the if condition no more matters
 
-            for (unsigned short k = 0; k < m_dim; ++k)
+            if (refinementLevel > 1)
+                divideElement(m_elementsList[elm], refinementLevel);
+        }
+        else
+        {
+            //If an element is too big, we add a node at his center
+            if (/**!needToRefineMore &&*/ m_elementsList[elm].getSize() > limitSize)
             {
-                newNode.m_position[k] = 0;
+                addOneNodeInTheMiddle:
+                Node newNode(*this);
+
+                if (m_useMeshRefinement)
+                {
+                    newNode.m_target_mesh_size = L;
+                    newNode.m_natural_mesh_size = m_elementsList[elm].getNaturalMeshSize(true);
+                }
+
+                /*for (auto it = m_elementsList[elm].m_facets.begin(); it != m_elementsList[elm].m_facets.end(); ++it)
+                {
+                    Facet* facet = *it;
+                    facet->m_elements.erase(&(m_elementsList[elm]));
+                }*/
+
+                for (unsigned short k = 0; k < m_dim; ++k)
+                {
+                    newNode.m_position[k] = 0;
+                    for (unsigned short d = 0; d <= m_dim; ++d)
+                    {
+                        assert(m_elementsList[elm].m_nodesIndexes[d] < m_nodesList.size());
+                        newNode.m_position[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_position[k];
+                    }
+                    newNode.m_position[k] /= (m_dim + 1);
+                }
+
+                newNode.m_states.resize(m_nodesList[0].m_states.size());
+                for (unsigned short k = 0; k < m_nodesList[0].m_states.size(); ++k)
+                {
+                    newNode.m_states[k] = 0;
+                    for (unsigned short d = 0; d <= m_dim; ++d)
+                    {
+                        newNode.m_states[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_states[k];
+                    }
+                    newNode.m_states[k] /= (m_dim + 1);
+                }
+
+                m_nodesList.push_back(std::move(newNode));
+
                 for (unsigned short d = 0; d <= m_dim; ++d)
                 {
-                    assert(m_elementsList[elm].m_nodesIndexes[d] < m_nodesList.size());
-                    newNode.m_position[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_position[k];
-                }
-                newNode.m_position[k] /= (m_dim + 1);
-            }
+                    Element element(*this);
 
-            newNode.m_states.resize(m_nodesList[0].m_states.size());
-            for (unsigned short k = 0; k < m_nodesList[0].m_states.size(); ++k)
-            {
-                newNode.m_states[k] = 0;
-                for (unsigned short d = 0; d <= m_dim; ++d)
+                    switch (m_dim)
+                    {
+                    case 2:
+                        if (d == m_dim)
+                        {
+                            element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
+                                                      m_elementsList[elm].m_nodesIndexes[0],
+                                                      m_nodesList.size() - 1 };
+                        }
+                        else
+                        {
+                            element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
+                                                      m_elementsList[elm].m_nodesIndexes[d + 1],
+                                                      m_nodesList.size() - 1 };
+                        }
+                        break;
+
+                    default:
+                        if (d == m_dim)
+                        {
+                            element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
+                                                      m_elementsList[elm].m_nodesIndexes[0],
+                                                      m_elementsList[elm].m_nodesIndexes[1],
+                                                      m_nodesList.size() - 1 };
+                        }
+                        else if (d == m_dim - 1)
+                        {
+                            element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
+                                                      m_elementsList[elm].m_nodesIndexes[d + 1],
+                                                      m_elementsList[elm].m_nodesIndexes[0],
+                                                      m_nodesList.size() - 1 };
+                        }
+                        else
+                        {
+                            element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
+                                                      m_elementsList[elm].m_nodesIndexes[d + 1],
+                                                      m_elementsList[elm].m_nodesIndexes[d + 2],
+                                                      m_nodesList.size() - 1 };
+                        }
+                        break;
+                    }
+
+                    //No recompute of J, detJ and ivJ, everything is recomputed in triangulateAndAlphaShape
+                    element.m_index = m_elementsList.size();
+                    m_elementsList.push_back(std::move(element));
+                    //if (element.getSize() > limitSize) refineMore = true;
+                }
+                toBeDeletedElements[elm] = true;
+
+                /*if (verboseOutput)
                 {
-                    newNode.m_states[k] += m_nodesList[m_elementsList[elm].m_nodesIndexes[d]].m_states[k];
-                }
-                newNode.m_states[k] /= (m_dim + 1);
+                    std::cout << "Adding node (" << "(";
+                    for (unsigned short d = 0; d < m_dim; ++d)
+                    {
+                        std::cout << m_nodesList[m_nodesList.size() - 1].m_position[d];
+                        if (d == m_dim - 1)
+                            std::cout << ")";
+                        else
+                            std::cout << ", ";
+                    }
+                    std::cout << std::endl;
+                }*/
+                addedNodes = true;
             }
-
-            m_nodesList.push_back(std::move(newNode));
-
-            for (unsigned short d = 0; d <= m_dim; ++d)
-            {
-                Element element(*this);
-
-                switch (m_dim)
-                {
-                case 2:
-                    if (d == m_dim)
-                    {
-                        element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
-                                                  m_elementsList[elm].m_nodesIndexes[0],
-                                                  m_nodesList.size() - 1 };
-                    }
-                    else
-                    {
-                        element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
-                                                  m_elementsList[elm].m_nodesIndexes[d + 1],
-                                                  m_nodesList.size() - 1 };
-                    }
-                    break;
-
-                default:
-                    if (d == m_dim)
-                    {
-                        element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
-                                                  m_elementsList[elm].m_nodesIndexes[0],
-                                                  m_elementsList[elm].m_nodesIndexes[1],
-                                                  m_nodesList.size() - 1 };
-                    }
-                    else if (d == m_dim - 1)
-                    {
-                        element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
-                                                  m_elementsList[elm].m_nodesIndexes[d + 1],
-                                                  m_elementsList[elm].m_nodesIndexes[0],
-                                                  m_nodesList.size() - 1 };
-                    }
-                    else
-                    {
-                        element.m_nodesIndexes = { m_elementsList[elm].m_nodesIndexes[d],
-                                                  m_elementsList[elm].m_nodesIndexes[d + 1],
-                                                  m_elementsList[elm].m_nodesIndexes[d + 2],
-                                                  m_nodesList.size() - 1 };
-                    }
-                    break;
-                }
-
-                //No recompute of J, detJ and ivJ, everything is recomputed in triangulateAndAlphaShape
-                element.m_index = m_elementsList.size();
-                m_elementsList.push_back(std::move(element));
-                //if (element.getSize() > limitSize) refineMore = true;
-            }
-            toBeDeletedElements[elm] = true;
-
-            if (verboseOutput)
-            {
-                std::cout << "Adding node (" << "(";
-                for (unsigned short d = 0; d < m_dim; ++d)
-                {
-                    std::cout << m_nodesList[m_nodesList.size() - 1].m_position[d];
-                    if (d == m_dim - 1)
-                        std::cout << ")";
-                    else
-                        std::cout << ", ";
-                }
-                std::cout << std::endl;
-            }
-            addedNodes = true;
         }
         /**if (m_useMeshRefinement) // in that case the limit size depend on the local target mesh size
         {
@@ -267,6 +408,143 @@ bool Mesh::addNodes(bool verboseOutput,bool &needToRefineMore)
     return addedNodes;
 }
 
+void Mesh::divideElement(Element& el,unsigned int level) 
+{
+    std::cout << "Refine element with refinement level == "<< level <<"!!\n";
+    if (level < 2)
+    {
+        std::cout<<"Warning: Divide element has no effect because the level is less than 2!!\n";
+        return;
+    }
+    unsigned int sum;
+    double level_d = double(level);
+
+    std::vector<unsigned int> charges;
+    for (unsigned int i = 0; i <= m_dim; i++)
+    {
+        if (el.m_chargedNode[i])
+            charges.push_back(1);
+        else
+            charges.push_back(0);
+    }
+
+    const Node& n0 = getNode(el.m_nodesIndexes[0]);
+    const Node& n1 = getNode(el.m_nodesIndexes[1]);
+    const Node& n2 = getNode(el.m_nodesIndexes[2]);
+
+    double f0, f1, f2;
+
+    if (m_dim == 2)
+    {     
+        for (unsigned int i = charges[0]; i < level; i++)
+        {
+            f0 = double(i) / level_d;
+            for (unsigned int j = charges[1]; j < level; j++)
+            {
+                sum = i+j;
+                if (sum > level) break;
+                f1 = double(j) / level_d;
+                for (unsigned int k = charges[2]; k < level; k++)
+                {
+                    sum = i+j+k;
+                    if (sum > level) break;
+                    f2 = double(k) / level_d;
+
+                    if (sum != level) continue;
+
+                    Node newNode(*this);
+                    newNode.m_target_mesh_size = el.getLocalMeshSize();
+                    newNode.m_natural_mesh_size = el.getNaturalMeshSize(true);
+
+                    for (unsigned short m = 0; m < m_dim; ++m)
+                        newNode.m_position[m] = f0 * n0.m_position[m] + f1 * n1.m_position[m] + f2 * n2.m_position[m];
+
+
+                    newNode.m_states.resize(m_nodesList[0].m_states.size());
+                    for (unsigned short m = 0; m < m_nodesList[0].m_states.size(); ++m)
+                        newNode.m_states[m] = f0 * n0.m_states[m] + f1 * n1.m_states[m] + f2 * n2.m_states[m];
+
+                    m_nodesList.push_back(std::move(newNode));
+                }
+
+            }
+        }
+    }
+    else //dim == 3
+    {
+        const Node& n3 = getNode(el.m_nodesIndexes[3]);
+        double f3;
+
+        for (unsigned int i = charges[0]; i < level; i++)
+        {
+            f0 = double(i) / level_d;
+            for (unsigned int j = charges[1]; j < level; j++)
+            {
+                sum = i+j;
+                if (sum > level) break;
+                f1 = double(j) / level_d;
+                for (unsigned int k = charges[2]; k < level; k++)
+                {
+                    sum = i+j+k;
+                    if (sum> level) break;
+                    f2 = double(k) / level_d;
+                    for (unsigned int l = charges[3]; l < level; l++)
+                    {
+                        sum = i+j+k+l;
+                        if (sum > level) break;
+                        f3 = double(l) / level_d;
+
+                        if (sum != level) continue;
+
+                        Node newNode(*this);
+                        newNode.m_target_mesh_size = el.getLocalMeshSize();
+                        newNode.m_natural_mesh_size = el.getNaturalMeshSize(true);
+
+                        for (unsigned short m = 0; m < m_dim; ++m)
+                            newNode.m_position[m] = f0 * n0.m_position[m] + f1 * n1.m_position[m] + f2 * n2.m_position[m] + f3 * n3.m_position[m];
+
+
+                        newNode.m_states.resize(m_nodesList[0].m_states.size());
+                        for (unsigned short m = 0; m < m_nodesList[0].m_states.size(); ++m)
+                            newNode.m_states[m] = f0 * n0.m_states[m] + f1 * n1.m_states[m] + f2 * n2.m_states[m] + f3 * n3.m_states[m];
+
+                        m_nodesList.push_back(std::move(newNode));
+                    }
+                }
+
+            }
+        }
+     
+    }
+
+    //loop to avoid the adjacent elements to add nodes on the same facets
+    for (auto it = el.m_facets.begin(); it != el.m_facets.end(); ++it)
+    {
+        std::size_t i = *it;
+        if (i > m_inBulkFacetList.size())
+            continue;
+
+        std::size_t otherElemIndex = m_inBulkFacetList[i].m_elementIndexes[0];
+        std::size_t otherNodeIndex = m_inBulkFacetList[i].m_outNodeIndexes[0];
+
+        if (otherElemIndex == el.m_index) 
+        {
+            otherElemIndex = m_inBulkFacetList[i].m_elementIndexes[1];
+            otherNodeIndex = m_inBulkFacetList[i].m_outNodeIndexes[1];
+        }
+
+        std::size_t inc = 0;
+        for (std::size_t j : m_elementsList[otherElemIndex].m_nodesIndexes)
+        {
+            if (j == otherNodeIndex) 
+            {
+                m_elementsList[otherElemIndex].m_chargedNode[inc] = true;
+            }
+            inc++;
+        }
+    }
+}
+
 bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
@@ -321,7 +599,7 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
     std::remove_if(m_elementsList.begin(), m_elementsList.end(), [this, &toBeDeletedElement, verboseOutput](const Element& element){
         if(toBeDeletedElement[&element - &*std::begin(m_elementsList)])
         {
-            if(verboseOutput)
+            /*if(verboseOutput)
             {
                 std::cout << "Removing out of bounding box element: [";
                 for(unsigned short n= 0 ; n < m_dim + 1 ; ++n)
@@ -341,7 +619,7 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
                         std::cout << ", ";
                 }
                 std::cout << std::endl;
-            }
+            }*/
 
             return true;
         }
@@ -354,7 +632,7 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
     {
         if(toBeDeletedNodes[&node - &*std::begin(m_nodesList)])
         {
-            if(verboseOutput)
+            /*if(verboseOutput)
             {
                 std::cout << "Removing out of bounding box node (";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
@@ -366,7 +644,7 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
                         std::cout << ", ";
                 }
                 std::cout << std::endl;
-            }
+            }*/
 
             return true;
         }
@@ -415,6 +693,80 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
 
     return outofBBNodes;
 }
+
+void Mesh::smoothingLcLoc()
+{
+    std::vector<Node*> seedingNodes;
+    std::vector<Node*> nodesToCheckNextIteration;
+    std::vector<Node*> freshlyRefinedNodes;
+
+    double TargetMeshSizeRatio;
+    double TargetMeshVsNeighboursRatio;
+    double realProg;
+
+    // loop to find the nodes which have a too high LcLocRatio and "seed" a
+    // refinement front from there to propagate until smooth
+    for (auto it = m_nodesList.begin(); it != m_nodesList.end(); ++it)
+    {
+        Node* nod1 = &(*it);
+        for (auto it2 = nod1->m_neighbourNodes.begin(); it2 != nod1->m_neighbourNodes.end(); ++it2)
+        {
+            Node* nod2 = &(m_nodesList[*it2]);
+            TargetMeshSizeRatio = nod2->m_target_mesh_size/ nod1->m_target_mesh_size; // = (localProgression + 1) / 2 = (LcOtherNode/LcThisNode + 1) / 2
+            TargetMeshVsNeighboursRatio = nod1->m_natural_mesh_size / nod1->m_target_mesh_size;
+            realProg = 1. + (m_maxProgressionFactor - 1.) * TargetMeshVsNeighboursRatio;
+            //f = (realProg + 1.) / 2.; // = max allowed edgeLcLoc/nodeLcLoc
+            //more complex but more rigorous, take into account the real size of the elements to update the target mesh size of the neighbouring elements
+
+            if (TargetMeshSizeRatio > realProg)
+            {
+                seedingNodes.push_back(nod1);
+                break;
+            }
+        }
+    }
+
+    //std::cout << "seedingNodes size = " << seedingNodes.size() << "\n";
+
+    // use nod->propagate() on these nodes, to propagate a "wave front" of
+    // refinement over sevral neighboring nodes. Each node that is checked and
+    // if found to need refinement will trigger its neighboring nodes to be
+    // checked also and so on, until there are no more harsh increases of LcLoc
+    int inc = 0;
+    while (true) // we are sure to go out because we keep increasing the LcLoc to check with and the LcLoc are bounded. Therefore, seedingNodes or nodesToCheckNextIteration must be empty at some point.
+    {
+        for (auto it = seedingNodes.begin(); it != seedingNodes.end(); ++it)
+        {
+            TargetMeshVsNeighboursRatio = (*it)->m_natural_mesh_size / (*it)->m_target_mesh_size;
+            realProg = 1. + (m_maxProgressionFactor - 1.) * TargetMeshVsNeighboursRatio;
+            freshlyRefinedNodes.clear();
+            freshlyRefinedNodes = (*it)->propagate(realProg * (*it)->m_target_mesh_size);
+            for (auto it2 = freshlyRefinedNodes.begin(); it2 != freshlyRefinedNodes.end(); ++it2)
+            {
+                Node* nod = *it2;
+                nodesToCheckNextIteration.push_back(nod); // add all neighbouring nodes that were just refined
+            }
+            //std::cout << "realProg = " << realProg << "\n";
+            //std::cout << "TargetMeshVsNeighboursRatio  = " << TargetMeshVsNeighboursRatio << "\n";
+        }
+        seedingNodes.clear();
+        if (nodesToCheckNextIteration.empty()) // no more nodes were refined in this iteration -> the "wave front" ends
+            break;
+
+        // prepare next iteration
+        seedingNodes = nodesToCheckNextIteration;
+        nodesToCheckNextIteration.clear();
+
+        inc++;
+        if (inc == 100)
+        {
+            throw std::runtime_error("while loop in the smoothLcLoc function goes forever...");
+        }
+    }
+    //throw std::runtime_error("I want the program to stop here 4! ");
+    //std::cout << "number of iteration in smoothing = " << inc << " \n";
+}
+
 
 /**void Mesh::linkElementsAndFacets()
 {
@@ -685,16 +1037,37 @@ void Mesh::updateBoundingElementSize()
     m_maxTargetMeshSize = maxValue;
 }
 
-void Mesh::updateLocalElementSize() 
+void Mesh::updateLocalElementSize()
 {
-    for (auto it = m_nodesList.begin(); it != m_nodesList.end(); ++it)
+    if (m_ImposedTargetMeshSizeBCtags.size() == 0)
     {
-        it->updateNaturalMeshSize();
-        double L = it->getNaturalMeshSize();
-        it->setLocalMeshSize(L);
-        /** set the local mesh size to the natural value defined by the local size of the mesh
-        (the local mesh size is not imposed yet), it is a first step to be able to run non-uniform simulations */
+        // default mesh refinement
+        for (auto it = m_nodesList.begin(); it != m_nodesList.end(); ++it)
+        {
+            it->updateNaturalMeshSize();
+            double L = it->getNaturalMeshSize();
+            it->setLocalMeshSize(L);
+            /** set the local mesh size to the natural value defined by the local size of the mesh
+            (the local mesh size is not imposed yet), it is a first step to be able to run non-uniform simulations */
+        }
     }
+    else 
+    {
+        for (auto it = m_nodesList.begin(); it != m_nodesList.end(); ++it)
+        {
+            it->updateNaturalMeshSize();
+            it->setLocalMeshSize(m_maxTargetMeshSize);
+            std::size_t inc = 0;
+            for (auto it2 = m_ImposedTargetMeshSizeBCtags.begin(); it2 != m_ImposedTargetMeshSizeBCtags.end(); ++it2)
+            {
+                if (it->m_tag == *it2)
+                    it->setLocalMeshSize(m_ImposedTargetMeshSizeValues[inc]);
+                inc++;
+            }
+        }
+        smoothingLcLoc();
+    }
+    //throw std::runtime_error("I want the program to stop here 2! ");
 }
 
 std::vector<std::vector<double>> Mesh::getShapeFunctions(unsigned int dimension, unsigned int n) const
@@ -810,6 +1183,28 @@ void Mesh::loadFromFile(const std::string& fileName)
 
     // Check that the mesh is not 3D
     computeMeshDim();
+
+    if (m_useMeshRefinement) 
+    {
+        if (m_dim == 2)
+        {
+            m_refinementFactor = 2. / 3.;
+            m_refinementLevels[0] = 2.;
+            m_refinementLevels[1] = 3.;
+        }
+        else
+        {
+            m_refinementFactor = 1. / 2.;
+            m_refinementLevels[0] = 3.;
+            m_refinementLevels[1] = 4.;
+        }
+
+        for (int k = 2; k <= 5; k++) 
+        {
+            m_refinementLevels[k] = std::pow(k, double(m_dim));
+        }
+    }
+
 
     if(m_boundingBox.size() != 2*m_dim)
         throw std::runtime_error("bad bounding box format! Format: [xmin, ymin, xmax, ymax]");
@@ -954,7 +1349,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     if (m_dim == 2)
     {
         std::vector<std::size_t> triangles;
-        for (int i = 0; i < nb_types; i++)
+        for (std::size_t i = 0; i < nb_types; i++)
         {
             //std::cout << "elementType = " << elementTypes[i] << "\n";
             if (elementTypes[i] != 2) continue;//not triangles
@@ -965,7 +1360,7 @@ void Mesh::loadFromFile(const std::string& fileName)
         std::size_t L = triangles.size() / 3;
         //std::cout << "triangles size = " << triangles.size() << "\n";
 
-        for (int i = 0; i < L; ++i)
+        for (std::size_t i = 0; i < L; ++i)
         {
             Element element(*this);
             std::vector<std::size_t> elementNodes = { nodeIndexMap[triangles[3 * i]], nodeIndexMap[triangles[3 * i + 1]], nodeIndexMap[triangles[3 * i + 2]]};
@@ -979,7 +1374,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     else
     {
         std::vector<std::size_t> tetrahedrons;
-        for (int i = 0; i < nb_types; i++)
+        for (std::size_t i = 0; i < nb_types; i++)
         {
             if (elementTypes[i] != 4) continue;//not tetrahedrons
 
@@ -988,7 +1383,7 @@ void Mesh::loadFromFile(const std::string& fileName)
         }
         std::size_t L = tetrahedrons.size() / 4;
 
-        for (int i = 0; i < L; ++i)
+        for (std::size_t i = 0; i < L; ++i)
         {
             Element element(*this);
             std::vector<std::size_t> elementNodes = { nodeIndexMap[tetrahedrons[3 * i]],nodeIndexMap[tetrahedrons[3 * i + 1]], nodeIndexMap[tetrahedrons[3 * i + 2]], nodeIndexMap[tetrahedrons[3 * i + 3]]};
@@ -1031,17 +1426,10 @@ void Mesh::loadFromFile(const std::string& fileName)
 
 void Mesh::remesh(bool verboseOutput)
 {
-    bool needToAddMoreNodes = false;
     checkBoundingBox(verboseOutput);
-    //do {
-    addNodes(verboseOutput, needToAddMoreNodes);
-    //}
-    //while (needToAddMoreNodes);
-    /** this loop is usefull for non-uniform meshes when the size of the element is very
-    different from the prescribed size, which should happen only at specific time step, the condition inside of the while() being false most of the time */
+    addNodes(verboseOutput);
     removeNodes(verboseOutput);
     triangulateAlphaShape();
-    //linkElementsAndFacets();
 }
 
 bool Mesh::removeNodes(bool verboseOutput) noexcept
@@ -1116,7 +1504,7 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
     {
        if(toBeDeleted[&node - &*std::begin(m_nodesList)])
        {
-           if(verboseOutput)
+           /*if(verboseOutput)
            {
                 std::cout << "Removing node " << "(";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
@@ -1128,7 +1516,7 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
                         std::cout << ", ";
                 }
                 std::cout << std::endl;
-           }
+           }*/ 
 
            return true;
        }
@@ -1364,73 +1752,4 @@ double Mesh::getCircumScribedRadius(std::vector<size_t> nods)
     double ydummy = DET * (x21 * R31 - x31 * R21);
 
     return std::sqrt(xdummy * xdummy + ydummy * ydummy);
-}
-
-Node Mesh::splitBoundaryElement(Element* elm, std::size_t oppositeNodeIndex)
-{
-    Node newNode(*this);
-
-    std::size_t nbStates = m_nodesList[0].m_states.size();
-
-    for (unsigned short i = 0; i < m_dim; ++i)
-    {
-        newNode.m_position[i] = 0;
-        for (unsigned short j = 0; j <= m_dim; ++j)
-        {
-            //assert(elm->m_nodesIndexes[j] < nodeListSize);
-            if (elm->m_nodesIndexes[j] != oppositeNodeIndex)
-                newNode.m_position[i] += m_nodesList[elm->m_nodesIndexes[j]].m_position[i];
-        }
-        newNode.m_position[i] /= m_dim;
-    }
-
-    newNode.m_states.resize(nbStates);
-    for (std::size_t i = 0; i < nbStates; ++i)
-    {
-        newNode.m_states[i] = 0;
-        for (unsigned short j = 0; j <= m_dim; ++j)
-        {
-            if (elm->m_nodesIndexes[j] != oppositeNodeIndex)
-                newNode.m_position[i] += m_nodesList[elm->m_nodesIndexes[j]].m_states[i];
-        }
-        newNode.m_states[i] /= m_dim;
-    }
-
-    switch (m_dim)
-    {
-    case 2:
-        for (unsigned short i = 0; i <= m_dim; ++i)
-        {
-            if (elm->m_nodesIndexes[i] == oppositeNodeIndex) continue;
-            Element element(*this);
-            std::vector<std::size_t> v = { elm->m_nodesIndexes[i],oppositeNodeIndex,m_nodesList.size() };
-            element.m_nodesIndexes = v;
-            element.build(v, m_nodesList);
-            element.m_index = m_elementsList.size();
-            m_elementsList.push_back(std::move(element));
-            for (std::size_t index : m_elementsList.back().m_nodesIndexes)
-                m_nodesList[index].m_elements.push_back(m_elementsList.size() - 1);
-        }
-    default:
-        for (unsigned short i = 0; i <= m_dim; ++i)
-        {
-            if (elm->m_nodesIndexes[i] == oppositeNodeIndex) continue;
-            for (unsigned short j = 0; j < i; ++j)
-            {
-                if (elm->m_nodesIndexes[j] == oppositeNodeIndex) continue;
-
-                Element element(*this);
-                std::vector<std::size_t> v = { elm->m_nodesIndexes[i],oppositeNodeIndex,m_nodesList.size() };
-                element.m_nodesIndexes = v;
-                element.build(v, m_nodesList);
-                element.m_index = m_elementsList.size();
-                m_elementsList.push_back(std::move(element));
-                for (std::size_t index : m_elementsList.back().m_nodesIndexes)
-                    m_nodesList[index].m_elements.push_back(m_elementsList.size() - 1);
-            }
-        }
-        break;
-    }
-   
-    return newNode;
 }

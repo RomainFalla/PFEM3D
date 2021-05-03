@@ -25,7 +25,7 @@ typedef Kernel::Tetrahedron_3                                                   
 
 struct CellInfo3
 {
-    CellInfo2() { isExt = true; }
+    CellInfo3() { isExt = true; }
     std::size_t index;
     std::vector<std::size_t> neighboursElemIndexes;
     bool isExt;
@@ -42,6 +42,7 @@ void Mesh::triangulateAlphaShape3D()
 
     m_elementsList.clear();
     m_facetsList.clear();
+    m_inBulkFacetList.clear();
 
     // We have to construct an intermediate representation for CGAL. We also reset
     // nodes properties.
@@ -182,14 +183,14 @@ void Mesh::triangulateAlphaShape3D()
             facet.m_nodesIndexes = {facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 0))->info(),
                                     facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 1))->info(),
                                     facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 2))->info()};
-            facet.m_outNodeIndex = facetAS.first->vertex(facetAS.second)->info();
+            facet.m_outNodeIndexes.push_back(facetAS.first->vertex(facetAS.second)->info());
             facet.computeJ();
             facet.computeDetJ();
             facet.computeInvJ();
 
-            if(facet.m_outNodeIndex == facet.m_nodesIndexes[0] ||
-               facet.m_outNodeIndex == facet.m_nodesIndexes[1] ||
-               facet.m_outNodeIndex == facet.m_nodesIndexes[2])
+            if(facet.m_outNodeIndexes[0] == facet.m_nodesIndexes[0] ||
+               facet.m_outNodeIndexes[0] == facet.m_nodesIndexes[1] ||
+               facet.m_outNodeIndexes[0] == facet.m_nodesIndexes[2])
             {
                 std::cerr << "A face with an outIndex equal to one of the face node index has been encountered" << std::endl;
                 continue;
@@ -247,17 +248,9 @@ void Mesh::TriangulateWeightedAlphaShape3D()
     std::vector<Triangulation_3::Cell_handle> elementCopies;
     std::vector<Triangulation_3::Cell_handle> elToPotentiallyRemove;
 
-    int count_total = 0;
-    int count_bulk = 0;
-    int count_inboundary = 0;
-    int count_outboundary = 0;
-    int count_outalpha = 0;
-    int count_notSmooth = 0;
-
     double meanElementSize = 0.;
     for (auto fit = T.finite_cells_begin(); fit != T.finite_cells_end(); ++fit)
     {
-        count_total++;
         index = m_elementsList.size();
         Triangulation_3::Cell_handle cell{ fit };
        
@@ -268,7 +261,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
         ELEMENT_TYPE elmType = getElementType(nodeIndexes);
         Element element(*this);
         element.m_nodesIndexes = nodeIndexes;
-        std::size_t nbNodes = m_nodesList.size();
 
         element.build(nodeIndexes, m_nodesList);
         element.updateLargestExtension();
@@ -292,48 +284,35 @@ void Mesh::TriangulateWeightedAlphaShape3D()
             std::vector<std::size_t> v = { in0,in1,in2 };
             
             if (elmType == IN_BULK)
-            {
                 keepElement = true;
-                count_bulk++;
-            }
             else if (elmType == INSIDE_BOUNDARY)
             {
-                count_inboundary++;
                 if (r > m_alphaRatio * localMeshSize)
                 {
                     if (element.getSize() > limitVal)
                     {
                         keepElement = true;
-                        //element.m_forcedRefinement = true;
+                        double area = element.getBoundaryFacetSize();
+                        if (std::pow(realMeshSize,2.) / area < 1./3.)
+                            element.m_forcedRefinement = true;
                     }
                 }
                 else
-                {
                     keepElement = true;
-                }
+
             }
             else if (elmType == OUTSIDE_BOUNDARY && r < m_alphaRatio * localMeshSize && realMeshSize < 1.4 * minMeshSize)
-            {
-                count_outboundary++;
                 keepElement = true;
-            }
-            else 
-            {
-                count_outalpha++;
-                count_outboundary++;
-            }
+
+
             
-        }
-        else 
-        {
-            count_notSmooth++;
         }
         if (keepElement)
         {
             cell->info().isExt = false;
             cell->info().index = index;
             element.m_index = index;
-            for (std::size_t j = 0; j < m_dim + 1; j++)
+            for (int j = 0; j < m_dim + 1; j++)
             {
                 cell->neighbor(j)->info().neighboursElemIndexes.push_back(index);
             }
@@ -344,7 +323,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
         }
     }
     meanElementSize /= m_elementsList.size();
-    std::cout << "meanElementSize = " << meanElementSize << "\n";
     
     std::size_t NbKeptElements = elementCopies.size();
     for (std::size_t i = 0; i < NbKeptElements; i++) 
@@ -355,16 +333,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
 
     elementCopies.clear();
 
-    //I leave it here for debugging purpose
-    std::cout << " count_total = " << count_total << "\n";
-    std::cout << " count_notSmooth = " << count_notSmooth << "\n";
-    std::cout << " count_bulk  = " << count_bulk << "\n";
-    std::cout << " count_inboundary = " << count_inboundary << "\n";
-    std::cout << " count_outboundary  = " << count_outboundary << "\n";
-    std::cout << " count_outalpha = " << count_outalpha << "\n";
- 
-   
-    /**/
 #pragma omp parallel for default(shared)
     for (std::size_t n = 0; n < m_nodesList.size(); ++n)
     {
@@ -374,11 +342,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
             m_nodesList[n].m_neighbourNodes.end());
     }
 
-    int count1 = 0;
-    int count2 = 0;
-    int count3 = 0;
-    int count4 = 0;
-    int count5 = 0;
     for (std::size_t i = 0; i < m_nodesList.size(); ++i)
     {
         if (m_nodesList[i].m_elements.size() != 0)
@@ -395,7 +358,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
 
     for (auto it = T.finite_facets_begin(); it != T.finite_facets_end(); ++it)
     {
-        count1++;
         // We compute the free surface nodes
         Triangulation_3::Facet facet1{ *it };
         Triangulation_3::Facet facet2 = T.mirror_facet(facet1);
@@ -405,34 +367,44 @@ void Mesh::TriangulateWeightedAlphaShape3D()
 
         Triangulation_3::Facet facetToBuildFacet;
 
+        Facet facet(*this);
+
         if (!cell1->info().isExt && !cell2->info().isExt) // not OnBoundary
         {
-            count2++;
+            facet.m_nodesIndexes = { facet1.first->vertex((facet1.second + 1) % 3)->info(),
+                                    facet1.first->vertex((facet1.second + 2) % 3)->info() };
+
+            facet.m_outNodeIndexes.push_back(facet1.first->vertex((facet1.second) % 3)->info());
+            facet.m_outNodeIndexes.push_back(facet2.first->vertex((facet2.second) % 3)->info());
+            facet.m_elementIndexes.push_back(facet1.first->info().index);
+            facet.m_elementIndexes.push_back(facet2.first->info().index);
+            m_inBulkFacetList.push_back(std::move(facet));
             continue;
         }
 
         if (cell1->info().isExt && cell2->info().isExt) // not on boundary + this condition --> not Regular
-        {
-            count3++;
             continue;
-        }
-
-        count4++;
 
         if (cell1->info().isExt)
             facetToBuildFacet = facet2;
         else
             facetToBuildFacet = facet1;
 
-        Triangulation_3::Vertex_handle outVertex = facetToBuildFacet.first->vertex((facetToBuildFacet.second) % 4);
-
-        Facet facet(*this);
         facet.m_nodesIndexes = { facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 0))->info(),
                                 facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 1))->info(),
-                                facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 2))->info()};
+                                facetToBuildFacet.first->vertex(Triangulation_3::vertex_triple_index(facetToBuildFacet.second, 2))->info() };
 
-        facet.m_outNodeIndex = facetToBuildFacet.first->vertex((facetToBuildFacet.second))->info();
-        facet.m_elementIndex = facetToBuildFacet.first->info().index;
+        facet.m_outNodeIndexes.push_back(facetToBuildFacet.first->vertex((facetToBuildFacet.second))->info());
+        facet.m_elementIndexes.push_back(facetToBuildFacet.first->info().index);
+
+        if (facet.isBound()) 
+        {
+            for (std::size_t k = 0; k < m_elementsList[facet.m_elementIndexes[0]].m_nodesIndexes.size(); k++)
+            {
+                if (facet.m_outNodeIndexes[0] == m_elementsList[facet.m_elementIndexes[0]].m_nodesIndexes[k])
+                    m_elementsList[facet.m_elementIndexes[0]].m_chargedNode[k] = true;
+            }
+        }
 
         if (!(m_nodesList[facet.m_nodesIndexes[0]].isBound() &&
             m_nodesList[facet.m_nodesIndexes[1]].isBound() &&
@@ -457,11 +429,23 @@ void Mesh::TriangulateWeightedAlphaShape3D()
             m_nodesList[i].m_facets.push_back(m_facetsList.size() - 1);
 
     }
-   std::cout << "count 1 =" << count1 << "\n";
-   std::cout << "count 2 =" << count2 << "\n";
-   std::cout << "count 3 =" << count3 << "\n";
-   std::cout << "count 4 =" << count4 << "\n";
-   std::cout << "count 5 =" << count5 << "\n";
+
+   std::size_t facetCounter = 0;
+   for (auto it = m_inBulkFacetList.begin(); it != m_inBulkFacetList.end(); ++it)
+   {
+       m_elementsList[it->m_elementIndexes[0]].m_facets.push_back(facetCounter);
+       m_elementsList[it->m_elementIndexes[1]].m_facets.push_back(facetCounter);
+       for (std::size_t i : it->m_nodesIndexes)
+           m_nodesList[i].m_facets.push_back(facetCounter);
+       facetCounter++;
+   }
+   for (auto it = m_facetsList.begin(); it != m_facetsList.end(); ++it)
+   {
+       m_elementsList[it->m_elementIndexes[0]].m_facets.push_back(facetCounter);
+       for (std::size_t i : it->m_nodesIndexes)
+           m_nodesList[i].m_facets.push_back(facetCounter);
+       facetCounter++;
+   }
 
     computeFSNormalCurvature3D();
 
@@ -494,6 +478,8 @@ void Mesh::computeFSNormalCurvature3D()
             std::array<double, 3> facetNormal;
 
             const Facet& f = node.getFacet(j);
+
+            if (!f.isOnBoundary()) continue;
 
             const Node& outNode = f.getOutNode();
 

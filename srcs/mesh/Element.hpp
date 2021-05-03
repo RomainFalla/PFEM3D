@@ -24,6 +24,7 @@ class MESH_API Element
     public:
         /// \param mesh a reference to the mesh
         Element(Mesh& mesh);
+        Element(Mesh& mesh,std::vector<std::size_t> nodeIndexes);
         Element(const Element& element)             = default;
         Element(Element&& element)                  = default;
         ~Element()                                  = default;
@@ -104,6 +105,9 @@ class MESH_API Element
         /// \return The area or volume of the element.
         double getSize() const noexcept;
 
+        /// \return The length or area of the element.
+        double getBoundaryFacetSize() const noexcept;
+
         /// \return The mean mesh size among tho nodes belonging to the element.
         double getLocalMeshSize() const noexcept;
 
@@ -130,6 +134,7 @@ class MESH_API Element
     private:
         Mesh* m_pMesh;                                  /**< A pointer to the mesh from which the facet comes from. */
         double m_largest_extension;                     /**< contains the highest separation between 2 nodes of the element*/
+        double m_target_mesh_size;                      /**< target mesh size at the element level (updated by the solution based refiners)*/
         bool m_forcedRefinement;
 
         double m_r;                                      /**< circumscrived radius*/
@@ -137,7 +142,11 @@ class MESH_API Element
         std::size_t m_index;                            /** Index of the element in the element list of the mesh*/
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this element. */
         std::vector<std::size_t> m_elemsIndexes;        /**< Indexes of the neighbors elements. */
-        //std::set<Facet*> m_facets;                      /**< set of pointer to the faces which have this element. */
+        std::vector<std::size_t> m_facets;              /**< Indexes of the neighbors facets. */
+
+        std::vector<bool> m_chargedNode;                  /**< flag inside the element, associated to each nodes corresponding in the m_nodeIndex List,
+                                                          which is true when the weight used for refinement cannot be 0 for that node.
+                                                          This is used to avoid adding several times the same nodes when refining adjacent elements*/
 
         double m_detJ;                                  /**< Determinant of the Jacobian matrix of the element. */
         std::array<std::array<double, 3>, 3> m_J;       /**< Jacobian matrix of the element. */

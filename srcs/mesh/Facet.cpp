@@ -14,6 +14,11 @@ m_pMesh(&mesh)
 
 }
 
+Facet::Facet(Mesh& mesh,std::vector<std::size_t> nodeIndexes) : Facet(mesh)
+{
+    m_nodesIndexes = nodeIndexes;
+}
+
 void Facet::computeJ()
 {
     m_J = {{{0, 0},
@@ -135,7 +140,83 @@ const Node& Facet::getNode(unsigned int nodeIndex) const noexcept
 
 const Node& Facet::getOutNode() const noexcept
 {
-    return m_pMesh->getNode(m_outNodeIndex);
+    return m_pMesh->getNode(m_outNodeIndexes[0]);
+}
+
+bool Facet::isBound() const noexcept
+{
+    if (m_nodesIndexes.size() == 2)
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+
+        return (n0.isBound() && n1.isBound());
+    }
+    else
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+        const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+
+        return (n0.isBound() && n1.isBound() && n2.isBound());
+    }
+}
+bool Facet::isOnBoundary() const noexcept
+{
+    if (m_nodesIndexes.size() == 2)
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+
+        return (n0.isOnBoundary() && n1.isOnBoundary());
+    }
+    else
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+        const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+
+        return (n0.isOnBoundary() && n1.isOnBoundary() && n2.isOnBoundary());
+    }
+}
+
+
+double Facet::getSize() const noexcept
+{
+    unsigned short dim = m_pMesh->getDim();
+    if (dim == 2)
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+
+        return n0.distance(n0, n1);
+    }
+    else
+    {
+        Element elm(*m_pMesh, m_nodesIndexes);
+
+        return elm.getSize();
+    }
+}
+
+double Facet::getLocalMeshSize() 
+{
+    if (m_nodesIndexes.size() == 2)
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+
+        return (1. / 2.) * (n0.getLocalMeshSize() + n1.getLocalMeshSize());
+    }
+    else
+    {
+        const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);
+        const Node& n1 = m_pMesh->getNode(m_nodesIndexes[1]);
+        const Node& n2 = m_pMesh->getNode(m_nodesIndexes[2]);
+
+        return (1. / 3.) * (n0.getLocalMeshSize() + n1.getLocalMeshSize() + n2.getLocalMeshSize());
+    }
+    return 0.;
 }
 
 std::array<double, 3> Facet::getPosFromGP(const std::array<double, 3>& gp) const noexcept

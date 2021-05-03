@@ -69,7 +69,8 @@ m_step(0)
         createInfo.refInfo.minTargetMeshSize = refinement.checkAndGet<double>("minTargetMeshSize");
         createInfo.refInfo.maxTargetMeshSize = refinement.checkAndGet<double>("maxTargetMeshSize");
         createInfo.refInfo.maxProgressionFactor = refinement.checkAndGet<double>("maxProgressionFactor");
-
+        createInfo.refInfo.imposedTargetMeshSizeBCtags = refinement.checkAndGet<std::vector<int>>("imposedTargetMeshSizeBCtags");
+        createInfo.refInfo.imposedTargetMeshSizeValues = refinement.checkAndGet<std::vector<double>>("imposedTargetMeshSizeValues");
     }
 
 

@@ -14,6 +14,13 @@ m_pMesh(&mesh)
     m_largest_extension = 0;
 }
 
+Element::Element(Mesh& mesh, std::vector<std::size_t> nodeIndexes):Element(mesh)
+{
+    m_nodesIndexes = nodeIndexes;
+    computeJ();
+    computeDetJ();
+}
+
 void Element::computeJ()
 {
     m_J = {{{0, 0, 0},
@@ -231,6 +238,42 @@ std::array<double, 3> Element::getPosFromGP(const std::array<double, 3>& gp) con
 double Element::getSize() const noexcept
 {
     return abs(m_detJ*m_pMesh->getRefElementSize(m_pMesh->getDim()));
+}
+
+double Element::getBoundaryFacetSize() const noexcept
+{
+    unsigned short dim = m_pMesh->getDim();
+    if (dim == 2)
+    {
+        std::vector<Node> facetNodes;
+        for (auto it = m_nodesIndexes.begin(); it != m_nodesIndexes.end(); it++)
+        {
+            Node nod = m_pMesh->getNode(*it);
+            if (nod.isOnBoundary())
+                facetNodes.push_back(nod);
+        }
+        if (facetNodes.size() < 2)
+            return -1.;
+
+        double L = facetNodes[0].distance(facetNodes[0], facetNodes[1]);
+        return L;
+    }
+    else 
+    {
+        Element elm(*this);
+        for (auto it = m_nodesIndexes.begin(); it != m_nodesIndexes.end(); it++)
+        {
+            if (m_pMesh->getNode(*it).isOnBoundary())
+                elm.m_nodesIndexes.push_back(*it);
+        }
+        if (elm.m_nodesIndexes.size() < 3)
+            return -1.;
+        
+        elm.computeJ();
+        elm.computeDetJ();
+        double S = elm.getSize();
+        return S;
+    }
 }
 
 double Element::getNaturalMeshSize(bool valueAtNodes)
@@ -479,6 +522,9 @@ void Element::build(std::vector<std::size_t> nodeIndices, std::vector<Node> &nod
     computeJ();
     computeDetJ();
     computeInvJ();
+
+    while (m_chargedNode.size() < m_nodesIndexes.size())
+        m_chargedNode.push_back(false);
 
     std::size_t L = nodeIndices.size();
     for (std::size_t  i = 0; i < L; i++)

@@ -7,7 +7,7 @@ inline std::size_t Facet::getNodeIndex(unsigned int node) const noexcept
 
 inline std::size_t Facet::getOutNodeIndex() const noexcept
 {
-    return m_outNodeIndex;
+    return m_outNodeIndexes[0];
 }
 
 inline double Facet::getDetJ() const noexcept

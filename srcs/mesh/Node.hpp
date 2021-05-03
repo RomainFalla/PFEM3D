@@ -90,6 +90,9 @@ class MESH_API Node
         /// \update the natural mesh size at the node
         void updateNaturalMeshSize();
 
+        /// \update the value of the neighbours nodes to tMeshSize if this value is higher than the actual target mesh size of that node, and return the list of nodes updated this way
+        std::vector<Node*> propagate(double tMeshSize);
+
 
 
         /// \return the point weight used for the weighted triangulation and alpha shape

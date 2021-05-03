@@ -70,8 +70,8 @@ void HeatEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& 
 
     const std::size_t nodesCount = m_pMesh->getNodesCount();
 
-    const std::size_t facetsCount = m_pMesh->getFacetsCount();
-    const std::size_t noPerFacet = m_pMesh->getNodesPerFacet();
+    //const std::size_t facetsCount = m_pMesh->getFacetsCount();
+    //const std::size_t noPerFacet = m_pMesh->getNodesPerFacet();
 
     //Do not parallelize this (lua)
     for (std::size_t n = 0 ; n < nodesCount ; ++n)

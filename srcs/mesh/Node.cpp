@@ -13,6 +13,9 @@ m_pMesh(&mesh)
     m_facets.clear();
 
     m_isOnBoundary = false;
+    m_isBound = false;
+    m_isOnFreeSurface = false;
+    m_target_mesh_size = std::numeric_limits<double>::infinity();
 }
 
 const Element& Node::getElement(unsigned int elementIndex) const noexcept
@@ -84,4 +87,23 @@ double Node::getWeight(double alphaRatio, double minTargetMeshSize)
     //std::cout << "natural_mesh_size= " << m_natural_mesh_size<< "\n";
     return std::pow(alphaRatio, 2.) * (std::pow(m_target_mesh_size, 2.) - std::pow(minTargetMeshSize, 2.));
 }
+
+std::vector<Node*> Node::propagate(double tMeshSize)
+{
+    std::vector<Node*> nextNodes;
+
+    for (auto it = m_neighbourNodes.begin(); it != m_neighbourNodes.end(); ++it)
+    {
+        Node* nod = m_pMesh->getNodePtr(*it);
+
+        if (nod->m_target_mesh_size > tMeshSize)
+        {
+            nod->m_target_mesh_size = tMeshSize;
+            nextNodes.push_back(nod);
+        }
+    }
+
+    return nextNodes;
+}
+
 
