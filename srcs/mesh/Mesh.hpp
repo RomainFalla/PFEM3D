@@ -90,7 +90,7 @@ class MESH_API Mesh
 
         /// \param facet The index of the face.
         /// \return A reference to the face.
-        inline const Facet& getFacet(std::size_t facet) const noexcept;
+        const Facet& getFacet(std::size_t facet) const noexcept;
 
         /// \return The number of boundary face in the mesh.
         inline std::size_t getFacetsCount() const noexcept;

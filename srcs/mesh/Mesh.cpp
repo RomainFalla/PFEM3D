@@ -521,7 +521,7 @@ void Mesh::divideElement(Element& el,unsigned int level)
     for (auto it = el.m_facets.begin(); it != el.m_facets.end(); ++it)
     {
         std::size_t i = *it;
-        if (i > m_inBulkFacetList.size())
+        if (i >= m_inBulkFacetList.size())
             continue;
 
         std::size_t otherElemIndex = m_inBulkFacetList[i].m_elementIndexes[0];
@@ -767,6 +767,13 @@ void Mesh::smoothingLcLoc()
     //std::cout << "number of iteration in smoothing = " << inc << " \n";
 }
 
+const Facet& Mesh::getFacet(std::size_t facet) const noexcept
+{
+    if (facet < m_inBulkFacetList.size())
+        return m_inBulkFacetList[facet];
+    else
+        return m_facetsList[facet - m_inBulkFacetList.size()];
+}
 
 /**void Mesh::linkElementsAndFacets()
 {

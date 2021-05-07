@@ -18,11 +18,6 @@ inline std::size_t Mesh::getElementsCount() const noexcept
     return m_elementsList.size();
 }
 
-inline const Facet& Mesh::getFacet(std::size_t facet) const noexcept
-{
-    return m_facetsList[facet];
-}
-
 inline std::size_t Mesh::getFacetsCount() const noexcept
 {
     return m_facetsList.size();

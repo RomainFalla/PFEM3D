@@ -322,6 +322,8 @@ void Mesh::TriangulateWeightedAlphaShape3D()
                 m_nodesList[i].m_elements.push_back(m_elementsList.size() - 1);     
         }
     }
+
+    
     meanElementSize /= m_elementsList.size();
     
     std::size_t NbKeptElements = elementCopies.size();
@@ -329,7 +331,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
     {
         m_elementsList[i].m_elemsIndexes = elementCopies[i]->info().neighboursElemIndexes; // copy the links from the CGAL data structure to our data structure.
     }
-
 
     elementCopies.clear();
 
@@ -355,7 +356,6 @@ void Mesh::TriangulateWeightedAlphaShape3D()
             m_nodesList[i].m_isOnBoundary = true;
         }
     }
-
     for (auto it = T.finite_facets_begin(); it != T.finite_facets_end(); ++it)
     {
         // We compute the free surface nodes
@@ -446,8 +446,10 @@ void Mesh::TriangulateWeightedAlphaShape3D()
            m_nodesList[i].m_facets.push_back(facetCounter);
        facetCounter++;
    }
-
-    computeFSNormalCurvature3D();
+   std::cout << "m_inBulkFacetList size = " << m_inBulkFacetList.size() << '\n';
+   std::cout << "m_facetsList size = " << m_facetsList.size() << '\n';
+   computeFSNormalCurvature3D();
+    //throw std::runtime_error("stop mesh constructor");
 
     if (m_elementsList.empty())
         throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
@@ -475,16 +477,17 @@ void Mesh::computeFSNormalCurvature3D()
         std::set<const Node*> pateletNodes;
         for(std::size_t j = 0; j < node.getFacetCount() ; ++j)
         {
-            std::array<double, 3> facetNormal;
+            std::vector<double> facetNormal;
 
             const Facet& f = node.getFacet(j);
-
+            
             if (!f.isOnBoundary()) continue;
 
             const Node& outNode = f.getOutNode();
 
             std::array<const Node*, 2> facetNodes;
 
+            
             if(f.getNode(0) == node)
             {
                 facetNodes = {&f.getNode(1), &f.getNode(2)};
@@ -503,7 +506,7 @@ void Mesh::computeFSNormalCurvature3D()
                 pateletNodes.insert(&f.getNode(0));
                 pateletNodes.insert(&f.getNode(1));
             }
-
+            
             const Node& n1 = *facetNodes[0];
             const Node& n2 = *facetNodes[1];
 
@@ -519,10 +522,15 @@ void Mesh::computeFSNormalCurvature3D()
                 n2.getCoordinate(2) - node.getCoordinate(2)
             };
 
-            facetNormal[0] = a[1]*b[2] - a[2]*b[1];
-            facetNormal[1] = a[2]*b[0] - a[0]*b[2];
-            facetNormal[2] = a[0]*b[1] - a[1]*b[0];
+            
+            facetNormal.push_back( a[1]*b[2] - a[2]*b[1]);
+            facetNormal.push_back( a[2]*b[0] - a[0]*b[2]);
+            facetNormal.push_back( a[0]*b[1] - a[1]*b[0]);
 
+            // here last
+            /*
+            std::cout << "facetNormal[0] = " << facetNormal[0] << "\n";
+            
             double norm = std::sqrt(facetNormal[0]*facetNormal[0] + facetNormal[1]*facetNormal[1] + facetNormal[2]*facetNormal[2]);
 
             facetNormal[0] /= norm;
@@ -538,6 +546,7 @@ void Mesh::computeFSNormalCurvature3D()
                 outNode.getCoordinate(2) - node.getCoordinate(2)
             };
 
+            
             if(vecToOutNode[0]*facetNormal[0] + vecToOutNode[1]*facetNormal[1] + vecToOutNode[2]*facetNormal[2] > 0)
             {
                 facetNormal[0] *= -1.0;
@@ -547,9 +556,11 @@ void Mesh::computeFSNormalCurvature3D()
 
             for(std::size_t k = 0 ; k < finalNodeNormal.size() ; ++k)
                 finalNodeNormal[k] += angle*facetNormal[k];
+            */
+
         }
 
-        double finalNodeNormalNorm = std::sqrt(finalNodeNormal[0]*finalNodeNormal[0]
+        /*double finalNodeNormalNorm = std::sqrt(finalNodeNormal[0]*finalNodeNormal[0]
                                               + finalNodeNormal[1]*finalNodeNormal[1]
                                               + finalNodeNormal[2]*finalNodeNormal[2]);
 
@@ -560,7 +571,6 @@ void Mesh::computeFSNormalCurvature3D()
             continue;
 
         //We now compute the two curvatures by fitting a 2D parabola onto the patelet of nodes.
-
         //Plane equation Ax+By+Cz+D = 0;
         double A = finalNodeNormal[0];
         double B = finalNodeNormal[1];
@@ -594,6 +604,7 @@ void Mesh::computeFSNormalCurvature3D()
         //Determine in the local plane the coordinate of the patelet nodes
         std::vector<std::pair<double, double>> pateletLocalCoord;
         std::vector<double> pateletDist;
+        
         for(const Node* pNode : pateletNodes)
         {
             double dist = A*pNode->getCoordinate(0) + B*pNode->getCoordinate(1) + C*pNode->getCoordinate(2) + D;
@@ -633,6 +644,6 @@ void Mesh::computeFSNormalCurvature3D()
         double k2 = 0.5*(c[0] + c[2] - std::sqrt(delta));
 
         m_freeSurfaceCurvature[i] = k1 + k2;
-        m_boundFSNormal[i] = finalNodeNormal;
+        m_boundFSNormal[i] = finalNodeNormal;*/
     }
 }
